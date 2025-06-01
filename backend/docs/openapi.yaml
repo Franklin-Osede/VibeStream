@@ -1,0 +1,865 @@
+openapi: 3.1.0
+info:
+  title: Vibestream API
+  description: API para la plataforma de streaming de música con NFTs
+  version: 1.0.0
+  contact:
+    name: Vibestream Team
+
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Servidor de desarrollo
+
+tags:
+  - name: auth
+    description: Autenticación y autorización
+  - name: users
+    description: Gestión de usuarios
+  - name: artists
+    description: Gestión de artistas
+  - name: songs
+    description: Gestión de canciones
+  - name: playlists
+    description: Gestión de playlists
+  - name: nfts
+    description: Gestión de NFTs
+  - name: royalties
+    description: Gestión de regalías
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+      required:
+        - code
+        - message
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+      required:
+        - email
+        - password
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+      required:
+        - token
+        - user
+
+    RegisterRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 3
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+        wallet_address:
+          type: string
+          pattern: '^0x[a-fA-F0-9]{40}$'
+      required:
+        - username
+        - email
+        - password
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        wallet_address:
+          type: string
+          pattern: '^0x[a-fA-F0-9]{40}$'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - username
+        - email
+        - created_at
+        - updated_at
+
+    Artist:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        bio:
+          type: string
+        profile_image_url:
+          type: string
+          format: uri
+        verified:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - verified
+        - created_at
+        - updated_at
+
+    CreateArtistRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        bio:
+          type: string
+        profile_image_url:
+          type: string
+          format: uri
+      required:
+        - name
+
+    Song:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        artist_id:
+          type: string
+          format: uuid
+        duration_seconds:
+          type: integer
+          minimum: 1
+        genre:
+          type: string
+        ipfs_hash:
+          type: string
+        cover_art_url:
+          type: string
+          format: uri
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - artist_id
+        - duration_seconds
+        - ipfs_hash
+        - created_at
+        - updated_at
+
+    CreateSongRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        duration_seconds:
+          type: integer
+          minimum: 1
+        genre:
+          type: string
+        audio_file:
+          type: string
+          format: binary
+        cover_art:
+          type: string
+          format: binary
+      required:
+        - title
+        - duration_seconds
+        - audio_file
+
+    Playlist:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        user_id:
+          type: string
+          format: uuid
+        description:
+          type: string
+        is_public:
+          type: boolean
+        songs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Song'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - user_id
+        - is_public
+        - created_at
+        - updated_at
+
+    CreatePlaylistRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        is_public:
+          type: boolean
+      required:
+        - name
+
+    Contract:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        address:
+          type: string
+          pattern: '^0x[a-fA-F0-9]{40}$'
+        name:
+          type: string
+        symbol:
+          type: string
+        chain_id:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - address
+        - name
+        - symbol
+        - chain_id
+        - created_at
+        - updated_at
+
+    SongNFT:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        song_id:
+          type: string
+          format: uuid
+        contract_id:
+          type: string
+          format: uuid
+        token_id:
+          type: integer
+        royalty_percentage:
+          type: number
+          format: decimal
+          minimum: 0
+          maximum: 100
+        owner_address:
+          type: string
+          pattern: '^0x[a-fA-F0-9]{40}$'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - song_id
+        - contract_id
+        - token_id
+        - royalty_percentage
+        - owner_address
+        - created_at
+        - updated_at
+
+    CreateNFTRequest:
+      type: object
+      properties:
+        song_id:
+          type: string
+          format: uuid
+        contract_id:
+          type: string
+          format: uuid
+        royalty_percentage:
+          type: number
+          format: decimal
+          minimum: 0
+          maximum: 100
+      required:
+        - song_id
+        - contract_id
+        - royalty_percentage
+
+    RoyaltyPayment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        song_nft_id:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: decimal
+        currency:
+          type: string
+        tx_hash:
+          type: string
+          pattern: '^0x[a-fA-F0-9]{64}$'
+        paid_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - song_nft_id
+        - amount
+        - currency
+        - tx_hash
+        - paid_at
+        - created_at
+
+paths:
+  /auth/login:
+    post:
+      tags:
+        - auth
+      summary: Iniciar sesión
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Credenciales inválidas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/register:
+    post:
+      tags:
+        - auth
+      summary: Registrar nuevo usuario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Usuario creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /users/me:
+    get:
+      tags:
+        - users
+      summary: Obtener perfil del usuario actual
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Perfil del usuario
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: No autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /artists:
+    post:
+      tags:
+        - artists
+      summary: Crear perfil de artista
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateArtistRequest'
+      responses:
+        '201':
+          description: Artista creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Artist'
+        '400':
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    get:
+      tags:
+        - artists
+      summary: Listar artistas
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Lista de artistas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Artist'
+
+  /artists/{id}:
+    get:
+      tags:
+        - artists
+      summary: Obtener artista por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Artista encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Artist'
+        '404':
+          description: Artista no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /songs:
+    post:
+      tags:
+        - songs
+      summary: Subir nueva canción
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateSongRequest'
+      responses:
+        '201':
+          description: Canción creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Song'
+        '400':
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    get:
+      tags:
+        - songs
+      summary: Listar canciones
+      parameters:
+        - name: artist_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: genre
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Lista de canciones
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Song'
+
+  /songs/{id}:
+    get:
+      tags:
+        - songs
+      summary: Obtener canción por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Canción encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Song'
+        '404':
+          description: Canción no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /playlists:
+    post:
+      tags:
+        - playlists
+      summary: Crear nueva playlist
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePlaylistRequest'
+      responses:
+        '201':
+          description: Playlist creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Playlist'
+        '400':
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    get:
+      tags:
+        - playlists
+      summary: Listar playlists públicas
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Lista de playlists
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Playlist'
+
+  /playlists/{id}:
+    get:
+      tags:
+        - playlists
+      summary: Obtener playlist por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Playlist encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Playlist'
+        '404':
+          description: Playlist no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /playlists/{id}/songs:
+    post:
+      tags:
+        - playlists
+      summary: Añadir canción a playlist
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                song_id:
+                  type: string
+                  format: uuid
+              required:
+                - song_id
+      responses:
+        '200':
+          description: Canción añadida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Playlist'
+        '404':
+          description: Playlist o canción no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /nfts:
+    post:
+      tags:
+        - nfts
+      summary: Crear nuevo NFT
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateNFTRequest'
+      responses:
+        '201':
+          description: NFT creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SongNFT'
+        '400':
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    get:
+      tags:
+        - nfts
+      summary: Listar NFTs
+      parameters:
+        - name: owner
+          in: query
+          schema:
+            type: string
+            pattern: '^0x[a-fA-F0-9]{40}$'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Lista de NFTs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SongNFT'
+
+  /nfts/{id}:
+    get:
+      tags:
+        - nfts
+      summary: Obtener NFT por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: NFT encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SongNFT'
+        '404':
+          description: NFT no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /royalties:
+    get:
+      tags:
+        - royalties
+      summary: Listar pagos de regalías
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: nft_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Lista de pagos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RoyaltyPayment' 

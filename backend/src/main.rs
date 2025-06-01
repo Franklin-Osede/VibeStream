@@ -1,20 +1,15 @@
 use std::net::SocketAddr;
-use axum::{
-    routing::{get, post},
-    Router,
-};
-use tower_http::cors::CorsLayer;
+use std::sync::Arc;
+
+use tower_http::cors::{Any, CorsLayer};
+use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-mod core;
-mod api;
-mod adapters;
-mod db;
-mod zk;
+use vibestream_backend::{create_router, AppConfig, AppError};
 
 #[tokio::main]
-async fn main() {
-    // Initialize tracing
+async fn main() -> Result<(), AppError> {
+    // Inicializar logging
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
             std::env::var("RUST_LOG").unwrap_or_else(|_| "info".into()),
@@ -22,21 +17,29 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    // Build our application with a route
-    let app = Router::new()
-        .route("/health", get(health_check))
-        // Add more routes here
-        .layer(CorsLayer::permissive()); // Configure CORS for development
+    // Cargar configuración
+    let config = AppConfig::new()?;
+    let vault_client = config.init_vault_client().await?;
+    let secrets = Arc::new(vault_client);
 
-    // Run it
+    // Crear router con CORS y logging
+    let app = create_router()
+        .layer(
+            CorsLayer::new()
+                .allow_origin(Any)
+                .allow_methods(Any)
+                .allow_headers(Any),
+        )
+        .layer(TraceLayer::new_for_http());
+
+    // Iniciar servidor
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    tracing::info!("listening on {}", addr);
+    tracing::info!("Servidor iniciado en {}", addr);
+    
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
-        .unwrap();
-}
+        .map_err(|e| AppError::InternalError(e.into()))?;
 
-async fn health_check() -> &'static str {
-    "OK"
+    Ok(())
 }

@@ -17,6 +17,7 @@ sqlx = { version = "0.7", features = [
   "uuid",
   "time",
   "json",
+  "migrate",
 ] }
 sea-orm = { version = "0.12", features = [
   "sqlx-postgres",
@@ -33,6 +34,9 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 uuid = { version = "1.6", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
+rust_decimal = "1.33"
+rust_decimal_macros = "1.33"
+bcrypt = "0.15"
 
 # Logging y métricas
 tracing = "0.1"
@@ -49,3 +53,7 @@ mock-it = "0.5"
 [dev-dependencies]
 pretty_assertions = "1.4"
 test-log = "0.2"
+
+[[bin]]
+name = "migrate"
+path = "scripts/migrate.rs"

@@ -1,0 +1,11 @@
+# Configuración de SQLx
+migrations_directory = "migrations"
+target_version = "0.7.0"
+
+[database]
+# La URL se obtendrá de las variables de entorno
+url = "${DATABASE_URL}"
+
+[database.migrations]
+# Habilitar transacciones para las migraciones
+transactions = true
