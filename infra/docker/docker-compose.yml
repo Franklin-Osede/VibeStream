@@ -3,7 +3,7 @@ services:
     image: postgres:15-alpine
     environment:
       POSTGRES_USER: vibestream
-      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_PASSWORD: dev_password_123_change_in_production
       POSTGRES_DB: vibestream
     ports:
       - "5432:5432"
