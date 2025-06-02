@@ -1,46 +1,28 @@
-pub mod auth;
-pub mod users;
-pub mod artists;
-pub mod songs;
-pub mod playlists;
-pub mod nfts;
-pub mod royalties;
+use axum::Router;
+use crate::AppState;
 
-use axum::{
-    routing::{get, post},
-    Router,
-};
+mod auth;
+mod users;
+mod artists;
+mod songs;
+mod playlists;
+mod nfts;
+mod royalties;
 
-pub fn create_router() -> Router {
+pub fn create_router() -> Router<AppState> {
     Router::new()
         // Auth routes
-        .route("/auth/login", post(auth::login))
-        .route("/auth/register", post(auth::register))
-        
+        .merge(auth::create_auth_router())
         // User routes
-        .route("/users/me", get(users::get_current_user))
-        
+        .merge(users::create_user_router())
         // Artist routes
-        .route("/artists", get(artists::list_artists))
-        .route("/artists", post(artists::create_artist))
-        .route("/artists/:id", get(artists::get_artist))
-        
+        .merge(artists::create_artist_router())
         // Song routes
-        .route("/songs", get(songs::list_songs))
-        .route("/songs", post(songs::create_song))
-        .route("/songs/:id", get(songs::get_song))
-        
+        .merge(songs::create_song_router())
         // Playlist routes
-        .route("/playlists", get(playlists::list_playlists))
-        .route("/playlists", post(playlists::create_playlist))
-        .route("/playlists/:id", get(playlists::get_playlist))
-        .route("/playlists/:id/songs", post(playlists::add_song))
-        
+        .merge(playlists::create_playlist_router())
         // NFT routes
-        .route("/nfts", get(nfts::list_nfts))
-        .route("/nfts", post(nfts::create_nft))
-        .route("/nfts/:id", get(nfts::get_nft))
-        
+        .merge(nfts::create_nft_router())
         // Royalty routes
-        .route("/royalties", get(royalties::list_payments))
+        .merge(royalties::create_royalty_router())
 } 

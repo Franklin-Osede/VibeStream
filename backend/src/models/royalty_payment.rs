@@ -1,25 +1,28 @@
 use sea_orm::entity::prelude::*;
+use sea_orm::Set;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use rust_decimal::Decimal;
+use chrono::Utc;
 
-#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
-#[sea_orm(table_name = "royalty_payments", schema_name = "blockchain")]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+#[sea_orm(table_name = "royalty_payments")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: Uuid,
     pub song_nft_id: Uuid,
-    #[sea_orm(column_type = "Decimal(Some((20, 18)))")]
-    pub amount: Decimal,
-    pub currency: String,
-    pub tx_hash: String,
+    pub amount: f64,
     pub paid_at: DateTimeWithTimeZone,
     pub created_at: DateTimeWithTimeZone,
+    pub updated_at: DateTimeWithTimeZone,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(belongs_to = "super::song_nft::Entity")]
+    #[sea_orm(
+        belongs_to = "super::song_nft::Entity",
+        from = "Column::SongNftId",
+        to = "super::song_nft::Column::Id"
+    )]
     SongNft,
 }
 
@@ -34,10 +37,7 @@ impl ActiveModelBehavior for ActiveModel {}
 #[derive(Debug, Deserialize)]
 pub struct CreateRoyaltyPayment {
     pub song_nft_id: Uuid,
-    pub amount: Decimal,
-    pub currency: String,
-    pub tx_hash: String,
-    pub paid_at: DateTimeWithTimeZone,
+    pub amount: f64,
 }
 
 impl Model {
@@ -45,14 +45,14 @@ impl Model {
         db: &DatabaseConnection,
         data: CreateRoyaltyPayment,
     ) -> Result<Self, DbErr> {
+        let now = Utc::now();
         let payment = ActiveModel {
             id: Set(Uuid::new_v4()),
             song_nft_id: Set(data.song_nft_id),
             amount: Set(data.amount),
-            currency: Set(data.currency),
-            tx_hash: Set(data.tx_hash),
-            paid_at: Set(data.paid_at),
-            created_at: Set(chrono::Utc::now().into()),
+            paid_at: Set(now.into()),
+            created_at: Set(now.into()),
+            updated_at: Set(now.into()),
         };
 
         payment.insert(db).await
@@ -61,13 +61,6 @@ impl Model {
     pub async fn get_nft(&self, db: &DatabaseConnection) -> Result<super::song_nft::Model, DbErr> {
         self.find_related(super::song_nft::Entity).one(db).await?
             .ok_or(DbErr::Custom("NFT not found".to_string()))
-    }
-
-    pub async fn find_by_tx_hash(db: &DatabaseConnection, tx_hash: &str) -> Result<Option<Self>, DbErr> {
-        Entity::find()
-            .filter(Column::TxHash.eq(tx_hash))
-            .one(db)
-            .await
     }
 }
 
@@ -152,10 +145,7 @@ mod tests {
         // Create royalty payment
         let payment_data = CreateRoyaltyPayment {
             song_nft_id: nft.id,
-            amount: dec!(0.5),
-            currency: "ETH".to_string(),
-            tx_hash: "0xPayment123...".to_string(),
-            paid_at: chrono::Utc::now().into(),
+            amount: 0.5,
         };
 
         let payment = Model::create(&db, payment_data)
@@ -163,16 +153,6 @@ mod tests {
             .expect("Failed to create royalty payment");
 
         assert_eq!(payment.song_nft_id, nft.id);
-        assert_eq!(payment.amount, dec!(0.5));
-        assert_eq!(payment.currency, "ETH");
-        assert_eq!(payment.tx_hash, "0xPayment123...");
-
-        // Test find by tx hash
-        let found_payment = Model::find_by_tx_hash(&db, "0xPayment123...")
-            .await
-            .expect("Failed to find payment")
-            .expect("Payment not found");
-
-        assert_eq!(found_payment.id, payment.id);
+        assert_eq!(payment.amount, 0.5);
     }
 } 

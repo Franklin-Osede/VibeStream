@@ -1,9 +1,11 @@
 use sea_orm::entity::prelude::*;
+use sea_orm::ActiveValue::Set;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use sea_orm::QueryOrder;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
-#[sea_orm(table_name = "playlists", schema_name = "music")]
+#[sea_orm(table_name = "playlists")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: Uuid,
@@ -18,9 +20,17 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(belongs_to = "super::user::Entity")]
+    #[sea_orm(
+        belongs_to = "super::user::Entity",
+        from = "Column::UserId",
+        to = "super::user::Column::Id"
+    )]
     User,
-    #[sea_orm(has_many = "super::playlist_song::Entity")]
+    #[sea_orm(
+        has_many = "super::playlist_song::Entity",
+        from = "Column::Id",
+        to = "super::playlist_song::Column::PlaylistId"
+    )]
     PlaylistSongs,
 }
 
@@ -30,7 +40,7 @@ impl Related<super::user::Entity> for Entity {
     }
 }
 
-impl Related<super::playlist_song::Entity> for Entity {
+impl Related<super::song::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::PlaylistSongs.def()
     }
@@ -64,15 +74,20 @@ impl Model {
     }
 
     pub async fn get_songs(&self, db: &DatabaseConnection) -> Result<Vec<(super::playlist_song::Model, super::song::Model)>, DbErr> {
-        let playlist_songs = self.find_related(super::playlist_song::Entity)
+        let playlist_songs = super::playlist_song::Entity::find()
+            .filter(super::playlist_song::Column::PlaylistId.eq(self.id))
             .order_by_asc(super::playlist_song::Column::Position)
             .find_with_related(super::song::Entity)
             .all(db)
-            .await?;
+            .await?
+            .into_iter()
+            .map(|(ps, songs)| {
+                // Assuming each playlist_song has exactly one song
+                (ps, songs.into_iter().next().unwrap())
+            })
+            .collect();
 
-        Ok(playlist_songs.into_iter().filter_map(|(ps, songs)| {
-            songs.first().map(|s| (ps, s.clone()))
-        }).collect())
+        Ok(playlist_songs)
     }
 
     pub async fn add_song(
@@ -80,16 +95,15 @@ impl Model {
         db: &DatabaseConnection,
         song_id: Uuid,
     ) -> Result<super::playlist_song::Model, DbErr> {
-        // Get the next position
-        let next_position = self.find_related(super::playlist_song::Entity)
-            .all(db)
-            .await?
-            .len() as i32 + 1;
+        let count = super::playlist_song::Entity::find()
+            .filter(super::playlist_song::Column::PlaylistId.eq(self.id))
+            .count(db)
+            .await?;
 
         super::playlist_song::Model::create(db, super::playlist_song::CreatePlaylistSong {
             playlist_id: self.id,
             song_id,
-            position: next_position,
+            position: count as i32 + 1,
         }).await
     }
 

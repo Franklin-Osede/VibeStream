@@ -1,23 +1,32 @@
 use sea_orm::entity::prelude::*;
+use sea_orm::Set;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
-#[sea_orm(table_name = "playlist_songs", schema_name = "music")]
+#[sea_orm(table_name = "playlist_songs")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub playlist_id: Uuid,
     #[sea_orm(primary_key)]
     pub song_id: Uuid,
     pub position: i32,
-    pub added_at: DateTimeWithTimeZone,
+    pub created_at: DateTimeWithTimeZone,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(belongs_to = "super::playlist::Entity")]
+    #[sea_orm(
+        belongs_to = "super::playlist::Entity",
+        from = "Column::PlaylistId",
+        to = "super::playlist::Column::Id"
+    )]
     Playlist,
-    #[sea_orm(belongs_to = "super::song::Entity")]
+    #[sea_orm(
+        belongs_to = "super::song::Entity",
+        from = "Column::SongId",
+        to = "super::song::Column::Id"
+    )]
     Song,
 }
 
@@ -51,10 +60,22 @@ impl Model {
             playlist_id: Set(data.playlist_id),
             song_id: Set(data.song_id),
             position: Set(data.position),
-            added_at: Set(chrono::Utc::now().into()),
+            created_at: Set(chrono::Utc::now().into()),
         };
 
         playlist_song.insert(db).await
+    }
+
+    pub async fn find_by_id(
+        db: &DatabaseConnection,
+        playlist_id: Uuid,
+        song_id: Uuid,
+    ) -> Result<Option<Self>, DbErr> {
+        Entity::find()
+            .filter(Column::PlaylistId.eq(playlist_id))
+            .filter(Column::SongId.eq(song_id))
+            .one(db)
+            .await
     }
 
     pub async fn reorder(
@@ -63,7 +84,7 @@ impl Model {
         song_id: Uuid,
         new_position: i32,
     ) -> Result<(), DbErr> {
-        let mut playlist_song: ActiveModel = Self::find_by_id((playlist_id, song_id))
+        let mut playlist_song: ActiveModel = Entity::find_by_id((playlist_id, song_id))
             .one(db)
             .await?
             .ok_or(DbErr::Custom("Playlist song not found".to_string()))?
@@ -97,6 +118,42 @@ impl Model {
 
         playlist_song.update(db).await?;
         Ok(())
+    }
+
+    pub async fn update_position(&self, db: &DatabaseConnection, playlist_id: Uuid, song_id: Uuid, new_position: i32) -> Result<Self, DbErr> {
+        let mut playlist_song: ActiveModel = Entity::find_by_id((playlist_id, song_id))
+            .one(db)
+            .await?
+            .ok_or(DbErr::Custom("PlaylistSong not found".to_string()))?
+            .into();
+
+        let old_position = playlist_song.position.as_ref().clone();
+        playlist_song.position = Set(new_position);
+
+        // Update positions of other songs
+        if new_position > old_position {
+            Entity::update_many()
+                .filter(
+                    Column::PlaylistId.eq(playlist_id)
+                        .and(Column::Position.gt(old_position))
+                        .and(Column::Position.lte(new_position))
+                )
+                .col_expr(Column::Position, Expr::col(Column::Position).sub(1))
+                .exec(db)
+                .await?;
+        } else {
+            Entity::update_many()
+                .filter(
+                    Column::PlaylistId.eq(playlist_id)
+                        .and(Column::Position.lt(old_position))
+                        .and(Column::Position.gte(new_position))
+                )
+                .col_expr(Column::Position, Expr::col(Column::Position).add(1))
+                .exec(db)
+                .await?;
+        }
+
+        playlist_song.update(db).await
     }
 }
 
@@ -202,14 +259,12 @@ mod tests {
             .await
             .expect("Failed to reorder songs");
 
-        let updated_ps1 = Model::find_by_id((playlist.id, song1.id))
-            .one(db)
+        let updated_ps1 = Model::find_by_id(&db, playlist.id, song1.id)
             .await
             .expect("Failed to find playlist song 1")
             .expect("Playlist song 1 not found");
 
-        let updated_ps2 = Model::find_by_id((playlist.id, song2.id))
-            .one(db)
+        let updated_ps2 = Model::find_by_id(&db, playlist.id, song2.id)
             .await
             .expect("Failed to find playlist song 2")
             .expect("Playlist song 2 not found");

@@ -1,32 +1,35 @@
 use sea_orm::entity::prelude::*;
+use sea_orm::Set;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use chrono::Utc;
 
-#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
-#[sea_orm(table_name = "songs", schema_name = "music")]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+#[sea_orm(table_name = "songs")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: Uuid,
     pub title: String,
     pub artist_id: Uuid,
-    pub duration_seconds: i32,
-    #[sea_orm(column_type = "String", nullable)]
+    pub duration: i32,
     pub genre: Option<String>,
-    pub ipfs_hash: String,
-    #[sea_orm(column_type = "Text", nullable)]
-    pub cover_art_url: Option<String>,
+    pub release_date: DateTimeWithTimeZone,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(belongs_to = "super::artist::Entity")]
+    #[sea_orm(
+        belongs_to = "super::artist::Entity",
+        from = "Column::ArtistId",
+        to = "super::artist::Column::Id"
+    )]
     Artist,
-    #[sea_orm(has_many = "super::playlist_song::Entity")]
-    PlaylistSongs,
     #[sea_orm(has_many = "super::song_nft::Entity")]
     SongNfts,
+    #[sea_orm(has_many = "super::playlist_song::Entity")]
+    PlaylistSongs,
 }
 
 impl Related<super::artist::Entity> for Entity {
@@ -35,15 +38,15 @@ impl Related<super::artist::Entity> for Entity {
     }
 }
 
-impl Related<super::playlist_song::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::PlaylistSongs.def()
-    }
-}
-
 impl Related<super::song_nft::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::SongNfts.def()
+    }
+}
+
+impl Related<super::playlist_song::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::PlaylistSongs.def()
     }
 }
 
@@ -55,8 +58,6 @@ pub struct CreateSong {
     pub artist_id: Uuid,
     pub duration_seconds: i32,
     pub genre: Option<String>,
-    pub ipfs_hash: String,
-    pub cover_art_url: Option<String>,
 }
 
 impl Model {
@@ -64,14 +65,16 @@ impl Model {
         db: &DatabaseConnection,
         data: CreateSong,
     ) -> Result<Self, DbErr> {
+        let now = Utc::now();
         let song = ActiveModel {
             id: Set(Uuid::new_v4()),
             title: Set(data.title),
             artist_id: Set(data.artist_id),
-            duration_seconds: Set(data.duration_seconds),
+            duration: Set(data.duration_seconds),
             genre: Set(data.genre),
-            ipfs_hash: Set(data.ipfs_hash),
-            cover_art_url: Set(data.cover_art_url),
+            release_date: Set(now.into()),
+            created_at: Set(now.into()),
+            updated_at: Set(now.into()),
             ..Default::default()
         };
 
@@ -136,8 +139,6 @@ mod tests {
             artist_id: artist.id,
             duration_seconds: 180,
             genre: Some("Pop".to_string()),
-            ipfs_hash: "QmHash123...".to_string(),
-            cover_art_url: Some("https://example.com/cover.jpg".to_string()),
         };
 
         let song = Model::create(&db, song_data)
@@ -146,7 +147,7 @@ mod tests {
 
         assert_eq!(song.title, "My First Song");
         assert_eq!(song.artist_id, artist.id);
-        assert_eq!(song.duration_seconds, 180);
+        assert_eq!(song.duration, 180);
         assert_eq!(song.genre.unwrap(), "Pop");
     }
 } 

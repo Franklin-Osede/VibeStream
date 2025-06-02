@@ -1,30 +1,27 @@
 use sea_orm::{Database, DatabaseConnection};
-use anyhow::Result;
-use crate::config::{AppConfig, SecretsManager};
+use crate::{
+    config::{AppConfig, SecretsManager},
+    error::AppError,
+};
 
-pub mod models;
 pub mod migrations;
 
-pub async fn create_connection(config: &AppConfig, secrets: &SecretsManager) -> Result<DatabaseConnection> {
-    let db_secrets = secrets.get_database_secrets().await?;
-    
+pub async fn create_connection(
+    config: &AppConfig,
+    _secrets: &SecretsManager,
+) -> Result<DatabaseConnection, AppError> {
     let database_url = format!(
         "postgres://{}:{}@{}:{}/{}",
-        db_secrets.username,
-        db_secrets.password,
-        db_secrets.host,
-        db_secrets.port,
-        db_secrets.database
+        config.database.user,
+        config.database.password,
+        config.database.host,
+        config.database.port,
+        config.database.name
     );
 
-    let connection_options = sea_orm::ConnectOptions::new(database_url)
-        .max_connections(config.database.max_connections)
-        .connect_timeout(std::time::Duration::from_secs(config.database.connection_timeout))
-        .sqlx_logging(true);
-
-    Database::connect(connection_options)
+    Database::connect(&database_url)
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to connect to database: {}", e))
+        .map_err(AppError::DatabaseError)
 }
 
 #[cfg(test)]

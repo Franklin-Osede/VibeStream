@@ -1,10 +1,15 @@
-use sea_orm::DatabaseConnection;
+use sea_orm::{DatabaseConnection, ConnectionTrait};
 use sqlx::migrate::{Migrator, MigrateDatabase};
 use anyhow::Result;
 use std::path::Path;
 
 pub async fn run_migrations(db: &DatabaseConnection) -> Result<()> {
-    let db_url = db.get_database_backend().get_name();
+    let db_backend = db.get_database_backend();
+    let db_url = match db_backend {
+        sea_orm::DatabaseBackend::Postgres => "postgres",
+        sea_orm::DatabaseBackend::MySql => "mysql",
+        sea_orm::DatabaseBackend::Sqlite => "sqlite",
+    };
     
     // Verificar si la base de datos existe
     if !sqlx::Postgres::database_exists(db_url).await? {

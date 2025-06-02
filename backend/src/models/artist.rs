@@ -1,4 +1,5 @@
 use sea_orm::entity::prelude::*;
+use sea_orm::Set;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -19,9 +20,9 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(belongs_to = "super::user::Entity")]
+    #[sea_orm(belongs_to = "super::user::Entity", from = "Column::Id", to = "super::user::Column::Id")]
     User,
-    #[sea_orm(has_many = "super::song::Entity")]
+    #[sea_orm(has_many = "super::song::Entity", from = "Column::Id", to = "super::song::Column::ArtistId")]
     Songs,
 }
 

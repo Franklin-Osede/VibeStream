@@ -1,19 +1,17 @@
 use sea_orm::DatabaseConnection;
+use std::sync::Arc;
 
 pub mod user;
 pub mod artist;
 pub mod song;
 pub mod playlist;
 pub mod nft;
-pub mod royalty;
 
-// Re-export repository traits
-pub use user::UserRepository;
-pub use artist::ArtistRepository;
-pub use song::SongRepository;
-pub use playlist::PlaylistRepository;
-pub use nft::NFTRepository;
-pub use royalty::RoyaltyRepository;
+pub use user::*;
+pub use artist::*;
+pub use song::*;
+pub use playlist::*;
+pub use nft::*;
 
 // Repository factory trait
 pub trait RepositoryProvider {
@@ -21,8 +19,7 @@ pub trait RepositoryProvider {
     fn artist_repository(&self) -> &dyn ArtistRepository;
     fn song_repository(&self) -> &dyn SongRepository;
     fn playlist_repository(&self) -> &dyn PlaylistRepository;
-    fn nft_repository(&self) -> &dyn NFTRepository;
-    fn royalty_repository(&self) -> &dyn RoyaltyRepository;
+    fn nft_repository(&self) -> &dyn NftRepository;
 }
 
 // Default implementation using Sea-ORM
@@ -54,11 +51,29 @@ impl RepositoryProvider for SeaORMRepositoryProvider {
         unimplemented!()
     }
 
-    fn nft_repository(&self) -> &dyn NFTRepository {
+    fn nft_repository(&self) -> &dyn NftRepository {
         unimplemented!()
     }
+}
 
-    fn royalty_repository(&self) -> &dyn RoyaltyRepository {
-        unimplemented!()
+pub struct Repositories {
+    pub user: Arc<dyn UserRepository>,
+    pub artist: Arc<dyn ArtistRepository>,
+    pub song: Arc<dyn SongRepository>,
+    pub playlist: Arc<dyn PlaylistRepository>,
+    pub nft: Arc<dyn NftRepository>,
+}
+
+impl Repositories {
+    pub fn new(
+        db: DatabaseConnection,
+    ) -> Self {
+        Self {
+            user: Arc::new(UserRepositoryImpl),
+            artist: Arc::new(ArtistRepositoryImpl),
+            song: Arc::new(SongRepositoryImpl),
+            playlist: Arc::new(PlaylistRepositoryImpl),
+            nft: Arc::new(NftRepositoryImpl),
+        }
     }
 } 

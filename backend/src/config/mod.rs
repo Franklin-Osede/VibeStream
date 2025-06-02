@@ -1,71 +1,61 @@
+use serde::Deserialize;
+use hashicorp_vault::client::{VaultClient, TokenData};
+use crate::error::AppError;
+
+mod secrets;
+pub use secrets::SecretsManager;
+
 use std::sync::Arc;
 use config::{Config, ConfigError, Environment, File};
-use serde::Deserialize;
-use hashicorp_vault::client::{VaultClient, VaultClientSettingsBuilder};
+use reqwest::Client;
 
 #[derive(Debug, Deserialize)]
 pub struct AppConfig {
-    pub server: ServerConfig,
     pub database: DatabaseConfig,
+    pub server: ServerConfig,
     pub vault: VaultConfig,
-    pub redis: RedisConfig,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DatabaseConfig {
+    pub host: String,
+    pub port: u16,
+    pub name: String,
+    pub user: String,
+    pub password: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct ServerConfig {
     pub host: String,
     pub port: u16,
-    pub cors_origins: Vec<String>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct DatabaseConfig {
-    pub max_connections: u32,
-    pub connection_timeout: u64,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct VaultConfig {
-    pub addr: String,
+    pub address: String,
     pub token: String,
     pub mount_path: String,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct RedisConfig {
-    pub ttl: u64,
-    pub max_connections: u32,
-}
-
 impl AppConfig {
-    pub fn new() -> Result<Self, ConfigError> {
-        let config = Config::builder()
-            // Base config
-            .add_source(File::with_name("config/base/app"))
-            // Override with environment specific config
-            .add_source(
-                Environment::with_prefix("APP")
-                    .try_parsing(true)
-                    .separator("_"),
-            )
-            .build()?;
+    pub fn new() -> Result<Self, AppError> {
+        let config = config::Config::builder()
+            .add_source(config::Environment::default())
+            .build()
+            .map_err(|e| AppError::ConfigError(e.to_string()))?;
 
         config.try_deserialize()
+            .map_err(|e| AppError::ConfigError(e.to_string()))
     }
 
-    pub async fn init_vault_client(&self) -> Result<Arc<VaultClient>, anyhow::Error> {
-        let client = VaultClientSettingsBuilder::default()
-            .address(&self.vault.addr)
-            .token(&self.vault.token)
-            .build()
-            .map(VaultClient::new)?;
+    pub async fn init_vault_client(&self) -> Result<VaultClient<TokenData>, AppError> {
+        let vault_client = VaultClient::new(
+            &self.vault.address,
+            &self.vault.token
+        ).map_err(|e| AppError::ConfigError(e.to_string()))?;
 
-        // Verificar conexión
-        client.get_secret(&format!("{}/database", self.vault.mount_path))
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to connect to Vault: {}", e))?;
-
-        Ok(Arc::new(client))
+        Ok(vault_client)
     }
 }
 

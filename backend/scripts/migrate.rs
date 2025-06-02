@@ -1,8 +1,9 @@
+use std::sync::Arc;
 use vibestream_backend::{
     config::{AppConfig, SecretsManager},
     db::migrations::run_migrations,
+    db::create_connection,
 };
-use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -12,7 +13,7 @@ async fn main() -> anyhow::Result<()> {
     let secrets = SecretsManager::new(Arc::new(vault_client), config.vault.mount_path.clone());
 
     // Conectar a la base de datos
-    let db = vibestream_backend::db::create_connection(&config, &secrets).await?;
+    let db = create_connection(&config, &secrets).await?;
 
     // Ejecutar migraciones
     println!("Ejecutando migraciones...");
