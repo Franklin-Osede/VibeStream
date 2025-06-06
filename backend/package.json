@@ -1,18 +1,25 @@
 {
-  "name": "backend",
+  "name": "vibestream-backend",
   "version": "1.0.0",
   "main": "index.js",
   "directories": {
     "doc": "docs"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "mocha circuits/test/*.test.js",
+    "test:watch": "mocha -w circuits/test/*.test.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "Backend para VibeStream con ZK proofs",
   "dependencies": {
     "circomlib": "^2.0.5"
+  },
+  "devDependencies": {
+    "chai": "^4.3.7",
+    "circom_tester": "^0.0.19",
+    "ffjavascript": "^0.2.57",
+    "mocha": "^10.2.0"
   }
 }
