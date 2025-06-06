@@ -22,6 +22,34 @@ template MockEdDSAVerifier() {
     isValid <== 1;
 }
 
+template TimeRangeCheck() {
+    signal input startTime;
+    signal input currentTime;
+    signal input endTime;
+    signal output isValid;
+
+    // Check if currentTime is between startTime and endTime
+    signal timeDiff1;
+    signal timeDiff2;
+    timeDiff1 <== currentTime - startTime;
+    timeDiff2 <== endTime - currentTime;
+
+    // Create comparison signals
+    signal isAfterStart;
+    signal isBeforeEnd;
+    
+    // Compare differences (0 if false, 1 if true)
+    isAfterStart <-- timeDiff1 >= 0 ? 1 : 0;
+    isBeforeEnd <-- timeDiff2 >= 0 ? 1 : 0;
+
+    // Ensure comparison signals are binary
+    isAfterStart * (1 - isAfterStart) === 0;
+    isBeforeEnd * (1 - isBeforeEnd) === 0;
+
+    // Both conditions must be true for isValid to be 1
+    isValid <== isAfterStart * isBeforeEnd;
+}
+
 template ProofOfListen() {
     // Input signals
     signal input startTime;
@@ -58,35 +86,6 @@ template ProofOfListen() {
     signal hashEquality;
     hashEquality <== verifiedSongHash - songHash;
     hashEquality === 0;
-}
-
-template TimeRangeCheck() {
-    signal input startTime;
-    signal input currentTime;
-    signal input endTime;
-    signal output isValid;
-
-    // Check if currentTime is between startTime and endTime
-    signal timeDiff1 <== currentTime - startTime;
-    signal timeDiff2 <== endTime - currentTime;
-
-    // Convert differences to binary signals
-    signal aux1;
-    signal aux2;
-    
-    aux1 <-- (timeDiff1 >= 0) ? 1 : 0;
-    aux2 <-- (timeDiff2 >= 0) ? 1 : 0;
-
-    // Ensure aux signals are binary
-    aux1 * (1 - aux1) === 0;
-    aux2 * (1 - aux2) === 0;
-
-    // Ensure differences are valid
-    (1 - aux1) * timeDiff1 === 0;
-    (1 - aux2) * timeDiff2 === 0;
-
-    // Both conditions must be true
-    isValid <== aux1 * aux2;
 }
 
 component main = ProofOfListen(); 

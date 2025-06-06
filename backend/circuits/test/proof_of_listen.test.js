@@ -103,8 +103,70 @@ describe("Proof of Listen Circuit", function() {
         );
     });
 
-    // TODO: Add more test cases for invalid scenarios
-    // - Invalid time range
-    // - Invalid signature
-    // - Invalid hash
+    // Tests para casos inválidos
+    it("Should reject when currentTime is before startTime", async function() {
+        const input = {
+            startTime: "20",      // currentTime < startTime
+            currentTime: "10",
+            endTime: "30",
+            songHash: "42",
+            userSignature: ["123", "456"],
+            userPublicKey: ["111", "222"]
+        };
+
+        const witness = await circuit.calculateWitness(input);
+        const validPlaytime = witness[2];
+        
+        assert.equal(validPlaytime.toString(), "0", "validPlaytime should be 0 when currentTime < startTime");
+    });
+
+    it("Should reject when currentTime is after endTime", async function() {
+        const input = {
+            startTime: "10",
+            currentTime: "40",    // currentTime > endTime
+            endTime: "30",
+            songHash: "42",
+            userSignature: ["123", "456"],
+            userPublicKey: ["111", "222"]
+        };
+
+        const witness = await circuit.calculateWitness(input);
+        const validPlaytime = witness[2];
+        
+        assert.equal(validPlaytime.toString(), "0", "validPlaytime should be 0 when currentTime > endTime");
+    });
+
+    it("Should verify song hash even when time is invalid", async function() {
+        const input = {
+            startTime: "30",      // Invalid time range
+            currentTime: "10",
+            endTime: "20",
+            songHash: "42",
+            userSignature: ["123", "456"],
+            userPublicKey: ["111", "222"]
+        };
+
+        const witness = await circuit.calculateWitness(input);
+        const verifiedSongHash = witness[1];
+        const validPlaytime = witness[2];
+        
+        assert.equal(verifiedSongHash.toString(), input.songHash, "verifiedSongHash should match even with invalid time");
+        assert.equal(validPlaytime.toString(), "0", "validPlaytime should be 0 with invalid time");
+    });
+
+    it("Should handle edge cases in time validation", async function() {
+        const input = {
+            startTime: "20",
+            currentTime: "20",    // currentTime equals startTime
+            endTime: "20",        // endTime equals currentTime
+            songHash: "42",
+            userSignature: ["123", "456"],
+            userPublicKey: ["111", "222"]
+        };
+
+        const witness = await circuit.calculateWitness(input);
+        const validPlaytime = witness[2];
+        
+        assert.equal(validPlaytime.toString(), "1", "validPlaytime should be 1 when all times are equal");
+    });
 }); 
