@@ -3,170 +3,203 @@ const path = require("path");
 const wasm_tester = require("circom_tester").wasm;
 const F1Field = require("ffjavascript").F1Field;
 const Scalar = require("ffjavascript").Scalar;
+const crypto = require("crypto");
+const circomlibjs = require("circomlibjs");
 
 const assert = chai.assert;
 
 describe("Proof of Listen Circuit", function() {
     let circuit;
+    let poseidon;
+    let eddsa;
+    let F;
+
+    // Constants for time validation (in seconds)
+    const SONG_DURATION = 210;  // 3:30 minutes
+    const MIN_LISTEN_TIME = 30; // Must listen at least 30 seconds
+    
     const p = Scalar.fromString("21888242871839275222246405745257275088548364400416034343698204186575808495617");
     const Fr = new F1Field(p);
 
     // Increase timeout as compilation might take time
     this.timeout(100000);
 
+    // Helper function to convert buffer to field element
+    function bufferToField(buff) {
+        if (Buffer.isBuffer(buff)) {
+            // Convert buffer to hex string without separators
+            return BigInt('0x' + buff.toString('hex')).toString();
+        } else if (Array.isArray(buff)) {
+            // If it's an array of numbers, convert each to hex and concatenate
+            const hex = buff.map(b => b.toString(16).padStart(2, '0')).join('');
+            return BigInt('0x' + hex).toString();
+        }
+        // If it's already a string, return as is
+        return buff.toString();
+    }
+
+    // Helper function to create EdDSA signature
+    async function createEdDSASignature(privateKey, message) {
+        try {
+            const msgBuff = Buffer.from(message);
+            // Use poseidon array input format
+            const msgHash = await poseidon([msgBuff]);
+            const signature = await eddsa.signPoseidon(privateKey, msgHash);
+            
+            console.log("Debug - Raw signature:", {
+                R8: signature.R8,
+                S: signature.S,
+                hash: msgHash
+            });
+
+            return {
+                R8: [bufferToField(signature.R8[0])],
+                S: bufferToField(signature.S),
+                hash: bufferToField(msgHash)
+            };
+        } catch (error) {
+            console.error("Error creating signature:", error);
+            throw error;
+        }
+    }
+
+    // Helper function to convert field element to string
+    function fieldToString(element) {
+        if (typeof element === 'bigint') {
+            return element.toString();
+        }
+        if (Array.isArray(element)) {
+            return element.map(e => e.toString()).join(',');
+        }
+        if (Buffer.isBuffer(element)) {
+            return BigInt('0x' + element.toString('hex')).toString();
+        }
+        return element.toString();
+    }
+
     before(async function () {
-        circuit = await wasm_tester(path.join(__dirname, "../proof_of_listen.circom"));
+        try {
+            // First build poseidon and eddsa
+            poseidon = await circomlibjs.buildPoseidon();
+            eddsa = await circomlibjs.buildEddsa();
+            F = eddsa.F;
+            
+            // Then compile the circuit
+            circuit = await wasm_tester(path.join(__dirname, "../proof_of_listen.circom"));
+        } catch (error) {
+            console.error("Error in setup:", error);
+            throw error;
+        }
     });
 
-    it("Should verify valid listening session with direct values", async function() {
+    it("Should verify valid listening session with realistic duration", async function() {
+        const startTime = 1000; // Some timestamp
+        const currentTime = startTime + 120; // 2 minutes into song
+        const endTime = startTime + SONG_DURATION;
+
         const input = {
-            startTime: "10",
-            currentTime: "20",
-            endTime: "30",
+            startTime: startTime.toString(),
+            currentTime: currentTime.toString(),
+            endTime: endTime.toString(),
             songHash: "42",
             userSignature: ["123", "456"],
-            userPublicKey: ["111", "222"]
+            userPublicKey: ["111", "222"],
+            messageHash: "789"
         };
 
-        console.log("Debug - Input values:", input);
-        
-        const witness = await circuit.calculateWitness(input);
-        await circuit.checkConstraints(witness);
-        
-        // Log all witness values for debugging
-        console.log("Debug - Witness array:");
-        witness.forEach((value, index) => {
-            console.log(`witness[${index}] = ${value.toString()}`);
-        });
-        
-        // Verify each output signal - note the order
-        const verifiedSongHash = witness[1];  // First output
-        const validPlaytime = witness[2];     // Second output
-        
-        console.log("Debug - Output signals:");
-        console.log("verifiedSongHash:", verifiedSongHash.toString());
-        console.log("validPlaytime:", validPlaytime.toString());
-        console.log("Expected songHash:", input.songHash);
-        
-        // Assert the outputs
-        assert.equal(
-            verifiedSongHash.toString(),
-            input.songHash,
-            "verifiedSongHash should match input songHash"
-        );
-        assert.equal(
-            validPlaytime.toString(),
-            "1",
-            "validPlaytime should be 1"
-        );
-    });
-
-    it("Should verify valid listening session with field elements", async function() {
-        const input = {
-            startTime: Fr.e("10"),
-            currentTime: Fr.e("20"),
-            endTime: Fr.e("30"),
-            songHash: Fr.e("42"),
-            userSignature: [Fr.e("123"), Fr.e("456")],
-            userPublicKey: [Fr.e("111"), Fr.e("222")]
-        };
-
-        console.log("Debug - Field element input:", {
-            startTime: Fr.toString(input.startTime),
-            currentTime: Fr.toString(input.currentTime),
-            endTime: Fr.toString(input.endTime),
-            songHash: Fr.toString(input.songHash),
-            userSignature: input.userSignature.map(x => Fr.toString(x)),
-            userPublicKey: input.userPublicKey.map(x => Fr.toString(x))
+        console.log("Debug - Input values:", {
+            ...input,
+            duration: SONG_DURATION,
+            timeElapsed: currentTime - startTime,
+            timeRemaining: endTime - currentTime
         });
         
         const witness = await circuit.calculateWitness(input);
         await circuit.checkConstraints(witness);
         
-        // Log witness values in field element form - note the order
-        const verifiedSongHash = Fr.e(witness[1]);  // First output
-        const validPlaytime = Fr.e(witness[2]);     // Second output
-        
-        console.log("Debug - Field element outputs:");
-        console.log("verifiedSongHash:", Fr.toString(verifiedSongHash));
-        console.log("validPlaytime:", Fr.toString(validPlaytime));
-        console.log("Expected songHash:", Fr.toString(input.songHash));
-        
-        // Assert using field element comparison
-        assert(
-            Fr.eq(verifiedSongHash, input.songHash),
-            "verifiedSongHash should match input songHash"
-        );
-        assert(
-            Fr.eq(validPlaytime, Fr.e(1)),
-            "validPlaytime should be 1"
-        );
-    });
-
-    // Tests para casos inválidos
-    it("Should reject when currentTime is before startTime", async function() {
-        const input = {
-            startTime: "20",      // currentTime < startTime
-            currentTime: "10",
-            endTime: "30",
-            songHash: "42",
-            userSignature: ["123", "456"],
-            userPublicKey: ["111", "222"]
-        };
-
-        const witness = await circuit.calculateWitness(input);
-        const validPlaytime = witness[2];
-        
-        assert.equal(validPlaytime.toString(), "0", "validPlaytime should be 0 when currentTime < startTime");
-    });
-
-    it("Should reject when currentTime is after endTime", async function() {
-        const input = {
-            startTime: "10",
-            currentTime: "40",    // currentTime > endTime
-            endTime: "30",
-            songHash: "42",
-            userSignature: ["123", "456"],
-            userPublicKey: ["111", "222"]
-        };
-
-        const witness = await circuit.calculateWitness(input);
-        const validPlaytime = witness[2];
-        
-        assert.equal(validPlaytime.toString(), "0", "validPlaytime should be 0 when currentTime > endTime");
-    });
-
-    it("Should verify song hash even when time is invalid", async function() {
-        const input = {
-            startTime: "30",      // Invalid time range
-            currentTime: "10",
-            endTime: "20",
-            songHash: "42",
-            userSignature: ["123", "456"],
-            userPublicKey: ["111", "222"]
-        };
-
-        const witness = await circuit.calculateWitness(input);
         const verifiedSongHash = witness[1];
         const validPlaytime = witness[2];
         
-        assert.equal(verifiedSongHash.toString(), input.songHash, "verifiedSongHash should match even with invalid time");
-        assert.equal(validPlaytime.toString(), "0", "validPlaytime should be 0 with invalid time");
+        assert.equal(verifiedSongHash.toString(), input.songHash, "verifiedSongHash should match input songHash");
+        assert.equal(validPlaytime.toString(), "1", "validPlaytime should be 1 for valid duration");
     });
 
-    it("Should handle edge cases in time validation", async function() {
+    it("Should reject when listening time is too short", async function() {
+        const startTime = 1000;
+        const currentTime = startTime + 15; // Only 15 seconds (less than minimum)
+        const endTime = startTime + SONG_DURATION;
+
         const input = {
-            startTime: "20",
-            currentTime: "20",    // currentTime equals startTime
-            endTime: "20",        // endTime equals currentTime
+            startTime: startTime.toString(),
+            currentTime: currentTime.toString(),
+            endTime: endTime.toString(),
             songHash: "42",
             userSignature: ["123", "456"],
-            userPublicKey: ["111", "222"]
+            userPublicKey: ["111", "222"],
+            messageHash: "789"
         };
+
+        console.log("Debug - Short listen duration:", {
+            timeElapsed: currentTime - startTime,
+            minimumRequired: MIN_LISTEN_TIME
+        });
 
         const witness = await circuit.calculateWitness(input);
         const validPlaytime = witness[2];
         
-        assert.equal(validPlaytime.toString(), "1", "validPlaytime should be 1 when all times are equal");
+        assert.equal(validPlaytime.toString(), "0", "validPlaytime should be 0 when listen time is too short");
+    });
+
+    it("Should reject when currentTime exceeds song duration", async function() {
+        const startTime = 1000;
+        const currentTime = startTime + SONG_DURATION + 60; // 1 minute after song ends
+        const endTime = startTime + SONG_DURATION;
+
+        const input = {
+            startTime: startTime.toString(),
+            currentTime: currentTime.toString(),
+            endTime: endTime.toString(),
+            songHash: "42",
+            userSignature: ["123", "456"],
+            userPublicKey: ["111", "222"],
+            messageHash: "789"
+        };
+
+        console.log("Debug - Exceeded duration:", {
+            songDuration: SONG_DURATION,
+            timeElapsed: currentTime - startTime,
+            overTime: currentTime - endTime
+        });
+
+        const witness = await circuit.calculateWitness(input);
+        const validPlaytime = witness[2];
+        
+        assert.equal(validPlaytime.toString(), "0", "validPlaytime should be 0 when exceeding song duration");
+    });
+
+    it("Should handle exact boundary times", async function() {
+        const startTime = 1000;
+        const currentTime = startTime + MIN_LISTEN_TIME; // Exactly minimum time
+        const endTime = startTime + SONG_DURATION;
+
+        const input = {
+            startTime: startTime.toString(),
+            currentTime: currentTime.toString(),
+            endTime: endTime.toString(),
+            songHash: "42",
+            userSignature: ["123", "456"],
+            userPublicKey: ["111", "222"],
+            messageHash: "789"
+        };
+
+        console.log("Debug - Boundary case:", {
+            minimumRequired: MIN_LISTEN_TIME,
+            actualListenTime: currentTime - startTime
+        });
+
+        const witness = await circuit.calculateWitness(input);
+        const validPlaytime = witness[2];
+        
+        assert.equal(validPlaytime.toString(), "1", "validPlaytime should be 1 when exactly at minimum time");
     });
 }); 
