@@ -62,7 +62,7 @@ template ProofOfListen() {
     signal input songHash;
     signal input userSignature[3];    // (R8x, R8y, S)
     signal input userPublicKey[2];    // (Ax, Ay)
-    signal input messageHash;         // Message hash for signature verification
+    signal input nonce;               // Nonce to prevent replay attacks
 
     // Output signals
     signal output verifiedSongHash;
@@ -74,6 +74,13 @@ template ProofOfListen() {
     timeCheck.currentTime <== currentTime;
     timeCheck.endTime <== endTime;
 
+    // Calculate the message hash internally for security
+    // M = H(songHash, Ax, nonce)
+    component messageHasher = Poseidon(3);
+    messageHasher.inputs[0] <== songHash;
+    messageHasher.inputs[1] <== userPublicKey[0];
+    messageHasher.inputs[2] <== nonce;
+
     // Real EdDSA signature verification
     component signatureVerifier = EdDSAPoseidonVerifier();
     signatureVerifier.enabled <== 1;
@@ -82,7 +89,7 @@ template ProofOfListen() {
     signatureVerifier.S <== userSignature[2];
     signatureVerifier.Ax <== userPublicKey[0];
     signatureVerifier.Ay <== userPublicKey[1];
-    signatureVerifier.M <== messageHash;
+    signatureVerifier.M <== messageHasher.out;
 
     // Direct hash assignment and verification
     verifiedSongHash <== songHash;
@@ -94,4 +101,4 @@ template ProofOfListen() {
     songHash === verifiedSongHash;
 }
 
-component main { public [ userPublicKey, messageHash ] } = ProofOfListen(); 
+component main { public [ userPublicKey, songHash, nonce ] } = ProofOfListen(); 

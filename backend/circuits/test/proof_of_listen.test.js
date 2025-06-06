@@ -21,7 +21,12 @@ describe("Proof of Listen Circuit", function() {
     async function generateValidInputs() {
         const privateKey = crypto.randomBytes(32);
         const publicKey = eddsa.prv2pub(privateKey);
-        const message = F.e(Date.now());
+        
+        // The data that will be signed
+        const songHash = "42";
+        const nonce = F.e(Date.now()); // A unique value for each signature
+        const message = poseidon([songHash, F.toObject(publicKey[0]), F.toObject(nonce)]);
+
         const signature = eddsa.signPoseidon(privateKey, message);
 
         const bufferToString = (buf) => eddsa.F.toObject(buf).toString();
@@ -30,7 +35,7 @@ describe("Proof of Listen Circuit", function() {
             startTime: "1000",
             currentTime: "1050",
             endTime: (1000 + SONG_DURATION).toString(),
-            songHash: "42",
+            songHash: songHash,
             userSignature: [
                 bufferToString(signature.R8[0]),
                 bufferToString(signature.R8[1]),
@@ -40,7 +45,7 @@ describe("Proof of Listen Circuit", function() {
                 bufferToString(publicKey[0]),
                 bufferToString(publicKey[1])
             ],
-            messageHash: bufferToString(message)
+            nonce: bufferToString(nonce)
         };
     }
 
@@ -107,6 +112,7 @@ describe("Proof of Listen Circuit", function() {
 
         it("Should fail when the signature is invalid", async function() {
             const input = await generateValidInputs();
+            // Corrupt the signature
             input.userSignature[2] = (BigInt(input.userSignature[2]) + 1n).toString();
 
             try {
@@ -117,13 +123,15 @@ describe("Proof of Listen Circuit", function() {
             }
         });
 
-        it("Should fail when the signed message is different", async function() {
+        it("Should fail when the nonce is incorrect (replay attack)", async function() {
             const input = await generateValidInputs();
-            input.messageHash = (BigInt(input.messageHash) + 1n).toString();
+            // Change the nonce, simulating a replay attack where the signature is valid
+            // but the nonce doesn't match the one expected by the verifier for this session.
+            input.nonce = (BigInt(input.nonce) + 1n).toString();
 
             try {
                 await circuit.calculateWitness(input);
-                assert.fail("Should have thrown an error for different message hash");
+                assert.fail("Should have thrown an error for incorrect nonce");
             } catch (error) {
                 assert.include(error.message, "Error: Assert Failed", "Should fail with a constraint assertion error");
             }
