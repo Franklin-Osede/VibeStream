@@ -1,0 +1,21 @@
+[package]
+name = "vibestream-program"
+version = "0.1.0"
+edition = "2021"
+description = "Programa Solana para VibeStream - Sistema de verificación de reproducciones musicales"
+
+[features]
+no-entrypoint = []
+
+[dependencies]
+solana-program = "1.17"
+anchor-lang = "0.28"
+borsh = "0.10"
+thiserror = "1.0"
+
+[dev-dependencies]
+solana-program-test = "1.17"
+solana-sdk = "1.17"
+
+[lib]
+crate-type = ["cdylib", "lib"] 
