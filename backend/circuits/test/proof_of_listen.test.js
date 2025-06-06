@@ -14,192 +14,119 @@ describe("Proof of Listen Circuit", function() {
     let eddsa;
     let F;
 
-    // Constants for time validation (in seconds)
-    const SONG_DURATION = 210;  // 3:30 minutes
-    const MIN_LISTEN_TIME = 30; // Must listen at least 30 seconds
+    const SONG_DURATION = 210;
+    const MIN_LISTEN_TIME = 30;
     
-    const p = Scalar.fromString("21888242871839275222246405745257275088548364400416034343698204186575808495617");
-    const Fr = new F1Field(p);
+    // --- Helper function to generate valid inputs for all tests ---
+    async function generateValidInputs() {
+        const privateKey = crypto.randomBytes(32);
+        const publicKey = eddsa.prv2pub(privateKey);
+        const message = F.e(Date.now());
+        const signature = eddsa.signPoseidon(privateKey, message);
 
-    // Increase timeout as compilation might take time
-    this.timeout(100000);
+        const bufferToString = (buf) => eddsa.F.toObject(buf).toString();
 
-    // Helper function to convert buffer to field element
-    function bufferToField(buff) {
-        if (Buffer.isBuffer(buff)) {
-            // Convert buffer to hex string without separators
-            return BigInt('0x' + buff.toString('hex')).toString();
-        } else if (Array.isArray(buff)) {
-            // If it's an array of numbers, convert each to hex and concatenate
-            const hex = buff.map(b => b.toString(16).padStart(2, '0')).join('');
-            return BigInt('0x' + hex).toString();
-        }
-        // If it's already a string, return as is
-        return buff.toString();
+        return {
+            startTime: "1000",
+            currentTime: "1050",
+            endTime: (1000 + SONG_DURATION).toString(),
+            songHash: "42",
+            userSignature: [
+                bufferToString(signature.R8[0]),
+                bufferToString(signature.R8[1]),
+                signature.S.toString()
+            ],
+            userPublicKey: [
+                bufferToString(publicKey[0]),
+                bufferToString(publicKey[1])
+            ],
+            messageHash: bufferToString(message)
+        };
     }
 
-    // Helper function to create EdDSA signature
-    async function createEdDSASignature(privateKey, message) {
-        try {
-            const msgBuff = Buffer.from(message);
-            // Use poseidon array input format
-            const msgHash = await poseidon([msgBuff]);
-            const signature = await eddsa.signPoseidon(privateKey, msgHash);
-            
-            console.log("Debug - Raw signature:", {
-                R8: signature.R8,
-                S: signature.S,
-                hash: msgHash
-            });
-
-            return {
-                R8: [bufferToField(signature.R8[0])],
-                S: bufferToField(signature.S),
-                hash: bufferToField(msgHash)
-            };
-        } catch (error) {
-            console.error("Error creating signature:", error);
-            throw error;
-        }
-    }
-
-    // Helper function to convert field element to string
-    function fieldToString(element) {
-        if (typeof element === 'bigint') {
-            return element.toString();
-        }
-        if (Array.isArray(element)) {
-            return element.map(e => e.toString()).join(',');
-        }
-        if (Buffer.isBuffer(element)) {
-            return BigInt('0x' + element.toString('hex')).toString();
-        }
-        return element.toString();
-    }
+    this.timeout(200000);
 
     before(async function () {
-        try {
-            // First build poseidon and eddsa
-            poseidon = await circomlibjs.buildPoseidon();
-            eddsa = await circomlibjs.buildEddsa();
-            F = eddsa.F;
-            
-            // Then compile the circuit
-            circuit = await wasm_tester(path.join(__dirname, "../proof_of_listen.circom"));
-        } catch (error) {
-            console.error("Error in setup:", error);
-            throw error;
-        }
+        poseidon = await circomlibjs.buildPoseidon();
+        eddsa = await circomlibjs.buildEddsa();
+        F = eddsa.F;
+        circuit = await wasm_tester(
+            path.join(__dirname, "../proof_of_listen.circom"),
+            { include: [path.join(__dirname, "../../node_modules/circomlib/circuits")] }
+        );
     });
 
-    it("Should verify valid listening session with realistic duration", async function() {
-        const startTime = 1000; // Some timestamp
-        const currentTime = startTime + 120; // 2 minutes into song
-        const endTime = startTime + SONG_DURATION;
+    context("when verifying time constraints", function() {
+        it("Should verify a valid listening session", async function() {
+            const input = await generateValidInputs();
+            input.currentTime = (parseInt(input.startTime) + 120).toString(); // 2 mins
 
-        const input = {
-            startTime: startTime.toString(),
-            currentTime: currentTime.toString(),
-            endTime: endTime.toString(),
-            songHash: "42",
-            userSignature: ["123", "456"],
-            userPublicKey: ["111", "222"],
-            messageHash: "789"
-        };
-
-        console.log("Debug - Input values:", {
-            ...input,
-            duration: SONG_DURATION,
-            timeElapsed: currentTime - startTime,
-            timeRemaining: endTime - currentTime
+            const witness = await circuit.calculateWitness(input);
+            await circuit.checkConstraints(witness);
+            const validPlaytime = witness[2];
+            assert.equal(validPlaytime.toString(), "1", "Playtime should be valid");
         });
-        
-        const witness = await circuit.calculateWitness(input);
-        await circuit.checkConstraints(witness);
-        
-        const verifiedSongHash = witness[1];
-        const validPlaytime = witness[2];
-        
-        assert.equal(verifiedSongHash.toString(), input.songHash, "verifiedSongHash should match input songHash");
-        assert.equal(validPlaytime.toString(), "1", "validPlaytime should be 1 for valid duration");
+
+        it("Should reject when listening time is too short", async function() {
+            const input = await generateValidInputs();
+            input.currentTime = (parseInt(input.startTime) + 15).toString(); // Too short
+
+            const witness = await circuit.calculateWitness(input);
+            const validPlaytime = witness[2];
+            assert.equal(validPlaytime.toString(), "0", "Playtime should be invalid when listen time is too short");
+        });
+
+        it("Should reject when currentTime exceeds song duration", async function() {
+            const input = await generateValidInputs();
+            input.currentTime = (parseInt(input.endTime) + 60).toString(); // Exceeded
+
+            const witness = await circuit.calculateWitness(input);
+            const validPlaytime = witness[2];
+            assert.equal(validPlaytime.toString(), "0", "Playtime should be invalid when exceeding song duration");
+        });
+
+        it("Should handle exact boundary times", async function() {
+            const input = await generateValidInputs();
+            input.currentTime = (parseInt(input.startTime) + MIN_LISTEN_TIME).toString(); // Boundary
+
+            const witness = await circuit.calculateWitness(input);
+            await circuit.checkConstraints(witness);
+            const validPlaytime = witness[2];
+            assert.equal(validPlaytime.toString(), "1", "Playtime should be valid at the boundary");
+        });
     });
 
-    it("Should reject when listening time is too short", async function() {
-        const startTime = 1000;
-        const currentTime = startTime + 15; // Only 15 seconds (less than minimum)
-        const endTime = startTime + SONG_DURATION;
-
-        const input = {
-            startTime: startTime.toString(),
-            currentTime: currentTime.toString(),
-            endTime: endTime.toString(),
-            songHash: "42",
-            userSignature: ["123", "456"],
-            userPublicKey: ["111", "222"],
-            messageHash: "789"
-        };
-
-        console.log("Debug - Short listen duration:", {
-            timeElapsed: currentTime - startTime,
-            minimumRequired: MIN_LISTEN_TIME
+    context("when verifying EdDSA signature", function() {
+        it("Should successfully pass with a valid signature", async function() {
+            const input = await generateValidInputs();
+            const witness = await circuit.calculateWitness(input);
+            await circuit.checkConstraints(witness);
+            const validPlaytime = witness[2];
+            assert.equal(validPlaytime.toString(), "1", "Playtime should be valid with a correct signature");
         });
 
-        const witness = await circuit.calculateWitness(input);
-        const validPlaytime = witness[2];
-        
-        assert.equal(validPlaytime.toString(), "0", "validPlaytime should be 0 when listen time is too short");
-    });
+        it("Should fail when the signature is invalid", async function() {
+            const input = await generateValidInputs();
+            input.userSignature[2] = (BigInt(input.userSignature[2]) + 1n).toString();
 
-    it("Should reject when currentTime exceeds song duration", async function() {
-        const startTime = 1000;
-        const currentTime = startTime + SONG_DURATION + 60; // 1 minute after song ends
-        const endTime = startTime + SONG_DURATION;
-
-        const input = {
-            startTime: startTime.toString(),
-            currentTime: currentTime.toString(),
-            endTime: endTime.toString(),
-            songHash: "42",
-            userSignature: ["123", "456"],
-            userPublicKey: ["111", "222"],
-            messageHash: "789"
-        };
-
-        console.log("Debug - Exceeded duration:", {
-            songDuration: SONG_DURATION,
-            timeElapsed: currentTime - startTime,
-            overTime: currentTime - endTime
+            try {
+                await circuit.calculateWitness(input);
+                assert.fail("Should have thrown an error for invalid signature");
+            } catch (error) {
+                assert.include(error.message, "Error: Assert Failed", "Should fail with a constraint assertion error");
+            }
         });
 
-        const witness = await circuit.calculateWitness(input);
-        const validPlaytime = witness[2];
-        
-        assert.equal(validPlaytime.toString(), "0", "validPlaytime should be 0 when exceeding song duration");
-    });
+        it("Should fail when the signed message is different", async function() {
+            const input = await generateValidInputs();
+            input.messageHash = (BigInt(input.messageHash) + 1n).toString();
 
-    it("Should handle exact boundary times", async function() {
-        const startTime = 1000;
-        const currentTime = startTime + MIN_LISTEN_TIME; // Exactly minimum time
-        const endTime = startTime + SONG_DURATION;
-
-        const input = {
-            startTime: startTime.toString(),
-            currentTime: currentTime.toString(),
-            endTime: endTime.toString(),
-            songHash: "42",
-            userSignature: ["123", "456"],
-            userPublicKey: ["111", "222"],
-            messageHash: "789"
-        };
-
-        console.log("Debug - Boundary case:", {
-            minimumRequired: MIN_LISTEN_TIME,
-            actualListenTime: currentTime - startTime
+            try {
+                await circuit.calculateWitness(input);
+                assert.fail("Should have thrown an error for different message hash");
+            } catch (error) {
+                assert.include(error.message, "Error: Assert Failed", "Should fail with a constraint assertion error");
+            }
         });
-
-        const witness = await circuit.calculateWitness(input);
-        const validPlaytime = witness[2];
-        
-        assert.equal(validPlaytime.toString(), "1", "validPlaytime should be 1 when exactly at minimum time");
     });
 }); 

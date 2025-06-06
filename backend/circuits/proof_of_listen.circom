@@ -12,7 +12,7 @@ pragma circom 2.2.2;
 */
 
 include "./util/mimc.circom";  // For hashing
-include "./util/eddsa.circom";
+include "./util/eddsa.circom"; // Now contains the real EdDSAPoseidonVerifier
 include "./util/babyjub.circom";
 
 // Mock EdDSA verifier for testing
@@ -60,13 +60,13 @@ template ProofOfListen() {
     signal input currentTime;
     signal input endTime;
     signal input songHash;
-    signal input userSignature[2];    // (R8x, S)
+    signal input userSignature[3];    // (R8x, R8y, S)
     signal input userPublicKey[2];    // (Ax, Ay)
     signal input messageHash;         // Message hash for signature verification
 
-    // Output signals - Explicit order
-    signal output verifiedSongHash;   // First output
-    signal output validPlaytime;      // Second output
+    // Output signals
+    signal output verifiedSongHash;
+    signal output validPlaytime;
 
     // Time validation
     component timeCheck = TimeRangeCheck();
@@ -74,21 +74,24 @@ template ProofOfListen() {
     timeCheck.currentTime <== currentTime;
     timeCheck.endTime <== endTime;
 
-    // EdDSA signature verification
-    component signatureVerifier = EdDSAVerifier();
-    signatureVerifier.signature[0] <== userSignature[0];  // R8x
-    signatureVerifier.signature[1] <== userSignature[1];  // S
-    signatureVerifier.publicKey[0] <== userPublicKey[0];  // Ax
-    signatureVerifier.publicKey[1] <== userPublicKey[1];  // Ay
+    // Real EdDSA signature verification
+    component signatureVerifier = EdDSAPoseidonVerifier();
+    signatureVerifier.enabled <== 1;
+    signatureVerifier.R8x <== userSignature[0];
+    signatureVerifier.R8y <== userSignature[1];
+    signatureVerifier.S <== userSignature[2];
+    signatureVerifier.Ax <== userPublicKey[0];
+    signatureVerifier.Ay <== userPublicKey[1];
+    signatureVerifier.M <== messageHash;
 
     // Direct hash assignment and verification
     verifiedSongHash <== songHash;
 
-    // Only validate time for now
+    // Time validation output
     validPlaytime <== timeCheck.isValid;
 
     // Explicit constraint to ensure hash matches
     songHash === verifiedSongHash;
 }
 
-component main = ProofOfListen(); 
+component main { public [ userPublicKey, messageHash ] } = ProofOfListen(); 
