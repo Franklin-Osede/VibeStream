@@ -54,6 +54,24 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = "1.0"
 anyhow = "1.0"
 
+# Solana Integration
+solana-sdk = "1.17"
+solana-client = "1.17"
+solana-program = "1.17"
+anchor-lang = "0.28"
+anchor-client = "0.28"
+
+# Zero Knowledge Proofs
+ark-ff = "0.4"
+ark-ec = "0.4"
+ark-bn254 = "0.4"
+ark-groth16 = "0.4"
+ark-serialize = "0.4"
+circom-proving = "2.1"
+
+# LayerZero (Multichain)
+layerzero-sdk = "0.1"
+
 # Testing
 tokio-test = "0.4"
 mock-it = "0.5"
