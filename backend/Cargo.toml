@@ -1,86 +1,12 @@
-[package]
-name = "vibestream-backend"
+[workspace]
+resolver = "2"
+members = [
+    "backend-core",
+    "solana-integration",
+    "solana-service"
+]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2021"
-
-[dependencies]
-# Servidor web
-axum = { version = "0.7", features = ["http2", "macros"] }
-axum-extra = { version = "0.9", features = ["typed-header"] }
-tower = "0.4"
-tower-http = { version = "0.5", features = ["trace", "cors"] }
-tokio = { version = "1.0", features = ["full"] }
-
-# HTTP Client
-reqwest = { version = "0.11", features = ["json"] }
-
-# Base de datos
-sqlx = { version = "0.7", features = [
-  "runtime-tokio-rustls",
-  "postgres",
-  "uuid",
-  "time",
-  "json",
-  "migrate",
-] }
-sea-orm = { version = "0.12", features = [
-  "sqlx-postgres",
-  "runtime-tokio-rustls",
-  "macros",
-] }
-
-# Autenticación y seguridad
-jsonwebtoken = "9.2"
-bcrypt = "0.15"
-
-# Vault y configuración
-hashicorp_vault = "2.1"
-config = "0.13"
-
-# Utilidades
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-uuid = { version = "1.0", features = ["serde", "v4"] }
-chrono = { version = "0.4", features = ["serde"] }
-rust_decimal = "1.33"
-rust_decimal_macros = "1.33"
-async-trait = "0.1"
-
-# Logging y métricas
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-
-# Error handling
-thiserror = "1.0"
-anyhow = "1.0"
-
-# Solana Integration
-solana-sdk = "1.17"
-solana-client = "1.17"
-solana-program = "1.17"
-anchor-lang = "0.28"
-anchor-client = "0.28"
-
-# Zero Knowledge Proofs
-ark-ff = "0.4"
-ark-ec = "0.4"
-ark-bn254 = "0.4"
-ark-groth16 = "0.4"
-ark-serialize = "0.4"
-circom-proving = "2.1"
-
-# LayerZero (Multichain)
-layerzero-sdk = "0.1"
-
-# Testing
-tokio-test = "0.4"
-mock-it = "0.5"
-
-[dev-dependencies]
-pretty_assertions = "1.4"
-test-log = "0.2"
-mockall = "0.12"
-
-[[bin]]
-name = "migrate"
-path = "scripts/migrate.rs"
+authors = ["VibeStream Team"]

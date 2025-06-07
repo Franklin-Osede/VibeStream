@@ -98,7 +98,7 @@ template EdDSAPoseidonVerifier() {
     addRight.y1 <== R8y;
     addRight.x2 <== mulAny.out[0];
     addRight.y2 <== mulAny.out[1];
-
+    
 // Calculate left side of equation left = S*B8
 
     var BASE8[2] = [

@@ -1,0 +1,36 @@
+[package]
+name = "solana-service"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Solana integration
+solana-integration = { path = "../solana-integration" }
+solana-sdk = "1.16.0"
+
+# Server
+tokio = { version = "=1.14.1", features = ["full"] }
+axum = { version = "=0.4.8", features = ["headers"] }
+axum-extra = { version = "=0.1.4" }
+tower = "=0.4.13"
+tower-http = { version = "=0.2.5", features = ["cors"] }
+hyper = { version = "=0.14.20", features = ["full"] }
+socket2 = "=0.4.9"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Override dependencies
+base64ct = "=1.6.0"
+
+[dev-dependencies]
+tokio-test = "0.4" 

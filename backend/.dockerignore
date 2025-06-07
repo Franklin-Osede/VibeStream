@@ -1,0 +1,33 @@
+# Development artifacts
+target/
+.git/
+.gitignore
+.env
+.env.*
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Documentation
+README.md
+docs/
+
+# Test files
+tests/
+**/tests/
+
+# Temporary files
+**/*.rs.bk
+
+# Build artifacts
+**/debug/
+**/release/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log* 

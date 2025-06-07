@@ -31,7 +31,7 @@ describe("Proof of Listen Circuit", function() {
 
         const bufferToString = (buf) => eddsa.F.toObject(buf).toString();
 
-        return {
+            return {
             startTime: "1000",
             currentTime: "1050",
             endTime: (1000 + SONG_DURATION).toString(),
@@ -47,14 +47,14 @@ describe("Proof of Listen Circuit", function() {
             ],
             nonce: bufferToString(nonce)
         };
-    }
+        }
 
     this.timeout(200000);
 
     before(async function () {
-        poseidon = await circomlibjs.buildPoseidon();
-        eddsa = await circomlibjs.buildEddsa();
-        F = eddsa.F;
+            poseidon = await circomlibjs.buildPoseidon();
+            eddsa = await circomlibjs.buildEddsa();
+            F = eddsa.F;
         circuit = await wasm_tester(
             path.join(__dirname, "../proof_of_listen.circom"),
             { include: [path.join(__dirname, "../../node_modules/circomlib/circuits")] }
@@ -65,32 +65,32 @@ describe("Proof of Listen Circuit", function() {
         it("Should verify a valid listening session", async function() {
             const input = await generateValidInputs();
             input.currentTime = (parseInt(input.startTime) + 120).toString(); // 2 mins
-
-            const witness = await circuit.calculateWitness(input);
-            await circuit.checkConstraints(witness);
-            const validPlaytime = witness[2];
+        
+        const witness = await circuit.calculateWitness(input);
+        await circuit.checkConstraints(witness);
+        const validPlaytime = witness[2];
             assert.equal(validPlaytime.toString(), "1", "Playtime should be valid");
-        });
+    });
 
-        it("Should reject when listening time is too short", async function() {
+    it("Should reject when listening time is too short", async function() {
             const input = await generateValidInputs();
             input.currentTime = (parseInt(input.startTime) + 15).toString(); // Too short
 
-            const witness = await circuit.calculateWitness(input);
-            const validPlaytime = witness[2];
+        const witness = await circuit.calculateWitness(input);
+        const validPlaytime = witness[2];
             assert.equal(validPlaytime.toString(), "0", "Playtime should be invalid when listen time is too short");
-        });
+    });
 
-        it("Should reject when currentTime exceeds song duration", async function() {
+    it("Should reject when currentTime exceeds song duration", async function() {
             const input = await generateValidInputs();
             input.currentTime = (parseInt(input.endTime) + 60).toString(); // Exceeded
 
-            const witness = await circuit.calculateWitness(input);
-            const validPlaytime = witness[2];
+        const witness = await circuit.calculateWitness(input);
+        const validPlaytime = witness[2];
             assert.equal(validPlaytime.toString(), "0", "Playtime should be invalid when exceeding song duration");
-        });
+    });
 
-        it("Should handle exact boundary times", async function() {
+    it("Should handle exact boundary times", async function() {
             const input = await generateValidInputs();
             input.currentTime = (parseInt(input.startTime) + MIN_LISTEN_TIME).toString(); // Boundary
 
@@ -104,9 +104,9 @@ describe("Proof of Listen Circuit", function() {
     context("when verifying EdDSA signature", function() {
         it("Should successfully pass with a valid signature", async function() {
             const input = await generateValidInputs();
-            const witness = await circuit.calculateWitness(input);
+        const witness = await circuit.calculateWitness(input);
             await circuit.checkConstraints(witness);
-            const validPlaytime = witness[2];
+        const validPlaytime = witness[2];
             assert.equal(validPlaytime.toString(), "1", "Playtime should be valid with a correct signature");
         });
 
