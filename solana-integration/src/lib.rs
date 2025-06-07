@@ -1,14 +1,16 @@
 use solana_sdk::{
     pubkey::Pubkey,
-    signature::{Keypair, Signer},
+    signature::Keypair,
 };
 use anyhow::{Result, anyhow};
 
 mod wallet;
 mod nft;
+mod zk;
 
 pub use wallet::WalletClient;
 pub use nft::NFTClient;
+pub use zk::{ZKService, ZKProof, ProofRequest, VerifyRequest};
 
 #[derive(Debug, Clone)]
 pub struct NFTMetadata {
@@ -19,20 +21,23 @@ pub struct NFTMetadata {
 }
 
 pub struct SolanaClient {
-    wallet_client: WalletClient,
-    nft_client: NFTClient,
+    pub wallet_client: WalletClient,
+    pub nft_client: NFTClient,
+    pub zk_service: ZKService,
 }
 
 impl SolanaClient {
-    pub fn new(keypair: Keypair) -> Self {
+    pub fn new(keypair: Keypair) -> Result<Self> {
         let keypair_copy = Keypair::from_bytes(&keypair.to_bytes()).unwrap();
         let wallet_client = WalletClient::new(keypair);
         let nft_client = NFTClient::new(keypair_copy);
+        let zk_service = ZKService::new()?;
         
-        Self {
+        Ok(Self {
             wallet_client,
             nft_client,
-        }
+            zk_service,
+        })
     }
 
     pub async fn transfer_sol(&self, to_address: &str, amount: u64) -> Result<String> {
@@ -45,7 +50,7 @@ impl SolanaClient {
         }
         
         let to_pubkey = Pubkey::new_from_array(bytes.try_into().unwrap());
-        self.wallet_client.transfer_sol(&to_pubkey, amount).await?;
+        self.wallet_client.transfer(&to_pubkey.to_string(), amount).await?;
         Ok("Transferencia completada con éxito".to_string())
     }
 
@@ -71,5 +76,13 @@ impl SolanaClient {
             description: "Test NFT Description".to_string(),
             image: "https://test.com/image.png".to_string(),
         })
+    }
+
+    pub async fn generate_proof(&self, request: ProofRequest) -> Result<ZKProof> {
+        self.zk_service.generate_proof(request).await
+    }
+
+    pub async fn verify_proof(&self, request: VerifyRequest) -> Result<bool> {
+        self.zk_service.verify_proof(request).await
     }
 } 
