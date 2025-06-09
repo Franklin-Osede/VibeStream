@@ -13,7 +13,7 @@ pub use song::SongService;
 pub use playlist::PlaylistService;
 pub use nft::NftService;
 pub use royalty::RoyaltyService;
-pub use auth::AuthService;
+pub use auth::AuthService; 
 
 use crate::{
     models::{User, Song},

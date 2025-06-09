@@ -1,8 +1,55 @@
+//! # Solana Integration Library
+//! 
+//! Esta biblioteca proporciona una interfaz simplificada para interactuar con la blockchain de Solana,
+//! específicamente diseñada para manejar operaciones de wallet y transferencias.
+//! 
+//! ## Características principales
+//! 
+//! - Manejo de wallets Solana
+//! - Transferencias de SOL
+//! - Métricas y monitoreo
+//! - Manejo robusto de errores
+//! 
+//! ## Ejemplo de uso
+//! 
+//! ```rust
+//! use solana_integration::WalletClient;
+//! use solana_sdk::signature::Keypair;
+//! 
+//! #[tokio::main]
+//! async fn main() -> anyhow::Result<()> {
+//!     // Crear una nueva wallet
+//!     let mut wallet = WalletClient::new(Keypair::new());
+//!     
+//!     // Obtener la dirección
+//!     println!("Dirección: {}", wallet.get_address());
+//!     
+//!     // Obtener el balance
+//!     let balance = wallet.get_balance().await?;
+//!     println!("Balance: {} SOL", balance as f64 / 1_000_000_000.0);
+//!     
+//!     // Realizar una transferencia
+//!     let recipient = "DIRECCIÓN_DESTINO";
+//!     let amount = 100_000; // 0.0001 SOL
+//!     match wallet.transfer(recipient, amount).await {
+//!         Ok(signature) => println!("Transferencia exitosa: {}", signature),
+//!         Err(e) => println!("Error en la transferencia: {}", e),
+//!     }
+//!     
+//!     // Obtener métricas
+//!     let metrics = wallet.get_metrics();
+//!     println!("Tasa de éxito: {}%", metrics.get_success_rate());
+//!     
+//!     Ok(())
+//! }
+//! ```
+
 use solana_sdk::{
     pubkey::Pubkey,
     signature::Keypair,
 };
 use anyhow::{Result, anyhow};
+use std::str::FromStr;
 
 mod wallet;
 mod nft;

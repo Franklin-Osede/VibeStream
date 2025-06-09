@@ -56,35 +56,38 @@ pub struct AuthUser {
 
 // Implementación del extractor personalizado
 #[async_trait]
-impl FromRequestParts<AuthState> for AuthUser {
+impl<S> FromRequestParts<S> for AuthUser 
+where
+    S: Send + Sync,
+    AuthState: FromRequestParts<S>,
+{
     type Rejection = AppError;
 
-    async fn from_request_parts(parts: &mut Parts, state: &AuthState) -> Result<Self, Self::Rejection> {
-        // Extract the token Bearer from header
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let auth_state = AuthState::from_request_parts(parts, state)
+            .await
+            .map_err(|_| AppError::Unauthorized)?;
+
         let TypedHeader(Authorization(bearer)) = parts
             .extract::<TypedHeader<Authorization<Bearer>>>()
             .await
             .map_err(|_| AppError::Unauthorized)?;
 
-        // 2. Validar y decodificar el JWT
         let token_data = decode::<AuthClaims>(
             bearer.token(),
-            &DecodingKey::from_secret(state.jwt_config.secret.as_bytes()),
+            &DecodingKey::from_secret(auth_state.jwt_config.secret.as_bytes()),
             &Validation::default(),
         )
         .map_err(|_| AppError::Unauthorized)?;
 
-        // 3. Extraer y validar los claims
         let claims = token_data.claims;
-
-        // 4. Verificar expiración
-        let now = chrono::Utc::now().timestamp();
+        let now = Utc::now().timestamp();
+        
         if claims.exp < now {
             return Err(AppError::Unauthorized);
         }
 
-        // 5. Obtener usuario de la base de datos usando el repositorio
-        let user = state
+        let user = auth_state
             .user_repository
             .find_by_id(&DatabaseConnection::default(), claims.sub)
             .await
@@ -108,7 +111,7 @@ pub fn auth_middleware(
 
 // Helper para proteger rutas
 pub async fn require_auth<B>(
-    State(_state): State<AuthState>,
+    State(state): State<AuthState>,
     auth_user: Result<AuthUser, AppError>,
     request: Request<B>,
 ) -> Result<Request<B>, AppError> {

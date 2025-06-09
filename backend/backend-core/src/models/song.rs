@@ -3,16 +3,19 @@ use sea_orm::Set;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use chrono::Utc;
+use crate::types::DateTimeWithTimeZone;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "songs")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: Uuid,
-    pub title: String,
     pub artist_id: Uuid,
+    pub title: String,
     pub duration: i32,
-    pub genre: Option<String>,
+    pub genre: String,
+    pub audio_url: String,
+    pub cover_art_url: Option<String>,
     pub release_date: DateTimeWithTimeZone,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
@@ -20,16 +23,12 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(
-        belongs_to = "super::artist::Entity",
-        from = "Column::ArtistId",
-        to = "super::artist::Column::Id"
-    )]
+    #[sea_orm(belongs_to = "super::artist::Entity")]
     Artist,
-    #[sea_orm(has_many = "super::song_nft::Entity")]
-    SongNfts,
     #[sea_orm(has_many = "super::playlist_song::Entity")]
-    PlaylistSongs,
+    PlaylistSong,
+    #[sea_orm(has_many = "super::song_nft::Entity")]
+    SongNft,
 }
 
 impl Related<super::artist::Entity> for Entity {
@@ -38,15 +37,15 @@ impl Related<super::artist::Entity> for Entity {
     }
 }
 
-impl Related<super::song_nft::Entity> for Entity {
+impl Related<super::playlist_song::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::SongNfts.def()
+        Relation::PlaylistSong.def()
     }
 }
 
-impl Related<super::playlist_song::Entity> for Entity {
+impl Related<super::song_nft::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::PlaylistSongs.def()
+        Relation::SongNft.def()
     }
 }
 
@@ -71,7 +70,9 @@ impl Model {
             title: Set(data.title),
             artist_id: Set(data.artist_id),
             duration: Set(data.duration_seconds),
-            genre: Set(data.genre),
+            genre: Set(data.genre.unwrap_or_default()),
+            audio_url: Set("".to_string()),
+            cover_art_url: Set(None),
             release_date: Set(now.into()),
             created_at: Set(now.into()),
             updated_at: Set(now.into()),
@@ -148,6 +149,6 @@ mod tests {
         assert_eq!(song.title, "My First Song");
         assert_eq!(song.artist_id, artist.id);
         assert_eq!(song.duration, 180);
-        assert_eq!(song.genre.unwrap(), "Pop");
+        assert_eq!(song.genre, "Pop");
     }
 } 

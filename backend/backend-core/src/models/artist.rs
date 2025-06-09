@@ -2,17 +2,17 @@ use sea_orm::entity::prelude::*;
 use sea_orm::Set;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use crate::types::DateTimeWithTimeZone;
 
-#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
-#[sea_orm(table_name = "artists", schema_name = "music")]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+#[sea_orm(table_name = "artists")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: Uuid,
+    pub user_id: Uuid,
     pub name: String,
-    #[sea_orm(column_type = "Text", nullable)]
     pub bio: Option<String>,
-    #[sea_orm(column_type = "Text", nullable)]
-    pub profile_image_url: Option<String>,
+    pub profile_image: Option<String>,
     pub verified: bool,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
@@ -20,10 +20,10 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(belongs_to = "super::user::Entity", from = "Column::Id", to = "super::user::Column::Id")]
+    #[sea_orm(belongs_to = "super::user::Entity")]
     User,
-    #[sea_orm(has_many = "super::song::Entity", from = "Column::Id", to = "super::song::Column::ArtistId")]
-    Songs,
+    #[sea_orm(has_many = "super::song::Entity")]
+    Song,
 }
 
 impl Related<super::user::Entity> for Entity {
@@ -34,7 +34,7 @@ impl Related<super::user::Entity> for Entity {
 
 impl Related<super::song::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::Songs.def()
+        Relation::Song.def()
     }
 }
 
@@ -57,7 +57,7 @@ impl Model {
             id: Set(data.user_id),
             name: Set(data.name),
             bio: Set(data.bio),
-            profile_image_url: Set(data.profile_image_url),
+            profile_image: Set(data.profile_image_url),
             verified: Set(false),
             ..Default::default()
         };

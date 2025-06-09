@@ -2,16 +2,16 @@ use sea_orm::entity::prelude::*;
 use sea_orm::{Set, ActiveValue};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use crate::types::DateTimeWithTimeZone;
 
-#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
-#[sea_orm(table_name = "contracts", schema_name = "blockchain")]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+#[sea_orm(table_name = "contracts")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: Uuid,
-    pub address: String,
-    pub name: String,
-    pub symbol: String,
     pub chain_id: i32,
+    pub address: String,
+    pub contract_type: String,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
 }

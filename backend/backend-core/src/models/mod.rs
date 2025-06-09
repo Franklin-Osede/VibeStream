@@ -7,6 +7,7 @@ pub mod contract;
 pub mod song_nft;
 pub mod royalty_payment;
 
+// Re-exportamos los modelos para facilitar su uso
 pub use user::Model as User;
 pub use artist::Model as Artist;
 pub use song::Model as Song;
@@ -14,7 +15,7 @@ pub use playlist::Model as Playlist;
 pub use playlist_song::Model as PlaylistSong;
 pub use contract::Model as Contract;
 pub use song_nft::Model as SongNft;
-pub use royalty_payment::Model as RoyaltyPayment;
+pub use royalty_payment::Model as RoyaltyPayment; 
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

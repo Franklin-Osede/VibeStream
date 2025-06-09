@@ -2,41 +2,41 @@ use sea_orm::entity::prelude::*;
 use sea_orm::Set;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
+use crate::types::DateTimeWithTimeZone;
 use crate::utils::{hash_password, verify_password};
 
-#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
-#[sea_orm(table_name = "users", schema_name = "auth")]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+#[sea_orm(table_name = "users")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
+    #[sea_orm(primary_key)]
     pub id: Uuid,
     pub username: String,
     pub email: String,
     #[sea_orm(column_type = "Text")]
     pub password_hash: String,
-    #[sea_orm(column_type = "Text", nullable)]
     pub wallet_address: Option<String>,
+    pub is_artist: bool,
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_one = "super::artist::Entity")]
-    Artist,
     #[sea_orm(has_many = "super::playlist::Entity")]
-    Playlists,
+    Playlist,
+    #[sea_orm(has_many = "super::artist::Entity")]
+    Artist,
+}
+
+impl Related<super::playlist::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Playlist.def()
+    }
 }
 
 impl Related<super::artist::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Artist.def()
-    }
-}
-
-impl Related<super::playlist::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::Playlists.def()
     }
 }
 

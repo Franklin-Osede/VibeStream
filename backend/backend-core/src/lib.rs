@@ -3,6 +3,7 @@ use std::sync::Arc;
 use crate::zk::proof_of_listen::ProofOfListenService;
 
 pub mod api;
+pub mod blockchain;
 pub mod config;
 pub mod core;
 pub mod db;
@@ -11,6 +12,7 @@ pub mod middleware;
 pub mod models;
 pub mod repositories;
 pub mod services;
+pub mod types;
 pub mod utils;
 pub mod zk;
 
@@ -19,18 +21,13 @@ pub mod zk;
     pub mod proof;
     pub mod verifier;
 
-pub mod blockchain {
-    pub mod solana;
-    pub mod ethereum;
-    pub mod layerzero;
-    pub mod common;
-}
-
 pub mod solana;
 
 pub use api::create_router;
 pub use config::AppConfig;
 pub use error::AppError;
+
+pub use types::*;
 
 #[derive(Clone)]
 pub struct AppState {

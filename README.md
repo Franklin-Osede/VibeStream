@@ -1,154 +1,163 @@
-# 🎧 Vibestream – Empowering Artists, Rewarding Fans
+# VibeStream 🎵 
 
-**Vibestream** is a multichain music platform that enables artists to publish, monetize, and tokenize their music directly. Fans earn rewards for supporting and listening. All powered by blockchain, NFTs, and privacy-preserving proofs.
+> Revolutionizing music streaming through blockchain technology and zero-knowledge proofs
 
-> Built for fairness. Designed for freedom.  
-> Powered by Web3.
+## Vision
+VibeStream is a decentralized music streaming platform that empowers artists and listeners through blockchain technology. We're building a fair, transparent, and innovative ecosystem where artists are properly compensated and fans can truly engage with their favorite music.
 
----
+## Core Features 🚀
 
-## 📌 Key Features
+```mermaid
+graph LR
+    A[Streaming] -->|ZK Proofs| B[Proof of Listen]
+    B --> C[Smart Rewards]
+    C -->|Tokens| D[Artist Revenue]
+    D --> E[NFT Marketplace]
+    E -->|Royalties| A
+```
 
-- 🎙️ **Artist-first platform**: Own your royalties, manage promotions, sell shares.
-- 🧑‍🤝‍🧑 **Fan rewards**: Earn $VIBES for listening, sharing, and investing in songs.
-- 🧩 **Tokenized albums**: Artists can sell % shares of tracks or albums as NFTs.
-- 🔐 **Proof-of-Listen**: Anti-fraud ZK system to validate legitimate streams.
-- 📡 **Campaign NFTs**: Artists launch ad campaigns as NFTs to boost visibility.
-- 🌍 **Multichain support**: Ethereum, Polygon, Solana (via LayerZero).
-- 💳 **Fiat withdrawal**: Integration with LemonCash for seamless banking.
+### 1. Proof of Listen System
+- Verifiable listening time through zero-knowledge proofs
+- Fair compensation based on actual engagement
+- Anti-fraud mechanisms built-in
 
----
+### 2. Multi-Chain Integration
+- Ethereum for main contracts and governance
+- Solana for high-speed transactions and NFTs
+- Cross-chain compatibility via LayerZero
 
-## 🛠️ Tech Stack
+### 3. Artist Empowerment
+- Direct fan engagement
+- Transparent royalty distribution
+- NFT-based exclusive content
 
-| Layer        | Tech                          |
-|-------------|-------------------------------|
-| Frontend     | React Native + Tailwind       |
-| Backend      | Rust (Axum)                   |
-| Smart Contracts | Solidity (Hardhat)         |
-| Database     | PostgreSQL + SeaORM           |
-| ZK Proofs    | Circom + SnarkJS (Groth16)    |
-| Storage      | IPFS + AWS S3 (mirrored)      |
-| Identity     | Neocheck (3rd party) or custom|
-| Auth & Payments | WebAuthn, Lemon Pay        |
-| Infra        | Terraform + Kubernetes + AWS  |
+## Technical Architecture 🏗️
 
----
+```mermaid
+graph TD
+    subgraph Frontend
+        Mobile[Mobile App]
+        Web[Web Platform]
+    end
 
-## 📁 Project Structure
+    subgraph Backend
+        API[API Service]
+        ZK[ZK Service]
+        BC[Blockchain Service]
+    end
 
-vibestream/
-├── mobile/ # React Native app (Spotify-style)
-│ ├── src/screens/ # Player, Profile, Upload, Discover
-│ ├── src/components/ # AudioCard, NFTBadge, Tabs
-│ ├── src/services/ # API, IPFS, LemonPay clients
-│ └── App.tsx
+    subgraph Blockchain
+        ETH[Ethereum]
+        SOL[Solana]
+        LZ[LayerZero]
+    end
 
-├── backend/ # Rust backend (Axum)
-│ ├── api/ # Routes: /upload, /stream, /withdraw
-│ ├── core/ # Traits & business logic
-│ ├── adapters/ # IPFS, DB, Chain, Neocheck
-│ ├── db/ # SeaORM models and migrations
-│ ├── zk/ # Circom circuits and Groth16 utils
-│ └── main.rs
+    Mobile --> API
+    Web --> API
+    API --> ZK
+    API --> BC
+    BC --> ETH
+    BC --> SOL
+    ETH <-->|Bridge| SOL
+    ETH <-->|Protocol| LZ
+    SOL <-->|Protocol| LZ
+```
 
-├── contracts/ # Smart Contracts (Solidity)
-│ ├── RoyaltyNFT.sol
-│ ├── CampaignNFT.sol
-│ ├── deploy/
-│ └── hardhat.config.ts
+## Roadmap 🗺️
 
-├── infra/ # Deployment & DevOps
-│ ├── terraform/ # AWS, VPC, DB, S3
-│ ├── k8s/ # Helm charts, autoscaling
-│ └── github-actions/ # CI/CD pipelines
+### Phase 1: Foundation (Q2 2024)
+- [x] Core architecture design
+- [x] Smart contract development
+- [x] Zero-knowledge proof implementation
+- [ ] Basic streaming functionality
 
-├── docs/ # Architecture, specs, security
-│ ├── flow-poc.md
-│ ├── security.md
-│ └── tokenomics.md
+### Phase 2: Integration (Q3 2024)
+- [ ] Multi-chain bridge deployment
+- [ ] Mobile app beta
+- [ ] Artist onboarding platform
+- [ ] NFT marketplace launch
 
-└── README.md
+### Phase 3: Expansion (Q4 2024)
+- [ ] Governance token launch
+- [ ] Community features
+- [ ] Advanced recommendation system
+- [ ] International market expansion
 
-yaml
-Copy
-Edit
+### Phase 4: Innovation (2025)
+- [ ] AI-powered features
+- [ ] Virtual concerts integration
+- [ ] Social features expansion
+- [ ] Enterprise partnerships
 
----
+## Technology Stack 💻
 
-## 🚀 Getting Started
+```mermaid
+graph TD
+    subgraph Frontend
+        React[React Native]
+        Next[Next.js]
+        TW[TailwindCSS]
+    end
 
-### 1. Clone the repository
+    subgraph Backend
+        Rust[Rust]
+        Axum[Axum Framework]
+        PostgreSQL[PostgreSQL]
+    end
+
+    subgraph Blockchain
+        Solidity[Solidity]
+        Anchor[Anchor Framework]
+        Circom[Circom/ZK]
+    end
+
+    React --> Next
+    Next --> TW
+    React --> Rust
+    Rust --> Axum
+    Axum --> PostgreSQL
+    Rust --> Solidity
+    Rust --> Anchor
+    Rust --> Circom
+```
+
+## Getting Started 🚀
 
 ```bash
-git clone https://github.com/yourname/vibestream.git
+# Clone the repository
+git clone https://github.com/yourusername/vibestream
+
+# Install dependencies
 cd vibestream
-2. Setup Backend (Rust)
-bash
-Copy
-Edit
-cd backend
+cargo build
+npm install
+
+# Run development environment
+docker-compose up -d
 cargo run
-3. Setup Mobile App
-bash
-Copy
-Edit
-cd mobile
-npm install
-npx expo start
-4. Compile Contracts
-bash
-Copy
-Edit
-cd contracts
-npm install
-npx hardhat compile
-🔐 Security Highlights
-zk-Proof-based stream verification (Groth16)
+```
 
-WebAuthn login (anti-sybil)
+## Documentation 📚
+- [Technical Documentation](./docs/technical.md)
+- [API Reference](./docs/api.md)
+- [Smart Contracts](./docs/contracts.md)
+- [Zero-Knowledge System](./docs/zk-system.md)
 
-Circuit validation of playback: no spoofed listeners
+## Contributing 🤝
+We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
 
-All audio hashes signed with artist's private key
+## Security 🔒
+Security is our top priority. For details about our security measures and audit reports, see [Security](SECURITY.md).
 
-Withdrawal KYC required (DNI stored encrypted via Neocheck)
+## License 📄
+VibeStream is licensed under the [MIT License](LICENSE).
 
-More in docs/security.md
+---
 
-📈 Tokenomics
-Role	Revenue Model
-Artists	Earn per stream, sell NFT shares
-Fans	Earn $VIBERS via listen-to-earn + NFTs
-Platform	% of all transactions & licensing fees
+<div align="center">
 
-Optional: Monthly subscription to boost limits and perks.
+[![Discord](https://img.shields.io/discord/XXXXXX?style=for-the-badge)](https://discord.gg/vibestream)
+[![Twitter Follow](https://img.shields.io/twitter/follow/vibestream?style=for-the-badge)](https://twitter.com/vibestream)
 
-Token: $VIBERS (ERC20, capped supply)
-
-🌐 Roadmap (Q3 2025)
-✅ MVP launch on Polygon testnet
-
-⏳ Mainnet deployment
-
-⏳ Community DAO + staking
-
-⏳ Virtual concerts + VR rooms
-
-⏳ Sync licensing marketplace
-
-⏳ AI music generation module
-
-🤝 Contributing
-We welcome musicians, developers, artists and dreamers.
-Start by opening an issue or submitting a pull request.
-
-📫 Contact
-Project Lead: Franklin Osede Prieto
-
-Email: info@domoblock.io
-
-Twitter: @domoblock
-
-Web: https://vibestream.app
+</div>
 

@@ -1,9 +1,9 @@
 use axum::{
+    body::Body,
     extract::State,
     http::Request,
     middleware::Next,
     response::Response,
-    body::Body,
 };
 use tower_http::trace::{
     TraceLayer,
@@ -41,7 +41,7 @@ pub fn create_trace_layer() -> TraceLayer<tower_http::classify::SharedClassifier
         .on_response(on_response)
 }
 
-pub async fn log_request(request: Request<Body>, next: Next) -> Response {
+pub async fn log_request<B>(request: Request<B>, next: Next<B>) -> Response {
     tracing::info!("Request: {} {}", request.method(), request.uri());
     next.run(request).await
 }
@@ -49,10 +49,12 @@ pub async fn log_request(request: Request<Body>, next: Next) -> Response {
 // Middleware trait for custom implementations
 #[async_trait::async_trait]
 pub trait Middleware<S>: Send + Sync + 'static {
-    async fn handle(
+    async fn handle<B>(
         &self,
         state: State<S>,
-        request: Request<Body>,
-        next: Next,
-    ) -> Result<Response, Response>;
+        request: Request<B>,
+        next: Next<B>,
+    ) -> Result<Response, Response>
+    where
+        B: Send + 'static;
 } 

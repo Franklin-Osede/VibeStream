@@ -24,10 +24,10 @@ async fn main() -> anyhow::Result<()> {
 
     // Cargar configuración
     let config = config::AppConfig::new()?;
-    
+
     // Conectar a la base de datos
     let db = db::create_connection(&config.database.url).await?;
-    
+
     // Crear estado de la aplicación
     let state = AppState {
         db: db.clone(),

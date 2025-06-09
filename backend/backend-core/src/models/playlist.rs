@@ -3,15 +3,15 @@ use sea_orm::ActiveValue::Set;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use sea_orm::QueryOrder;
+use crate::types::DateTimeWithTimeZone;
 
-#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "playlists")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: Uuid,
-    pub name: String,
     pub user_id: Uuid,
-    #[sea_orm(column_type = "Text", nullable)]
+    pub name: String,
     pub description: Option<String>,
     pub is_public: bool,
     pub created_at: DateTimeWithTimeZone,
@@ -20,18 +20,10 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(
-        belongs_to = "super::user::Entity",
-        from = "Column::UserId",
-        to = "super::user::Column::Id"
-    )]
+    #[sea_orm(belongs_to = "super::user::Entity")]
     User,
-    #[sea_orm(
-        has_many = "super::playlist_song::Entity",
-        from = "Column::Id",
-        to = "super::playlist_song::Column::PlaylistId"
-    )]
-    PlaylistSongs,
+    #[sea_orm(has_many = "super::playlist_song::Entity")]
+    PlaylistSong,
 }
 
 impl Related<super::user::Entity> for Entity {
@@ -40,9 +32,9 @@ impl Related<super::user::Entity> for Entity {
     }
 }
 
-impl Related<super::song::Entity> for Entity {
+impl Related<super::playlist_song::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::PlaylistSongs.def()
+        Relation::PlaylistSong.def()
     }
 }
 
