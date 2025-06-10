@@ -1,127 +1,205 @@
-# VibeStream Project Structure
+# VibeStream: Music Streaming with Web3
 
-## Current Project Layout
+## Project View
+
+A music platform connecting artists and listeners through blockchain technology:
+
++-------------+     +-----------+     +-------------+
+|   Artists   | --> | Platform  | --> |  Listeners  |
++-------------+     +-----------+     +-------------+
+      ↑                  ↑                  ↑
+      |                  |                  |
+      v                  v                  v
+   [Upload]         [Process]         [Listen]
+   [Manage]         [Secure]          [Share]
+   [Track]          [Verify]          [Support]
+
+## Core Features
+
+### Proof of Listen System
+
++------------------+
+|   PoL System    |
++------------------+
+| - Listen Verify |
+| - Anti-Bot      |
+| - User Privacy  |
++------------------+
+
+### Smart Features
+
++------------------+
+|   Smart Core    |
++------------------+
+| - Auto Playlist |
+| - Basic Stats   |
+| - Growth Data   |
++------------------+
+
+### User Roles
+
+Artists                  Listeners
+   ↓                        ↓
+[Upload]               [Stream]
+[Track]                [Share]
+[Manage]               [Support]
+
+## Platform Features
+
+      [Join App]
+          ↓
+    [Start Music]
+          ↓
++------------------+
+|    Community    |
++------------------+
+          ↓
+    [Grow Together]
+
+## Main Components
+
++------------------+     +------------------+     +------------------+
+|  Music App       |     |  Artist Tools    |     |  Web3 Core      |
++------------------+     +------------------+     +------------------+
+| - Streaming      |     | - Upload Tools   |     | - NFTs (Royalty)|
+| - Social Basic   |     | - Stats View     |     | - Token (VIBERS)|
+| - Mobile App     |     | - Growth Tools   |     | - Rights Mgmt   |
++------------------+     +------------------+     +------------------+
+
+## Technology Stack
+
+Frontend                 Backend                  Blockchain
+   ↓                       ↓                         ↓
+[React Native]         [Core API]              [ETH + Polygon]
+[TypeScript]          [Database]              [Smart Contracts
+                                              (VIBERS, RoyaltyNFT)]
+
+### Why These Choices?
+
+1. Multi-Chain Strategy
+   - Mobile-first approach
+   - Focus on core features
+   - Production ready
+
+2. Blockchain Integration
+   - Dual chain approach:
+     * Ethereum for NFTs (RoyaltyNFT)
+     * Polygon for transactions (VIBERS)
+     * EVM compatibility
+     * Fast transactions
+
+3. Core Features First
+   - Music streaming
+   - Rights management
+   - Reward distribution
+
+## Dual Chain Architecture
+
+POLYGON NETWORK                    ETHEREUM NETWORK
+[High Frequency - Low Cost]        [High Value - Lower Frequency]
+        ↓                                    ↓
+Daily Operations:                  Value Operations:
+- Listen rewards                   - Major NFT sales
+- Royalty micropayments           - Governance votes
+- Stats updates                   - Treasury management
+        ↓                                    ↓
+    ~1000 tx/day                      ~10 tx/day
+    <$0.01/tx                         Variable gas
+
+        ↑                                    ↑
+        └────────── Bridge ─────────────────┘
+
+
+## Smart Contracts Overview
+
+### Core Contracts (Polygon)
+
+VIBESToken.sol (ERC-20)           ListenerRewards.sol
+┌──────────────────┐              ┌──────────────────┐
+│- Listen rewards  │              │- Proof of Listen │
+│- Artist payments │              │- Reward calc     │
+│- Platform fees   │              │- Anti-fraud      │
+└──────────────────┘              └──────────────────┘
+
+EmissionController.sol            RoyaltyEngine.sol
+┌──────────────────┐              ┌──────────────────┐
+│- Token emission  │              │- Rights mgmt     │
+│- Rate control   │              │- Payment splits  │
+│- Distribution   │              │- Automated dist  │
+└──────────────────┘              └──────────────────┘
+```
+
+### Value Contracts (Ethereum)
+```
+MusicNFT.sol (ERC-721)            RoyaltyShares.sol (ERC-1155)
+┌──────────────────┐              ┌──────────────────┐
+│- Music rights    │              │- Fractional NFTs │
+│- Metadata store  │              │- Trading rights  │
+│- Access control  │              │- Revenue share   │
+└──────────────────┘              └──────────────────┘
+
+VibesDAO.sol                      Treasury.sol
+┌──────────────────┐              ┌──────────────────┐
+│- Governance      │              │- Fund management │
+│- Proposals      │              │- Fee collection  │
+│- Voting system  │              │- Value growth    │
+└──────────────────┘              └──────────────────┘
+```
+
+## Transaction Flow Example
 
 ```
-📦 VibeStream
-├── 🔧 backend/                # Backend services and core logic
-│   ├── backend-core/         # Main backend logic and shared code
-│   ├── ethereum-service/     # ETH blockchain integration
-│   └── ethereum-integration/ # ETH smart contract interaction
-│
-├── 📱 mobile/                # React Native mobile app
-│   ├── src/                 # App source code
-│   └── assets/             # Images, icons, etc.
-│
-├── 🌐 contracts/            # Smart contracts
-│   └── ethereum/           # ETH smart contracts
-│
-└── 📄 docs/                # Documentation
+User Listen -> Reward Event
+     ↓
+[Polygon Chain]
+1. ListenerRewards.verify()
+2. EmissionController.calculate()
+3. VIBESToken.transfer()
+     ↓
+[User Wallet] → Can bridge to ETH
+     ↓
+[Ethereum Chain] → For governance/NFTs
 ```
 
-## What's in Each Folder?
-
-### Backend
-
-#### `backend-core/`
-This is where most of our code lives right now. It handles:
-- Database operations (users, songs, playlists)
-- API endpoints
-- Blockchain integration
-- Zero-knowledge proof system
-
-We're having some dependency conflicts here because it's doing too much - we're working on splitting this up.
-
-#### `ethereum-service/`
-Handles Ethereum-specific operations:
-- Smart contract calls
-- NFT minting
-- Transaction management
-
-#### `ethereum-integration/`
-Low-level Ethereum interactions:
-- Contract ABIs
-- Web3 connections
-- Event listeners
-
-### Mobile App (`mobile/`)
-Our React Native app that lets users:
-- Play music
-- Manage playlists
-- Connect wallets
-- Earn rewards
-
-### Smart Contracts (`contracts/`)
-All our blockchain stuff:
-- NFT contracts
-- Payment handling
-- Reward distribution
-
-## Data Flow
+## Key Metrics & Limits
 
 ```
-[Mobile App] <----> [Backend Core] <----> [Ethereum]
-     ↑                    ↑                   ↑
-     |                    |                   |
-     v                    v                   v
-[Web Client] <----> [Database] <-----> [Smart Contracts]
-```
+Polygon Operations:               Ethereum Operations:
+- Rewards: 24/7                  - NFT Minting: On demand
+- Tx Cost: ~$0.001              - Tx Cost: Market based
+- Speed: 2s finality            - Speed: ~12s finality
+- Volume: Unlimited             - Volume: Strategic
 
-## Service Communication
+## Initial Features
 
-```
-+-------------+     +--------------+     +------------------+
-|  Frontend   | --> | Backend Core | --> | Ethereum Service |
-+-------------+     +--------------+     +------------------+
-       |                  |                      |
-       v                  v                      v
-  User Actions       Data Storage          Blockchain
-```
+1. For Artists
+   - Music upload
+   - Basic analytics
+   - Simple rights management
 
-## Current Issues We're Fixing
+2. For Listeners
+   - Music streaming
+   - Basic playlists
+   - Simple sharing
 
-```
-Problem:
-[All Services] --> [backend-core] --> [Dependency Hell]
+3. For Platform
+   - Essential moderation
+   - Basic security
+   - Core functions
 
-Solution:
-[Frontend] -----> [API Service] ------> [Database]
-                      ↓
-    [ETH Service] <---+---> [SOL Service]
-         ↓                       ↓
-  [ETH Network]           [SOL Network]
-```
+## Development Focus
 
-## Next Steps
+1. Phase 1: Core App
+   - Basic streaming
+   - User accounts
+   - Simple uploads
 
-1. Split `backend-core` into:
-   ```
-   backend-core/
-   ├── api-service/     (Web API)
-   ├── eth-service/     (ETH stuff)
-   └── shared-types/    (Common code)
-   ```
+2. Phase 2: Web3 Features
+   - Basic NFTs
+   - Simple rewards
+   - Rights tracking
 
-2. Move blockchain code to dedicated services
-3. Set up proper service communication
-4. Update dependencies independently
-
-## Development Notes
-
-- Most active development is in `backend-core`
-- Mobile app is in early stages
-- Smart contracts are being audited
-- Documentation is being updated
-
-## Quick Start
-
-```bash
-# Run the backend
-cd backend
-cargo run
-
-# Run the mobile app
-cd mobile
-npm install
-npm start
-``` 
+3. Phase 3: Growth
+   - More features
+   - Better analytics
+   - Enhanced security 
