@@ -3,13 +3,15 @@ use axum::{
     Router,
     Json,
     extract::Path,
+    http::StatusCode,
 };
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use tower_http::cors::CorsLayer;
+use vibestream_types::*;
 
 mod ethereum;
-use ethereum::EthereumClient;
+use ethereum::{EthereumClient, TransactionInfo, TokenInfo};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct TransferRequest {
@@ -18,13 +20,14 @@ struct TransferRequest {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     let client = EthereumClient::new(
-        std::env::var("ETH_RPC_URL").expect("ETH_RPC_URL must be set"),
-        std::env::var("ETH_PRIVATE_KEY").expect("ETH_PRIVATE_KEY must be set"),
-    ).expect("Failed to create Ethereum client");
+        std::env::var("ETH_RPC_URL").unwrap_or_else(|_| "http://localhost:8545".to_string()),
+        std::env::var("ETH_PRIVATE_KEY").unwrap_or_else(|_| "0x0000000000000000000000000000000000000000000000000000000000000001".to_string()),
+    )?;
 
     let app = Router::new()
+        .route("/health", get(health_check))
         .route("/balance/:address", get(get_balance))
         .route("/transfer", post(transfer))
         .route("/token/:address/info", get(get_token_info))
@@ -38,47 +41,59 @@ async fn main() {
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
-        .unwrap();
+        .map_err(|e| VibeStreamError::Network { 
+            message: format!("Server error: {}", e) 
+        })?;
+    
+    Ok(())
 }
 
-async fn get_balance(Path(address): Path<String>) -> Json<u64> {
-    let client = get_client();
-    let balance = client.get_balance(&address).await.unwrap();
-    Json(balance)
+async fn health_check() -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "status": "healthy",
+        "service": "ethereum-service",
+        "timestamp": Timestamp::now()
+    }))
 }
 
-async fn transfer(Json(request): Json<TransferRequest>) -> Json<ethereum::TransactionInfo> {
-    let client = get_client();
-    let tx_info = client.transfer(&request.to, request.amount).await.unwrap();
-    Json(tx_info)
+async fn get_balance(Path(address): Path<String>) -> std::result::Result<Json<u64>, StatusCode> {
+    let client = get_client().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let balance = client.get_balance(&address).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Json(balance))
 }
 
-async fn get_token_info(Path(address): Path<String>) -> Json<ethereum::TokenInfo> {
-    let client = get_client();
-    let token_info = client.get_token_info(&address).await.unwrap();
-    Json(token_info)
+async fn transfer(Json(request): Json<TransferRequest>) -> std::result::Result<Json<TransactionInfo>, StatusCode> {
+    let client = get_client().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let tx_info = client.transfer(&request.to, request.amount).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Json(tx_info))
+}
+
+async fn get_token_info(Path(address): Path<String>) -> std::result::Result<Json<TokenInfo>, StatusCode> {
+    let client = get_client().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let token_info = client.get_token_info(&address).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Json(token_info))
 }
 
 async fn get_token_balance(
     Path((token_address, owner)): Path<(String, String)>
-) -> Json<u64> {
-    let client = get_client();
-    let balance = client.get_token_balance(&token_address, &owner).await.unwrap();
-    Json(balance)
+) -> std::result::Result<Json<u64>, StatusCode> {
+    let client = get_client().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let balance = client.get_token_balance(&token_address, &owner).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Json(balance))
 }
 
 async fn transfer_token(
     Path(token_address): Path<String>,
     Json(request): Json<TransferRequest>
-) -> Json<ethereum::TransactionInfo> {
-    let client = get_client();
-    let tx_info = client.transfer_token(&token_address, &request.to, request.amount).await.unwrap();
-    Json(tx_info)
+) -> std::result::Result<Json<TransactionInfo>, StatusCode> {
+    let client = get_client().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let tx_info = client.transfer_token(&token_address, &request.to, request.amount).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Json(tx_info))
 }
 
-fn get_client() -> EthereumClient {
+fn get_client() -> Result<EthereumClient> {
     EthereumClient::new(
-        std::env::var("ETH_RPC_URL").expect("ETH_RPC_URL must be set"),
-        std::env::var("ETH_PRIVATE_KEY").expect("ETH_PRIVATE_KEY must be set"),
-    ).expect("Failed to create Ethereum client")
+        std::env::var("ETH_RPC_URL").unwrap_or_else(|_| "http://localhost:8545".to_string()),
+        std::env::var("ETH_PRIVATE_KEY").unwrap_or_else(|_| "0x0000000000000000000000000000000000000000000000000000000000000001".to_string()),
+    )
 } 
