@@ -1,26 +1,22 @@
 use axum::{
-    extract::Query,
-    http::StatusCode,
     response::Json,
     routing::{get, post},
     Router,
 };
 use serde_json::{json, Value};
-use std::collections::HashMap;
 use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
-use tracing::{info, warn};
+use tracing::info;
 use vibestream_types::*;
 
 mod handlers;
 mod services;
 
 use handlers::*;
-use services::MessageQueue;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::init();
+    tracing_subscriber::fmt::init();
     
     let app = create_app().await?;
     
