@@ -1,0 +1,33 @@
+[package]
+name = "api-gateway"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Shared types
+vibestream-types = { path = "../../shared/types" }
+
+# Web framework - usando tokio más reciente
+tokio = { version = "1.25", features = ["full"] }
+axum = "0.7"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["trace", "cors"] }
+hyper = "1.0"
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Message queue (Redis para comunicación con otros servicios)
+redis = { version = "0.24", features = ["tokio-comp"] }
+
+[dev-dependencies]
+tokio-test = "0.4" 

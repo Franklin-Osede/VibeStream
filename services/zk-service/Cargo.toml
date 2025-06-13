@@ -1,5 +1,5 @@
 [package]
-name = "ethereum-service"
+name = "zk-service"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,14 +7,11 @@ edition = "2021"
 # Shared types
 vibestream-types = { path = "../../shared/types" }
 
-# Ethereum
-ethers = { version = "2.0", features = ["ws", "rustls"] }
+# ZK dependencies
+# TODO: Agregar dependencias específicas de ZK cuando se definan
 
-# Server
-tokio = { version = "1.18", features = ["full"] }
-axum = "0.6.20"
-tower = "0.4"
-tower-http = { version = "0.4", features = ["trace", "cors"] }
+# Runtime - usando tokio compatible
+tokio = { version = "1.25", features = ["full"] }
 
 # Serialization
 serde = { workspace = true }
@@ -22,8 +19,10 @@ serde_json = { workspace = true }
 
 # Error handling
 anyhow = { workspace = true }
-async-trait = "0.1"
+thiserror = { workspace = true }
+
+# Logging
+tracing = "0.1"
 
 [dev-dependencies]
-mockall = "0.11"
 tokio-test = "0.4" 
