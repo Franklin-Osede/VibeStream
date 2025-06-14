@@ -9,6 +9,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 mod handlers;
 mod services;
 mod auth;
+// mod blockchain; // Comentado temporalmente
 
 use services::{AppState, MessageQueue, DatabasePool};
 
@@ -53,10 +54,11 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("📨 Conectando a Redis...");
     let message_queue = MessageQueue::new(&redis_url).await?;
     
-    // Crear estado compartido
+    // Crear estado compartido (sin blockchain por ahora)
     let app_state = AppState { 
         message_queue,
         database_pool,
+        // blockchain_clients, // Comentado temporalmente
     };
 
     // Crear router con todas las rutas
@@ -80,6 +82,12 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/users", post(handlers::create_user))
         .route("/api/v1/songs", get(handlers::get_songs))
         .route("/api/v1/songs", post(handlers::create_song))
+        
+        // Blockchain routes (simplificados)
+        .route("/api/v1/wallet/balance/:blockchain/:address", get(handlers::get_wallet_balance))
+        .route("/api/v1/songs/:song_id/purchase", post(handlers::purchase_song))
+        .route("/api/v1/blockchain/health", get(handlers::blockchain_health_check))
+        .route("/api/v1/user/transactions", get(handlers::get_user_transactions))
         
         // Estado compartido
         .with_state(app_state)
@@ -110,6 +118,11 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("  POST /api/v1/users - Crear usuario");
     tracing::info!("  GET  /api/v1/songs - Obtener canciones");
     tracing::info!("  POST /api/v1/songs - Crear canción");
+    tracing::info!("⛓️ Blockchain (simulado):");
+    tracing::info!("  GET  /api/v1/wallet/balance/:blockchain/:address - Balance de wallet");
+    tracing::info!("  POST /api/v1/songs/:song_id/purchase - Comprar canción");
+    tracing::info!("  GET  /api/v1/blockchain/health - Health check blockchain");
+    tracing::info!("  GET  /api/v1/user/transactions - Historial de transacciones");
 
     axum::serve(listener, app).await?;
 

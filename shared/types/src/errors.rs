@@ -15,6 +15,12 @@ pub enum VibeStreamError {
     #[error("Validation error: {message}")]
     Validation { message: String },
     
+    #[error("Resource not found: {resource} with id {id}")]
+    NotFound { resource: String, id: String },
+    
+    #[error("Serialization error: {message}")]
+    Serialization { message: String },
+    
     #[error("Insufficient balance: required {required}, available {available}")]
     InsufficientBalance { required: u64, available: u64 },
     

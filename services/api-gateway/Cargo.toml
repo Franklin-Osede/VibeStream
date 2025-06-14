@@ -46,5 +46,11 @@ bcrypt = "0.15"
 # Environment variables
 dotenvy = "0.15"
 
+# HTTP client for blockchain services
+reqwest = { version = "0.11", features = ["json"] }
+
+# Additional utilities for precise calculations
+rust_decimal = { version = "1.32", features = ["serde-float"] }
+
 [dev-dependencies]
 tokio-test = "0.4" 

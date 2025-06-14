@@ -269,4 +269,5 @@ impl MessageQueue {
 pub struct AppState {
     pub message_queue: MessageQueue,
     pub database_pool: DatabasePool,
+    // pub blockchain_clients: crate::blockchain::BlockchainClients, // Comentado temporalmente
 } 

@@ -1,13 +1,14 @@
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
     response::Json,
+    http::StatusCode,
 };
 use serde::{Deserialize, Serialize};
 use vibestream_types::{ApiMessage, Blockchain, WalletAddress, ServiceMessage, MessageBroker};
 use crate::services::AppState;
 use crate::auth::{Claims, LoginRequest, LoginResponse, UserInfo, hash_password, verify_password};
 use sqlx::Row;
+use uuid::Uuid;
 
 #[derive(Serialize)]
 pub struct HealthResponse {
@@ -85,6 +86,21 @@ pub struct BalanceResponse {
     pub blockchain: String,
     pub balance: Option<u64>,
     pub status: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WalletBalanceRequest {
+    pub blockchain: String,
+    pub address: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WalletBalanceResponse {
+    pub blockchain: String,
+    pub address: String,
+    pub balance: u64,
+    pub symbol: String,
+    pub timestamp: String,
 }
 
 #[axum::debug_handler]
@@ -560,4 +576,112 @@ pub async fn get_profile(claims: Claims) -> Result<Json<UserInfo>, StatusCode> {
     
     tracing::info!("📋 Perfil solicitado: {}", user_info.email);
     Ok(Json(user_info))
+}
+
+// GET /api/v1/wallet/balance/:blockchain/:address - Obtener balance de wallet (SIMPLIFICADO)
+pub async fn get_wallet_balance(
+    Path((blockchain, address)): Path<(String, String)>,
+    State(_state): State<crate::services::AppState>,
+) -> Json<serde_json::Value> {
+    tracing::info!("🔍 Balance solicitado para {} en {}", address, blockchain);
+
+    // Respuesta simulada por ahora
+    let balance = 1000u64; // Balance simulado
+    let symbol = match blockchain.to_lowercase().as_str() {
+        "ethereum" => "ETH",
+        "solana" => "SOL",
+        _ => "UNKNOWN",
+    };
+
+    Json(serde_json::json!({
+        "blockchain": blockchain.to_uppercase(),
+        "address": address,
+        "balance": balance,
+        "symbol": symbol,
+        "timestamp": chrono::Utc::now().to_rfc3339(),
+        "status": "simulated"
+    }))
+}
+
+// POST /api/v1/songs/:song_id/purchase - Comprar/pagar una canción (ULTRA SIMPLIFICADO)
+pub async fn purchase_song(
+    Path(song_id): Path<Uuid>,
+    State(state): State<crate::services::AppState>,
+    user_claims: Claims,
+    Json(payment_data): Json<serde_json::Value>,
+) -> Json<serde_json::Value> {
+    let user_id_str = &user_claims.sub;
+    tracing::info!("🎵 Procesando compra de canción {} por usuario {}", song_id, user_id_str);
+
+    // Verificar que la canción existe
+    let song_exists = sqlx::query("SELECT id FROM songs WHERE id = $1")
+        .bind(song_id)
+        .fetch_optional(state.database_pool.get_pool())
+        .await
+        .unwrap_or(None);
+
+    if song_exists.is_none() {
+        return Json(serde_json::json!({
+            "error": "Song not found",
+            "status": "error"
+        }));
+    }
+
+    let payment_id = Uuid::new_v4();
+    let transaction_hash = format!("sim_tx_{}", payment_id);
+    
+    Json(serde_json::json!({
+        "transaction_hash": transaction_hash,
+        "payment_id": payment_id,
+        "song_id": song_id,
+        "user_id": user_id_str,
+        "amount_paid": "0.01",
+        "artist_royalty": "0.008",
+        "platform_fee": "0.002", 
+        "blockchain": "ETHEREUM",
+        "status": "completed"
+    }))
+}
+
+// GET /api/v1/blockchain/health - Health check de servicios blockchain (SIMPLIFICADO)
+pub async fn blockchain_health_check(
+    State(_state): State<crate::services::AppState>,
+) -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "blockchain_services": {
+            "ethereum": {
+                "status": "simulated",
+                "url": "http://localhost:3001"
+            },
+            "solana": {
+                "status": "simulated", 
+                "url": "http://localhost:3003"
+            }
+        },
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    }))
+}
+
+// GET /api/v1/user/transactions - Obtener historial de transacciones del usuario (SIMPLIFICADO)
+pub async fn get_user_transactions(
+    State(_state): State<crate::services::AppState>,
+    user_claims: Claims,
+) -> Json<Vec<serde_json::Value>> {
+    let user_id_str = &user_claims.sub;
+    
+    // Por ahora retornar lista vacía o simulada
+    let transactions = vec![
+        serde_json::json!({
+            "id": Uuid::new_v4().to_string(),
+            "transaction_type": "song_purchase",
+            "amount": "0.01",
+            "blockchain_network": "ethereum",
+            "transaction_hash": "sim_tx_sample",
+            "created_at": chrono::Utc::now().to_rfc3339(),
+            "status": "completed"
+        })
+    ];
+
+    tracing::info!("✅ Retrieved {} transactions for user {}", transactions.len(), user_id_str);
+    Json(transactions)
 } 
