@@ -1,73 +1,64 @@
 use axum::{
-    response::Json,
     routing::{get, post},
     Router,
 };
-use serde_json::{json, Value};
-use std::sync::Arc;
-use tokio::net::TcpListener;
-use tower_http::cors::CorsLayer;
-use tracing::info;
-use vibestream_types::*;
+use tower::ServiceBuilder;
+use tower_http::{trace::TraceLayer, cors::CorsLayer};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod handlers;
 mod services;
 
-use handlers::*;
-use services::MessageQueue;
+use services::{AppState, MessageQueue};
 
 #[tokio::main]
-async fn main() -> Result<()> {
-    tracing_subscriber::fmt::init();
-    
-    // Inicializar MessageQueue
-    let message_queue = Arc::new(
-        MessageQueue::new("redis://127.0.0.1:6379")
-            .await
-            .map_err(|e| {
-                eprintln!("Failed to connect to Redis: {}", e);
-                e
-            })?
-    );
-    
-    info!("Connected to Redis successfully");
-    
-    let app = create_app(message_queue).await?;
-    
-    let listener = TcpListener::bind("0.0.0.0:3000")
-        .await
-        .map_err(|e| VibeStreamError::Network { 
-            message: format!("Failed to bind listener: {}", e) 
-        })?;
-    
-    info!("API Gateway listening on http://0.0.0.0:3000");
-    
-    axum::serve(listener, app)
-        .await
-        .map_err(|e| VibeStreamError::Network { 
-            message: format!("Server error: {}", e) 
-        })?;
-    
-    Ok(())
-}
+async fn main() -> anyhow::Result<()> {
+    // Inicializar logging
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "api_gateway=debug,tower_http=debug".into()),
+        )
+        .with(tracing_subscriber::fmt::layer())
+        .init();
 
-async fn create_app(message_queue: Arc<MessageQueue>) -> Result<Router> {
+    // Crear conexión a Redis
+    let message_queue = MessageQueue::new("redis://127.0.0.1:6379").await?;
+    
+    // Crear estado compartido
+    let app_state = AppState { message_queue };
+
+    // Crear router con todas las rutas
     let app = Router::new()
-        .route("/health", get(health_check))
-        .route("/api/balance", get(get_balance))
-        .route("/api/transaction", post(send_transaction))
-        .route("/api/stream", post(create_stream))
-        .with_state(message_queue)
-        .layer(CorsLayer::permissive());
-    
-    Ok(app)
-}
+        // Health check
+        .route("/health", get(handlers::health_check))
+        
+        // API v1 routes
+        .route("/api/v1/transactions", post(handlers::process_transaction))
+        .route("/api/v1/balance/:blockchain/:address", get(handlers::get_balance))
+        .route("/api/v1/queue-status", get(handlers::queue_status))
+        
+        // Estado compartido
+        .with_state(app_state)
+        
+        // Middleware
+        .layer(
+            ServiceBuilder::new()
+                .layer(TraceLayer::new_for_http())
+                .layer(CorsLayer::permissive())
+        );
 
-async fn health_check() -> Json<Value> {
-    Json(json!({
-        "status": "healthy",
-        "service": "api-gateway",
-        "timestamp": Timestamp::now(),
-        "redis": "connected"
-    }))
+    // Iniciar servidor
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
+    
+    tracing::info!("🚀 API Gateway iniciado en http://0.0.0.0:3000");
+    tracing::info!("📋 Endpoints disponibles:");
+    tracing::info!("  GET  /health - Health check");
+    tracing::info!("  POST /api/v1/transactions - Procesar transacciones");
+    tracing::info!("  GET  /api/v1/balance/:blockchain/:address - Obtener balance");
+    tracing::info!("  GET  /api/v1/queue-status - Estado de colas Redis");
+
+    axum::serve(listener, app).await?;
+
+    Ok(())
 } 

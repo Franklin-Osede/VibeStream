@@ -1,6 +1,7 @@
-use redis::{AsyncCommands, Client};
+use redis::{AsyncCommands, Client, Connection};
 use vibestream_types::*;
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 
 pub struct RedisMessageBroker {
     client: Client,
@@ -63,15 +64,57 @@ impl MessageBroker for RedisMessageBroker {
 }
 
 pub struct MessageQueue {
-    broker: RedisMessageBroker,
+    client: Client,
 }
 
 impl MessageQueue {
     pub async fn new(redis_url: &str) -> Result<Self> {
-        let broker = RedisMessageBroker::new(redis_url).await?;
-        Ok(Self { broker })
+        let client = Client::open(redis_url)
+            .map_err(|e| VibeStreamError::Network {
+                message: format!("Failed to create Redis client: {}", e),
+            })?;
+
+        // Test connection
+        let mut conn = client
+            .get_connection()
+            .map_err(|e| VibeStreamError::Network {
+                message: format!("Failed to connect to Redis: {}", e),
+            })?;
+
+        // Ping to verify connection
+        redis::cmd("PING")
+            .query::<String>(&mut conn)
+            .map_err(|e| VibeStreamError::Network {
+                message: format!("Redis ping failed: {}", e),
+            })?;
+
+        Ok(Self { client })
     }
-    
+
+    pub async fn ping(&self) -> Result<()> {
+        let mut conn = self.client
+            .get_connection()
+            .map_err(|e| VibeStreamError::Network {
+                message: format!("Failed to get Redis connection: {}", e),
+            })?;
+
+        redis::cmd("PING")
+            .query::<String>(&mut conn)
+            .map_err(|e| VibeStreamError::Network {
+                message: format!("Redis ping failed: {}", e),
+            })?;
+
+        Ok(())
+    }
+
+    async fn get_connection(&self) -> Result<Connection> {
+        self.client
+            .get_connection()
+            .map_err(|e| VibeStreamError::Network {
+                message: format!("Failed to get Redis connection: {}", e),
+            })
+    }
+
     pub async fn send_ethereum_message(&self, message: EthereumMessage) -> Result<()> {
         let service_message = ServiceMessage::new(message);
         let serialized = serde_json::to_string(&service_message)
@@ -79,7 +122,7 @@ impl MessageQueue {
                 message: format!("Serialization error: {}", e) 
             })?;
         
-        self.broker.send_message(QueueNames::ETHEREUM, &serialized).await
+        self.send_message(QueueNames::ETHEREUM, &serialized).await
     }
     
     pub async fn send_solana_message(&self, message: SolanaMessage) -> Result<()> {
@@ -89,7 +132,7 @@ impl MessageQueue {
                 message: format!("Serialization error: {}", e) 
             })?;
         
-        self.broker.send_message(QueueNames::SOLANA, &serialized).await
+        self.send_message(QueueNames::SOLANA, &serialized).await
     }
     
     pub async fn send_zk_message(&self, message: ZkMessage) -> Result<()> {
@@ -99,18 +142,24 @@ impl MessageQueue {
                 message: format!("Serialization error: {}", e) 
             })?;
         
-        self.broker.send_message(QueueNames::ZK, &serialized).await
+        self.send_message(QueueNames::ZK, &serialized).await
     }
     
     pub async fn receive_response(&self) -> Result<Option<ServiceResponse>> {
-        if let Some(message) = self.broker.receive_message(QueueNames::RESPONSES).await? {
-            let response: ServiceResponse = serde_json::from_str(&message)
-                .map_err(|e| VibeStreamError::Internal { 
-                    message: format!("Deserialization error: {}", e) 
-                })?;
-            Ok(Some(response))
-        } else {
-            Ok(None)
+        match self.receive_message("response_queue").await? {
+            Some(message) => {
+                let response: ServiceResponse = serde_json::from_str(&message)
+                    .map_err(|e| VibeStreamError::Internal {
+                        message: format!("Failed to deserialize response: {}", e),
+                    })?;
+                Ok(Some(response))
+            }
+            None => Ok(None),
         }
     }
+}
+
+#[derive(Clone)]
+pub struct AppState {
+    pub message_queue: MessageQueue,
 } 
