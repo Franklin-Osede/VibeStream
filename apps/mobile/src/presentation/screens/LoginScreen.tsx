@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,13 +9,67 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Domain layer imports
 import { AuthenticateUser, RegisterUser } from '../../application/usecases/AuthenticateUser';
 import { UserRepositoryImpl } from '../../infrastructure/api/UserRepositoryImpl';
 import { ApiClient } from '../../infrastructure/api/ApiClient';
+
+const { width, height } = Dimensions.get('window');
+
+// Componente de partículas musicales animadas
+const MusicParticle = ({ index }: { index: number }) => {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const startAnimation = () => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 2000 + index * 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(translateY, {
+            toValue: -50,
+            duration: 3000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(fadeAnim, {
+            toValue: 0,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    };
+
+    const timer = setTimeout(startAnimation, index * 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <Animated.View
+      style={[
+        styles.musicParticle,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY }],
+          left: Math.random() * width,
+          top: height * 0.2 + Math.random() * 200,
+        },
+      ]}
+    >
+      <Text style={styles.particleText}>♪</Text>
+    </Animated.View>
+  );
+};
 
 export default function LoginScreen({ navigation }: any) {
   const [isLogin, setIsLogin] = useState(true);
@@ -23,6 +77,34 @@ export default function LoginScreen({ navigation }: any) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Animaciones
+  const logoScale = useRef(new Animated.Value(0.8)).current;
+  const formTranslateY = useRef(new Animated.Value(50)).current;
+  const formOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Animación de entrada
+    Animated.sequence([
+      Animated.timing(logoScale, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.parallel([
+        Animated.timing(formTranslateY, {
+          toValue: 0,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(formOpacity, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+  }, []);
 
   // Initialize DDD layers
   const apiClient = new ApiClient();
@@ -105,150 +187,323 @@ export default function LoginScreen({ navigation }: any) {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
+    <View style={styles.container}>
       <StatusBar style="light" />
       
-      <View style={styles.header}>
-        <Text style={styles.title}>🎵 VibeStream</Text>
-        <Text style={styles.subtitle}>
-          {isLogin ? 'Inicia sesión' : 'Crea tu cuenta'}
-        </Text>
-      </View>
+      {/* Fondo con gradiente */}
+      <LinearGradient
+        colors={['#0f0f23', '#16213e', '#1a1a2e', '#0f3460']}
+        style={styles.background}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      />
 
-      <View style={styles.form}>
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor="#666"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
+      {/* Partículas musicales animadas */}
+      {[...Array(6)].map((_, index) => (
+        <MusicParticle key={index} index={index} />
+      ))}
 
-        {!isLogin && (
-          <TextInput
-            style={styles.input}
-            placeholder="Nombre de usuario"
-            placeholderTextColor="#666"
-            value={username}
-            onChangeText={setUsername}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        )}
-
-        <TextInput
-          style={styles.input}
-          placeholder="Contraseña"
-          placeholderTextColor="#666"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-
-        <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={isLogin ? handleLogin : handleRegister}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>
-              {isLogin ? 'Iniciar Sesión' : 'Registrarse'}
-            </Text>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={toggleMode} style={styles.toggleButton}>
-          <Text style={styles.toggleText}>
-            {isLogin 
-              ? '¿No tienes cuenta? Regístrate' 
-              : '¿Ya tienes cuenta? Inicia sesión'
+      <KeyboardAvoidingView 
+        style={styles.keyboardContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        {/* Header con logo animado */}
+        <Animated.View 
+          style={[
+            styles.header,
+            {
+              transform: [{ scale: logoScale }]
             }
+          ]}
+        >
+          <View style={styles.logoContainer}>
+            <LinearGradient
+              colors={['#6c5ce7', '#a29bfe', '#fd79a8']}
+              style={styles.logoGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Text style={styles.logoIcon}>🎵</Text>
+            </LinearGradient>
+            <Text style={styles.title}>VibeStream</Text>
+          </View>
+          <Text style={styles.subtitle}>
+            {isLogin ? 'Inicia sesión' : 'Crea tu cuenta'}
           </Text>
-        </TouchableOpacity>
-      </View>
+          <View style={styles.musicWave}>
+            <View style={[styles.waveBar, { height: 4 }]} />
+            <View style={[styles.waveBar, { height: 12 }]} />
+            <View style={[styles.waveBar, { height: 8 }]} />
+            <View style={[styles.waveBar, { height: 16 }]} />
+            <View style={[styles.waveBar, { height: 6 }]} />
+            <View style={[styles.waveBar, { height: 14 }]} />
+            <View style={[styles.waveBar, { height: 10 }]} />
+          </View>
+        </Animated.View>
 
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          Música descentralizada con blockchain
-        </Text>
-      </View>
-    </KeyboardAvoidingView>
+        {/* Formulario con efectos glassmorphism */}
+        <Animated.View 
+          style={[
+            styles.form,
+            {
+              opacity: formOpacity,
+              transform: [{ translateY: formTranslateY }]
+            }
+          ]}
+        >
+          <View style={styles.glassContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor="#9ca3af"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            {!isLogin && (
+              <TextInput
+                style={styles.input}
+                placeholder="Nombre de usuario"
+                placeholderTextColor="#9ca3af"
+                value={username}
+                onChangeText={setUsername}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            )}
+
+            <TextInput
+              style={styles.input}
+              placeholder="Contraseña"
+              placeholderTextColor="#9ca3af"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <TouchableOpacity
+              style={[styles.buttonContainer, loading && styles.buttonDisabled]}
+              onPress={isLogin ? handleLogin : handleRegister}
+              disabled={loading}
+            >
+              <LinearGradient
+                colors={loading ? ['#666', '#888'] : ['#6c5ce7', '#a29bfe']}
+                style={styles.button}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.buttonText}>
+                    {isLogin ? 'Iniciar Sesión' : 'Registrarse'}
+                  </Text>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={toggleMode} style={styles.toggleButton}>
+              <Text style={styles.toggleText}>
+                {isLogin 
+                  ? '¿No tienes cuenta? Regístrate' 
+                  : '¿Ya tienes cuenta? Inicia sesión'
+                }
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+
+        {/* Footer mejorado */}
+        <View style={styles.footer}>
+          <LinearGradient
+            colors={['#6c5ce7', '#a29bfe']}
+            style={styles.footerGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+          >
+            <Text style={styles.footerText}>
+              Música descentralizada con blockchain
+            </Text>
+          </LinearGradient>
+        </View>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+  },
+  background: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+  },
+  keyboardContainer: {
+    flex: 1,
     justifyContent: 'center',
     padding: 20,
+  },
+  musicParticle: {
+    position: 'absolute',
+    zIndex: 1,
+  },
+  particleText: {
+    fontSize: 20,
+    color: '#6c5ce7',
+    opacity: 0.7,
   },
   header: {
     alignItems: 'center',
     marginBottom: 50,
+    zIndex: 2,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  logoGradient: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 15,
+    shadowColor: '#6c5ce7',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.44,
+    shadowRadius: 10.32,
+    elevation: 16,
+  },
+  logoIcon: {
+    fontSize: 40,
+    color: '#fff',
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
+    fontSize: 36,
+    fontWeight: '800',
     color: '#fff',
-    marginBottom: 10,
+    textShadowColor: 'rgba(108, 92, 231, 0.5)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 10,
+    letterSpacing: 1,
   },
   subtitle: {
-    fontSize: 18,
-    color: '#aaa',
+    fontSize: 20,
+    color: '#d1d5db',
+    fontWeight: '300',
+    marginBottom: 20,
+  },
+  musicWave: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    height: 20,
+    gap: 3,
+  },
+  waveBar: {
+    width: 3,
+    backgroundColor: '#6c5ce7',
+    borderRadius: 2,
+    opacity: 0.8,
   },
   form: {
     width: '100%',
+    zIndex: 2,
+  },
+  glassContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 24,
+    padding: 30,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.44,
+    shadowRadius: 10.32,
+    elevation: 16,
   },
   input: {
-    backgroundColor: '#2d2d2d',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 20,
     color: '#fff',
     fontSize: 16,
     borderWidth: 1,
-    borderColor: '#444',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    fontWeight: '500',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  buttonContainer: {
+    borderRadius: 16,
+    marginTop: 10,
+    shadowColor: '#6c5ce7',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.44,
+    shadowRadius: 10.32,
+    elevation: 16,
   },
   button: {
-    backgroundColor: '#6c5ce7',
-    borderRadius: 10,
-    padding: 15,
+    borderRadius: 16,
+    padding: 18,
     alignItems: 'center',
-    marginTop: 10,
   },
   buttonDisabled: {
-    backgroundColor: '#666',
+    shadowOpacity: 0.2,
   },
   buttonText: {
     color: '#fff',
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   toggleButton: {
-    marginTop: 20,
+    marginTop: 25,
     alignItems: 'center',
   },
   toggleText: {
-    color: '#6c5ce7',
+    color: '#a29bfe',
     fontSize: 16,
+    fontWeight: '500',
   },
   footer: {
     alignItems: 'center',
-    marginTop: 50,
+    marginTop: 40,
+    zIndex: 2,
+  },
+  footerGradient: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 20,
   },
   footerText: {
-    color: '#666',
+    color: '#fff',
     fontSize: 14,
+    fontWeight: '600',
+    opacity: 0.9,
   },
 }); 
