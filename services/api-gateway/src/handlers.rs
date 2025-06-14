@@ -6,6 +6,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use vibestream_types::{ApiMessage, Blockchain, WalletAddress, ServiceMessage, MessageBroker};
 use crate::services::AppState;
+use crate::auth::{Claims, LoginRequest, LoginResponse, UserInfo, hash_password, verify_password};
 use sqlx::Row;
 
 #[derive(Serialize)]
@@ -34,6 +35,15 @@ pub struct UserResponse {
     created_at: String,
 }
 
+#[derive(Deserialize)]
+pub struct CreateUserRequest {
+    email: String,
+    username: String,
+    password: String,
+    wallet_address: Option<String>,
+    role: Option<String>,
+}
+
 #[derive(Serialize)]
 pub struct SongResponse {
     id: String,
@@ -42,6 +52,16 @@ pub struct SongResponse {
     duration: Option<i32>,
     file_hash: Option<String>,
     created_at: String,
+}
+
+#[derive(Deserialize)]
+pub struct CreateSongRequest {
+    title: String,
+    artist_id: String,
+    duration_seconds: Option<i32>,
+    genre: Option<String>,
+    ipfs_hash: Option<String>,
+    royalty_percentage: Option<f64>,
 }
 
 #[derive(Deserialize)]
@@ -285,4 +305,259 @@ pub async fn get_songs(State(state): State<AppState>) -> Result<Json<Vec<SongRes
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
+}
+
+// POST endpoint para crear usuarios
+#[axum::debug_handler]
+pub async fn create_user(
+    State(state): State<AppState>,
+    Json(request): Json<CreateUserRequest>,
+) -> Result<Json<UserResponse>, StatusCode> {
+    // Hash the password con bcrypt
+    let password_hash = match hash_password(&request.password) {
+        Ok(hash) => hash,
+        Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+    };
+    
+    let user_id = uuid::Uuid::new_v4();
+    let role = request.role.unwrap_or_else(|| "user".to_string());
+    
+    match sqlx::query(
+        "INSERT INTO users (id, email, username, password_hash, wallet_address, role) 
+         VALUES ($1, $2, $3, $4, $5, $6) 
+         RETURNING id, username, email, role, created_at"
+    )
+    .bind(user_id)
+    .bind(&request.email)
+    .bind(&request.username)
+    .bind(&password_hash)
+    .bind(&request.wallet_address)
+    .bind(&role)
+    .fetch_one(state.database_pool.get_pool())
+    .await
+    {
+        Ok(row) => {
+            let user = UserResponse {
+                id: row.get::<uuid::Uuid, _>("id").to_string(),
+                username: row.get("username"),
+                email: row.get("email"),
+                role: row.get("role"),
+                created_at: row.get::<chrono::DateTime<chrono::Utc>, _>("created_at").to_rfc3339(),
+            };
+            
+            tracing::info!("✅ Usuario creado: {} ({})", user.username, user.id);
+            Ok(Json(user))
+        }
+        Err(e) => {
+            tracing::error!("❌ Error al crear usuario: {:?}", e);
+            if e.to_string().contains("duplicate key") {
+                Err(StatusCode::CONFLICT) // 409 - Email o username ya existe
+            } else {
+                Err(StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        }
+    }
+}
+
+// POST endpoint para crear canciones
+#[axum::debug_handler]
+pub async fn create_song(
+    State(state): State<AppState>,
+    Json(request): Json<CreateSongRequest>,
+) -> Result<Json<SongResponse>, StatusCode> {
+    let song_id = uuid::Uuid::new_v4();
+    let artist_uuid = match uuid::Uuid::parse_str(&request.artist_id) {
+        Ok(id) => id,
+        Err(_) => return Err(StatusCode::BAD_REQUEST),
+    };
+    
+    match sqlx::query(
+        "INSERT INTO songs (id, title, artist_id, duration_seconds, genre, ipfs_hash, royalty_percentage) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7) 
+         RETURNING id, title, artist_id, duration_seconds, ipfs_hash, created_at"
+    )
+    .bind(song_id)
+    .bind(&request.title)
+    .bind(artist_uuid)
+    .bind(request.duration_seconds)
+    .bind(&request.genre)
+    .bind(&request.ipfs_hash)
+    .bind(request.royalty_percentage.unwrap_or(10.0))
+    .fetch_one(state.database_pool.get_pool())
+    .await
+    {
+        Ok(row) => {
+            let song = SongResponse {
+                id: row.get::<uuid::Uuid, _>("id").to_string(),
+                title: row.get("title"),
+                artist_id: row.get::<uuid::Uuid, _>("artist_id").to_string(),
+                duration: row.get("duration_seconds"),
+                file_hash: row.get("ipfs_hash"),
+                created_at: row.get::<chrono::DateTime<chrono::Utc>, _>("created_at").to_rfc3339(),
+            };
+            
+            tracing::info!("🎵 Canción creada: {} ({})", song.title, song.id);
+            Ok(Json(song))
+        }
+        Err(e) => {
+            tracing::error!("❌ Error al crear canción: {:?}", e);
+            if e.to_string().contains("foreign key") {
+                Err(StatusCode::BAD_REQUEST) // Artist ID no existe
+            } else {
+                Err(StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        }
+    }
+}
+
+// POST endpoint para login
+#[axum::debug_handler]
+pub async fn login(
+    State(state): State<AppState>,
+    Json(request): Json<LoginRequest>,
+) -> Result<Json<LoginResponse>, StatusCode> {
+    // Buscar usuario por email
+    match sqlx::query("SELECT id, username, email, password_hash, role FROM users WHERE email = $1")
+        .bind(&request.email)
+        .fetch_optional(state.database_pool.get_pool())
+        .await
+    {
+        Ok(Some(row)) => {
+            let stored_hash: String = row.get("password_hash");
+            
+            // Verificar password
+            match verify_password(&request.password, &stored_hash) {
+                Ok(true) => {
+                    // Password correcto, generar JWT
+                    let user_id: uuid::Uuid = row.get("id");
+                    let username: String = row.get("username");
+                    let email: String = row.get("email");
+                    let role: String = row.get("role");
+                    
+                    let claims = Claims::new(user_id, username.clone(), email.clone(), role.clone());
+                    
+                    match claims.to_jwt() {
+                        Ok(token) => {
+                            let response = LoginResponse {
+                                token,
+                                user: UserInfo {
+                                    id: user_id.to_string(),
+                                    username,
+                                    email,
+                                    role,
+                                },
+                            };
+                            
+                            tracing::info!("✅ Login exitoso: {}", request.email);
+                            Ok(Json(response))
+                        }
+                        Err(_) => {
+                            tracing::error!("❌ Error generando JWT");
+                            Err(StatusCode::INTERNAL_SERVER_ERROR)
+                        }
+                    }
+                }
+                Ok(false) => {
+                    tracing::warn!("🚫 Password incorrecto para: {}", request.email);
+                    Err(StatusCode::UNAUTHORIZED)
+                }
+                Err(_) => {
+                    tracing::error!("❌ Error verificando password");
+                    Err(StatusCode::INTERNAL_SERVER_ERROR)
+                }
+            }
+        }
+        Ok(None) => {
+            tracing::warn!("🚫 Usuario no encontrado: {}", request.email);
+            Err(StatusCode::UNAUTHORIZED)
+        }
+        Err(e) => {
+            tracing::error!("❌ Error en base de datos: {:?}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+// POST endpoint para register (crear usuario con login automático)
+#[axum::debug_handler]
+pub async fn register(
+    State(state): State<AppState>,
+    Json(request): Json<CreateUserRequest>,
+) -> Result<Json<LoginResponse>, StatusCode> {
+    // Hash the password con bcrypt
+    let password_hash = match hash_password(&request.password) {
+        Ok(hash) => hash,
+        Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+    };
+    
+    let user_id = uuid::Uuid::new_v4();
+    let role = request.role.unwrap_or_else(|| "user".to_string());
+    
+    match sqlx::query(
+        "INSERT INTO users (id, email, username, password_hash, wallet_address, role) 
+         VALUES ($1, $2, $3, $4, $5, $6) 
+         RETURNING id, username, email, role"
+    )
+    .bind(user_id)
+    .bind(&request.email)
+    .bind(&request.username)
+    .bind(&password_hash)
+    .bind(&request.wallet_address)
+    .bind(&role)
+    .fetch_one(state.database_pool.get_pool())
+    .await
+    {
+        Ok(row) => {
+            let user_id: uuid::Uuid = row.get("id");
+            let username: String = row.get("username");
+            let email: String = row.get("email");
+            let role: String = row.get("role");
+            
+            // Generar JWT automáticamente
+            let claims = Claims::new(user_id, username.clone(), email.clone(), role.clone());
+            
+            match claims.to_jwt() {
+                Ok(token) => {
+                    let response = LoginResponse {
+                        token,
+                        user: UserInfo {
+                            id: user_id.to_string(),
+                            username,
+                            email,
+                            role,
+                        },
+                    };
+                    
+                    tracing::info!("✅ Usuario registrado y logueado: {}", request.username);
+                    Ok(Json(response))
+                }
+                Err(_) => {
+                    tracing::error!("❌ Error generando JWT después de registro");
+                    Err(StatusCode::INTERNAL_SERVER_ERROR)
+                }
+            }
+        }
+        Err(e) => {
+            tracing::error!("❌ Error al registrar usuario: {:?}", e);
+            if e.to_string().contains("duplicate key") {
+                Err(StatusCode::CONFLICT) // 409 - Email o username ya existe
+            } else {
+                Err(StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        }
+    }
+}
+
+// Endpoint protegido de ejemplo - obtener perfil del usuario actual
+#[axum::debug_handler]
+pub async fn get_profile(claims: Claims) -> Result<Json<UserInfo>, StatusCode> {
+    let user_info = UserInfo {
+        id: claims.sub,
+        username: claims.username,
+        email: claims.email,
+        role: claims.role,
+    };
+    
+    tracing::info!("📋 Perfil solicitado: {}", user_info.email);
+    Ok(Json(user_info))
 } 
