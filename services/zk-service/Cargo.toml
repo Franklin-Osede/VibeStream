@@ -3,6 +3,10 @@ name = "zk-service"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "zk-service"
+path = "src/main.rs"
+
 [dependencies]
 # Shared types
 vibestream-types = { path = "../../shared/types" }
