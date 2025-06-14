@@ -1,7 +1,6 @@
 use redis::{AsyncCommands, Client, Connection};
 use vibestream_types::*;
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 
 pub struct RedisMessageBroker {
     client: Client,
@@ -63,6 +62,7 @@ impl MessageBroker for RedisMessageBroker {
     }
 }
 
+#[derive(Clone)]
 pub struct MessageQueue {
     client: Client,
 }
@@ -114,7 +114,67 @@ impl MessageQueue {
                 message: format!("Failed to get Redis connection: {}", e),
             })
     }
+}
 
+#[async_trait]
+impl MessageBroker for MessageQueue {
+    async fn send_message(&self, queue: &str, message: &str) -> Result<()> {
+        let mut conn = self.get_connection().await?;
+        
+        redis::cmd("LPUSH")
+            .arg(queue)
+            .arg(message)
+            .query::<i32>(&mut conn)
+            .map_err(|e| VibeStreamError::Network {
+                message: format!("Failed to send message to queue {}: {}", queue, e),
+            })?;
+
+        tracing::debug!("Message sent to queue {}: {}", queue, message);
+        Ok(())
+    }
+
+    async fn receive_message(&self, queue: &str) -> Result<Option<String>> {
+        let mut conn = self.get_connection().await?;
+        
+        let result: Option<String> = redis::cmd("RPOP")
+            .arg(queue)
+            .query(&mut conn)
+            .map_err(|e| VibeStreamError::Network {
+                message: format!("Failed to receive message from queue {}: {}", queue, e),
+            })?;
+
+        if let Some(ref msg) = result {
+            tracing::debug!("Message received from queue {}: {}", queue, msg);
+        }
+
+        Ok(result)
+    }
+
+    async fn receive_message_blocking(&self, queue: &str, timeout_secs: u64) -> Result<Option<String>> {
+        let mut conn = self.get_connection().await?;
+        
+        let result: Option<Vec<String>> = redis::cmd("BRPOP")
+            .arg(queue)
+            .arg(timeout_secs)
+            .query(&mut conn)
+            .map_err(|e| VibeStreamError::Network {
+                message: format!("Failed to receive blocking message from queue {}: {}", queue, e),
+            })?;
+
+        match result {
+            Some(mut values) if values.len() >= 2 => {
+                let message = values.pop().unwrap();
+                tracing::debug!("Blocking message received from queue {}: {}", queue, message);
+                Ok(Some(message))
+            }
+            _ => Ok(None),
+        }
+    }
+
+
+}
+
+impl MessageQueue {
     pub async fn send_ethereum_message(&self, message: EthereumMessage) -> Result<()> {
         let service_message = ServiceMessage::new(message);
         let serialized = serde_json::to_string(&service_message)
