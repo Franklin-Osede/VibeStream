@@ -6,6 +6,9 @@ pub enum VibeStreamError {
     #[error("Blockchain error: {message}")]
     Blockchain { message: String },
     
+    #[error("Database error: {message}")]
+    Database { message: String },
+    
     #[error("Network error: {message}")]
     Network { message: String },
     

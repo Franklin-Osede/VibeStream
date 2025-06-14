@@ -1,6 +1,52 @@
 use redis::{AsyncCommands, Client, Connection};
 use vibestream_types::*;
 use async_trait::async_trait;
+use sqlx::{PgPool, postgres::PgPoolOptions};
+
+// Nuevo struct para manejar la base de datos
+#[derive(Clone)]
+pub struct DatabasePool {
+    pool: PgPool,
+}
+
+impl DatabasePool {
+    pub async fn new(database_url: &str) -> Result<Self> {
+        let pool = PgPoolOptions::new()
+            .max_connections(10)
+            .connect(database_url)
+            .await
+            .map_err(|e| VibeStreamError::Database {
+                message: format!("Failed to connect to PostgreSQL: {}", e),
+            })?;
+
+        // Test the connection
+        sqlx::query("SELECT 1")
+            .execute(&pool)
+            .await
+            .map_err(|e| VibeStreamError::Database {
+                message: format!("Database connection test failed: {}", e),
+            })?;
+
+        tracing::info!("✅ Conexión PostgreSQL establecida exitosamente");
+        
+        Ok(Self { pool })
+    }
+
+    pub fn get_pool(&self) -> &PgPool {
+        &self.pool
+    }
+
+    pub async fn health_check(&self) -> Result<()> {
+        sqlx::query("SELECT 1")
+            .execute(&self.pool)
+            .await
+            .map_err(|e| VibeStreamError::Database {
+                message: format!("Database health check failed: {}", e),
+            })?;
+        
+        Ok(())
+    }
+}
 
 pub struct RedisMessageBroker {
     client: Client,
@@ -222,4 +268,5 @@ impl MessageQueue {
 #[derive(Clone)]
 pub struct AppState {
     pub message_queue: MessageQueue,
+    pub database_pool: DatabasePool,
 } 

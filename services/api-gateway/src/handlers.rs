@@ -6,6 +6,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use vibestream_types::{ApiMessage, Blockchain, WalletAddress, ServiceMessage, MessageBroker};
 use crate::services::AppState;
+use sqlx::Row;
 
 #[derive(Serialize)]
 pub struct HealthResponse {
@@ -13,6 +14,34 @@ pub struct HealthResponse {
     service: String,
     timestamp: String,
     redis: String,
+}
+
+#[derive(Serialize)]
+pub struct DatabaseHealthResponse {
+    status: String,
+    service: String,
+    timestamp: String,
+    database: String,
+    tables_count: Option<i64>,
+}
+
+#[derive(Serialize)]
+pub struct UserResponse {
+    id: String,
+    username: String,
+    email: String,
+    role: String,
+    created_at: String,
+}
+
+#[derive(Serialize)]
+pub struct SongResponse {
+    id: String,
+    title: String,
+    artist_id: String,
+    duration: Option<i32>,
+    file_hash: Option<String>,
+    created_at: String,
 }
 
 #[derive(Deserialize)]
@@ -167,4 +196,93 @@ pub async fn queue_status(State(state): State<AppState>) -> Result<Json<serde_js
     }
 
     Ok(Json(serde_json::Value::Object(status)))
+}
+
+// Health check específico para la base de datos
+#[axum::debug_handler]
+pub async fn database_health_check(State(state): State<AppState>) -> Result<Json<DatabaseHealthResponse>, StatusCode> {
+    let database_status = match state.database_pool.health_check().await {
+        Ok(_) => "connected",
+        Err(_) => "disconnected",
+    };
+
+    // Contar las tablas en la base de datos
+    let tables_count = if database_status == "connected" {
+        match sqlx::query("SELECT COUNT(*) as count FROM information_schema.tables WHERE table_schema = 'public'")
+            .fetch_one(state.database_pool.get_pool())
+            .await
+        {
+            Ok(row) => Some(row.get::<i64, _>("count")),
+            Err(_) => None,
+        }
+    } else {
+        None
+    };
+
+    Ok(Json(DatabaseHealthResponse {
+        status: if database_status == "connected" { "healthy".to_string() } else { "unhealthy".to_string() },
+        service: "api-gateway-database".to_string(),
+        timestamp: chrono::Utc::now().to_rfc3339(),
+        database: database_status.to_string(),
+        tables_count,
+    }))
+}
+
+// Endpoint para obtener usuarios (TEST)
+#[axum::debug_handler]
+pub async fn get_users(State(state): State<AppState>) -> Result<Json<Vec<UserResponse>>, StatusCode> {
+    match sqlx::query("SELECT id, username, email, role, created_at FROM users LIMIT 10")
+        .fetch_all(state.database_pool.get_pool())
+        .await
+    {
+        Ok(rows) => {
+            let users: Vec<UserResponse> = rows
+                .into_iter()
+                .map(|row| UserResponse {
+                    id: row.get::<uuid::Uuid, _>("id").to_string(),
+                    username: row.get("username"),
+                    email: row.get("email"),
+                    role: row.get("role"),
+                    created_at: row.get::<chrono::DateTime<chrono::Utc>, _>("created_at").to_rfc3339(),
+                })
+                .collect();
+            
+            tracing::info!("📋 Obtenidos {} usuarios de la base de datos", users.len());
+            Ok(Json(users))
+        }
+        Err(e) => {
+            tracing::error!("❌ Error al obtener usuarios: {:?}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+// Endpoint para obtener canciones (TEST)
+#[axum::debug_handler]
+pub async fn get_songs(State(state): State<AppState>) -> Result<Json<Vec<SongResponse>>, StatusCode> {
+    match sqlx::query("SELECT id, title, artist_id, duration_seconds, ipfs_hash, created_at FROM songs LIMIT 10")
+        .fetch_all(state.database_pool.get_pool())
+        .await
+    {
+        Ok(rows) => {
+            let songs: Vec<SongResponse> = rows
+                .into_iter()
+                .map(|row| SongResponse {
+                    id: row.get::<uuid::Uuid, _>("id").to_string(),
+                    title: row.get("title"),
+                    artist_id: row.get::<uuid::Uuid, _>("artist_id").to_string(),
+                    duration: row.get("duration_seconds"),
+                    file_hash: row.get("ipfs_hash"),
+                    created_at: row.get::<chrono::DateTime<chrono::Utc>, _>("created_at").to_rfc3339(),
+                })
+                .collect();
+            
+            tracing::info!("🎵 Obtenidas {} canciones de la base de datos", songs.len());
+            Ok(Json(songs))
+        }
+        Err(e) => {
+            tracing::error!("❌ Error al obtener canciones: {:?}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
 } 

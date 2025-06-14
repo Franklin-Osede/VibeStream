@@ -9,7 +9,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 mod handlers;
 mod services;
 
-use services::{AppState, MessageQueue};
+use services::{AppState, MessageQueue, DatabasePool};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -22,21 +22,56 @@ async fn main() -> anyhow::Result<()> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
+    tracing::info!("🚀 Iniciando API Gateway de VibeStream...");
+
+    // Intentar cargar archivo .env si existe (ignora errores si no existe)
+    if let Err(_) = dotenvy::dotenv() {
+        tracing::info!("📝 No se encontró archivo .env, usando variables de entorno del sistema");
+    } else {
+        tracing::info!("📝 Archivo .env cargado exitosamente");
+    }
+
+    // Cargar variables de entorno
+    let database_url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| {
+            tracing::warn!("⚠️ DATABASE_URL no encontrada, usando configuración por defecto");
+            "postgresql://vibestream:dev_password_123_change_in_production@localhost:5432/vibestream".to_string()
+        });
+    
+    let redis_url = std::env::var("REDIS_URL")
+        .unwrap_or_else(|_| {
+            tracing::warn!("⚠️ REDIS_URL no encontrada, usando configuración por defecto");
+            "redis://127.0.0.1:6379".to_string()
+        });
+    
+    // Crear conexión a PostgreSQL
+    tracing::info!("📊 Conectando a PostgreSQL...");
+    let database_pool = DatabasePool::new(&database_url).await?;
+    
     // Crear conexión a Redis
-    let message_queue = MessageQueue::new("redis://127.0.0.1:6379").await?;
+    tracing::info!("📨 Conectando a Redis...");
+    let message_queue = MessageQueue::new(&redis_url).await?;
     
     // Crear estado compartido
-    let app_state = AppState { message_queue };
+    let app_state = AppState { 
+        message_queue,
+        database_pool,
+    };
 
     // Crear router con todas las rutas
     let app = Router::new()
         // Health check
         .route("/health", get(handlers::health_check))
+        .route("/health/db", get(handlers::database_health_check))
         
         // API v1 routes
         .route("/api/v1/transactions", post(handlers::process_transaction))
         .route("/api/v1/balance/:blockchain/:address", get(handlers::get_balance))
         .route("/api/v1/queue-status", get(handlers::queue_status))
+        
+        // Database test routes
+        .route("/api/v1/users", get(handlers::get_users))
+        .route("/api/v1/songs", get(handlers::get_songs))
         
         // Estado compartido
         .with_state(app_state)
@@ -49,14 +84,17 @@ async fn main() -> anyhow::Result<()> {
         );
 
     // Iniciar servidor
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3002").await?;
     
-    tracing::info!("🚀 API Gateway iniciado en http://0.0.0.0:3000");
+    tracing::info!("✅ API Gateway iniciado exitosamente en http://0.0.0.0:3002");
     tracing::info!("📋 Endpoints disponibles:");
-    tracing::info!("  GET  /health - Health check");
+    tracing::info!("  GET  /health - Health check general");
+    tracing::info!("  GET  /health/db - Health check de base de datos");
     tracing::info!("  POST /api/v1/transactions - Procesar transacciones");
     tracing::info!("  GET  /api/v1/balance/:blockchain/:address - Obtener balance");
     tracing::info!("  GET  /api/v1/queue-status - Estado de colas Redis");
+    tracing::info!("  GET  /api/v1/users - Obtener usuarios (TEST)");
+    tracing::info!("  GET  /api/v1/songs - Obtener canciones (TEST)");
 
     axum::serve(listener, app).await?;
 
