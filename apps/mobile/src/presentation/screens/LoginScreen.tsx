@@ -20,6 +20,10 @@ import { AuthenticateUser, RegisterUser } from '../../application/usecases/Authe
 import { UserRepositoryImpl } from '../../infrastructure/api/UserRepositoryImpl';
 import { ApiClient } from '../../infrastructure/api/ApiClient';
 
+// Localization imports
+import { useTranslation } from '../../localization/hooks/useTranslation';
+import { LanguageSelector } from '../../localization/components/LanguageSelector';
+
 const { width, height } = Dimensions.get('window');
 
 // Componente de partículas musicales animadas
@@ -77,6 +81,10 @@ export default function LoginScreen({ navigation }: any) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showLanguageSelector, setShowLanguageSelector] = useState(false);
+
+  // Traducciones
+  const { t, getCurrentLanguageInfo } = useTranslation();
 
   // Animaciones
   const logoScale = useRef(new Animated.Value(0.8)).current;
@@ -114,7 +122,7 @@ export default function LoginScreen({ navigation }: any) {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Por favor ingresa email y contraseña');
+      Alert.alert(t('common.error'), t('auth.login.errors.emptyFields'));
       return;
     }
 
@@ -126,8 +134,8 @@ export default function LoginScreen({ navigation }: any) {
       });
 
       Alert.alert(
-        'Éxito',
-        `¡Bienvenido ${result.user.username}!`,
+        t('auth.login.success'),
+        t('auth.login.welcomeBack', { username: result.user.username }),
         [
           {
             text: 'OK',
@@ -136,7 +144,7 @@ export default function LoginScreen({ navigation }: any) {
         ]
       );
     } catch (error: any) {
-      Alert.alert('Error de Login', error.message);
+      Alert.alert(t('common.error'), t('auth.login.errors.invalidCredentials'));
     } finally {
       setLoading(false);
     }
@@ -144,12 +152,12 @@ export default function LoginScreen({ navigation }: any) {
 
   const handleRegister = async () => {
     if (!email || !username || !password) {
-      Alert.alert('Error', 'Por favor completa todos los campos');
+      Alert.alert(t('common.error'), t('auth.register.errors.emptyFields'));
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres');
+      Alert.alert(t('common.error'), t('auth.register.errors.passwordTooShort'));
       return;
     }
 
@@ -163,8 +171,8 @@ export default function LoginScreen({ navigation }: any) {
       });
 
       Alert.alert(
-        'Registro Exitoso',
-        `¡Cuenta creada para ${result.user.username}!`,
+        t('auth.register.success'),
+        t('auth.register.accountCreated', { username: result.user.username }),
         [
           {
             text: 'OK',
@@ -173,7 +181,7 @@ export default function LoginScreen({ navigation }: any) {
         ]
       );
     } catch (error: any) {
-      Alert.alert('Error de Registro', error.message);
+      Alert.alert(t('common.error'), t('auth.register.errors.serverError'));
     } finally {
       setLoading(false);
     }
@@ -225,11 +233,20 @@ export default function LoginScreen({ navigation }: any) {
             >
               <Text style={styles.logoIcon}>🎵</Text>
             </LinearGradient>
-            <Text style={styles.title}>VibeStream</Text>
+            <Text style={styles.title}>{t('app.name')}</Text>
           </View>
           <Text style={styles.subtitle}>
-            {isLogin ? 'Inicia sesión' : 'Crea tu cuenta'}
+            {isLogin ? t('auth.login.subtitle') : t('auth.register.subtitle')}
           </Text>
+          
+          {/* Selector de idioma */}
+          <TouchableOpacity 
+            style={styles.languageButton}
+            onPress={() => setShowLanguageSelector(true)}
+          >
+            <Text style={styles.languageFlag}>{getCurrentLanguageInfo().flag}</Text>
+            <Text style={styles.languageText}>{getCurrentLanguageInfo().name}</Text>
+          </TouchableOpacity>
           <View style={styles.musicWave}>
             <View style={[styles.waveBar, { height: 4 }]} />
             <View style={[styles.waveBar, { height: 12 }]} />
@@ -254,7 +271,7 @@ export default function LoginScreen({ navigation }: any) {
           <View style={styles.glassContainer}>
             <TextInput
               style={styles.input}
-              placeholder="Email"
+              placeholder={t('auth.login.email')}
               placeholderTextColor="#9ca3af"
               value={email}
               onChangeText={setEmail}
@@ -266,7 +283,7 @@ export default function LoginScreen({ navigation }: any) {
             {!isLogin && (
               <TextInput
                 style={styles.input}
-                placeholder="Nombre de usuario"
+                placeholder={t('auth.register.username')}
                 placeholderTextColor="#9ca3af"
                 value={username}
                 onChangeText={setUsername}
@@ -277,7 +294,7 @@ export default function LoginScreen({ navigation }: any) {
 
             <TextInput
               style={styles.input}
-              placeholder="Contraseña"
+              placeholder={t('auth.login.password')}
               placeholderTextColor="#9ca3af"
               value={password}
               onChangeText={setPassword}
@@ -301,7 +318,7 @@ export default function LoginScreen({ navigation }: any) {
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (
                   <Text style={styles.buttonText}>
-                    {isLogin ? 'Iniciar Sesión' : 'Registrarse'}
+                    {isLogin ? t('auth.login.button') : t('auth.register.button')}
                   </Text>
                 )}
               </LinearGradient>
@@ -310,8 +327,8 @@ export default function LoginScreen({ navigation }: any) {
             <TouchableOpacity onPress={toggleMode} style={styles.toggleButton}>
               <Text style={styles.toggleText}>
                 {isLogin 
-                  ? '¿No tienes cuenta? Regístrate' 
-                  : '¿Ya tienes cuenta? Inicia sesión'
+                  ? t('auth.login.switchToRegister')
+                  : t('auth.register.switchToLogin')
                 }
               </Text>
             </TouchableOpacity>
@@ -327,11 +344,21 @@ export default function LoginScreen({ navigation }: any) {
             end={{ x: 1, y: 0 }}
           >
             <Text style={styles.footerText}>
-              Música descentralizada con blockchain
+              {t('app.tagline')}
             </Text>
           </LinearGradient>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Selector de idioma */}
+      <LanguageSelector
+        visible={showLanguageSelector}
+        onClose={() => setShowLanguageSelector(false)}
+        onLanguageChange={() => {
+          // El cambio de idioma se maneja automáticamente
+          console.log('Language changed');
+        }}
+      />
     </View>
   );
 }
@@ -505,5 +532,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     opacity: 0.9,
+  },
+  languageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  languageFlag: {
+    fontSize: 16,
+    marginRight: 6,
+  },
+  languageText: {
+    color: '#d1d5db',
+    fontSize: 12,
+    fontWeight: '500',
   },
 }); 

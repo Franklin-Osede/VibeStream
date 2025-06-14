@@ -1,0 +1,98 @@
+{
+  "app": {
+    "name": "VibeStream",
+    "tagline": "Decentralized music with blockchain"
+  },
+  "auth": {
+    "login": {
+      "title": "Sign In",
+      "subtitle": "Welcome back to VibeStream",
+      "email": "Email",
+      "password": "Password",
+      "button": "Sign In",
+      "switchToRegister": "Don't have an account? Sign up",
+      "success": "Success",
+      "welcomeBack": "Welcome back {{username}}!",
+      "errors": {
+        "invalidCredentials": "Invalid email or password",
+        "networkError": "Network connection error",
+        "serverError": "Server error, please try again",
+        "emptyFields": "Please enter email and password"
+      }
+    },
+    "register": {
+      "title": "Create Account",
+      "subtitle": "Join the VibeStream community",
+      "email": "Email",
+      "username": "Username",
+      "password": "Password",
+      "button": "Sign Up",
+      "switchToLogin": "Already have an account? Sign in",
+      "success": "Registration Successful",
+      "accountCreated": "Account created for {{username}}!",
+      "errors": {
+        "emailExists": "Email already exists",
+        "usernameExists": "Username already taken",
+        "passwordTooShort": "Password must be at least 6 characters",
+        "invalidEmail": "Please enter a valid email",
+        "networkError": "Network connection error",
+        "serverError": "Server error, please try again",
+        "emptyFields": "Please fill in all fields"
+      }
+    }
+  },
+  "navigation": {
+    "home": "Home",
+    "music": "Music",
+    "wallet": "Wallet",
+    "profile": "Profile",
+    "settings": "Settings"
+  },
+  "home": {
+    "welcome": "Welcome to VibeStream",
+    "featuredMusic": "Featured Music",
+    "recentlyPlayed": "Recently Played",
+    "trending": "Trending Now"
+  },
+  "music": {
+    "play": "Play",
+    "pause": "Pause",
+    "next": "Next",
+    "previous": "Previous",
+    "purchase": "Purchase",
+    "price": "Price: {{amount}} ETH",
+    "duration": "Duration: {{time}}",
+    "artist": "Artist: {{name}}"
+  },
+  "wallet": {
+    "balance": "Balance",
+    "connect": "Connect Wallet",
+    "disconnect": "Disconnect",
+    "transactions": "Transactions",
+    "send": "Send",
+    "receive": "Receive"
+  },
+  "settings": {
+    "language": "Language",
+    "theme": "Theme",
+    "notifications": "Notifications",
+    "privacy": "Privacy",
+    "about": "About",
+    "logout": "Logout"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "share": "Share",
+    "back": "Back",
+    "next": "Next",
+    "done": "Done",
+    "retry": "Retry"
+  }
+} 

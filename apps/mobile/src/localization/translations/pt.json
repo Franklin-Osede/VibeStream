@@ -1,0 +1,98 @@
+{
+  "app": {
+    "name": "VibeStream",
+    "tagline": "Música descentralizada com blockchain"
+  },
+  "auth": {
+    "login": {
+      "title": "Entrar",
+      "subtitle": "Bem-vindo de volta ao VibeStream",
+      "email": "Email",
+      "password": "Senha",
+      "button": "Entrar",
+      "switchToRegister": "Não tem conta? Cadastre-se",
+      "success": "Sucesso",
+      "welcomeBack": "Bem-vindo de volta {{username}}!",
+      "errors": {
+        "invalidCredentials": "Email ou senha incorretos",
+        "networkError": "Erro de conexão de rede",
+        "serverError": "Erro do servidor, tente novamente",
+        "emptyFields": "Por favor digite email e senha"
+      }
+    },
+    "register": {
+      "title": "Criar Conta",
+      "subtitle": "Junte-se à comunidade VibeStream",
+      "email": "Email",
+      "username": "Nome de Usuário",
+      "password": "Senha",
+      "button": "Cadastrar",
+      "switchToLogin": "Já tem conta? Entre",
+      "success": "Cadastro Realizado",
+      "accountCreated": "Conta criada para {{username}}!",
+      "errors": {
+        "emailExists": "Email já existe",
+        "usernameExists": "Nome de usuário já existe",
+        "passwordTooShort": "A senha deve ter pelo menos 6 caracteres",
+        "invalidEmail": "Por favor digite um email válido",
+        "networkError": "Erro de conexão de rede",
+        "serverError": "Erro do servidor, tente novamente",
+        "emptyFields": "Por favor preencha todos os campos"
+      }
+    }
+  },
+  "navigation": {
+    "home": "Início",
+    "music": "Música",
+    "wallet": "Carteira",
+    "profile": "Perfil",
+    "settings": "Configurações"
+  },
+  "home": {
+    "welcome": "Bem-vindo ao VibeStream",
+    "featuredMusic": "Música em Destaque",
+    "recentlyPlayed": "Tocadas Recentemente",
+    "trending": "Em Alta Agora"
+  },
+  "music": {
+    "play": "Tocar",
+    "pause": "Pausar",
+    "next": "Próxima",
+    "previous": "Anterior",
+    "purchase": "Comprar",
+    "price": "Preço: {{amount}} ETH",
+    "duration": "Duração: {{time}}",
+    "artist": "Artista: {{name}}"
+  },
+  "wallet": {
+    "balance": "Saldo",
+    "connect": "Conectar Carteira",
+    "disconnect": "Desconectar",
+    "transactions": "Transações",
+    "send": "Enviar",
+    "receive": "Receber"
+  },
+  "settings": {
+    "language": "Idioma",
+    "theme": "Tema",
+    "notifications": "Notificações",
+    "privacy": "Privacidade",
+    "about": "Sobre",
+    "logout": "Sair"
+  },
+  "common": {
+    "loading": "Carregando...",
+    "error": "Erro",
+    "success": "Sucesso",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "save": "Salvar",
+    "delete": "Deletar",
+    "edit": "Editar",
+    "share": "Compartilhar",
+    "back": "Voltar",
+    "next": "Próximo",
+    "done": "Pronto",
+    "retry": "Tentar Novamente"
+  }
+} 

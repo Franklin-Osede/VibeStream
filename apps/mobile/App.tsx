@@ -7,6 +7,9 @@ import LoginScreen from './src/presentation/screens/LoginScreen';
 import 'react-native-get-random-values';
 import 'react-native-url-polyfill/auto';
 
+// Initialize i18n
+import './src/localization/config/i18n';
+
 const Stack = createNativeStackNavigator();
 
 // Placeholder Home Screen
