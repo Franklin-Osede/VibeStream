@@ -1,15 +1,27 @@
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 pub mod blockchain;
 pub mod messages;
 pub mod errors;
+pub mod models;
 
 // Re-exports principales
 pub use blockchain::*;
 pub use messages::*;
 pub use errors::*;
+pub use models::{
+    User, CreateUser, LoginRequest, LoginResponse, UserRole,
+    Artist, CreateArtist,
+    Song, CreateSong,
+    Playlist, CreatePlaylist, PlaylistSong,
+    TransactionRecord, TransactionType,
+    ListenEvent, CreateListenEvent
+};
+
+// Re-export commonly used external types
+pub use uuid::Uuid;
+pub use chrono::{DateTime, Utc};
+pub use rust_decimal::Decimal;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RequestId(pub Uuid);

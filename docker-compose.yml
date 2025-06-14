@@ -1,4 +1,5 @@
 services:
+  # Database
   postgres:
     image: postgres:15
     environment:
@@ -14,40 +15,92 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - vibestream-network
 
-  backend-core:
+  # Message Queue
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - vibestream-network
+
+  # API Gateway (Main entry point)
+  api-gateway:
     build:
-      context: ./backend
-      dockerfile: backend-core/Dockerfile
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
     environment:
       DATABASE_URL: postgres://vibestream:vibestream@postgres:5432/vibestream
+      REDIS_URL: redis://redis:6379
       RUST_LOG: info
       SERVER_HOST: 0.0.0.0
       SERVER_PORT: 3000
-      SOLANA_SERVICE_URL: http://solana-service:3001
     ports:
       - "3000:3000"
     depends_on:
       postgres:
         condition: service_healthy
-      solana-service:
-        condition: service_started
+      redis:
+        condition: service_healthy
+    networks:
+      - vibestream-network
 
+  # Ethereum Service
+  ethereum-service:
+    build:
+      context: ./services/ethereum
+      dockerfile: Dockerfile
+    environment:
+      REDIS_URL: redis://redis:6379
+      RUST_LOG: info
+      ETH_RPC_URL: ${ETH_RPC_URL:-https://eth-mainnet.alchemyapi.io/v2/your-api-key}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - vibestream-network
+
+  # Solana Service
   solana-service:
     build:
-      context: ./solana-integration
+      context: ./services/solana
       dockerfile: Dockerfile
-    ports:
-      - "3001:3001"
     environment:
-      - RUST_LOG=debug
-    volumes:
-      - ./solana-integration:/usr/src/app
+      REDIS_URL: redis://redis:6379
+      RUST_LOG: info
+      SOLANA_RPC_URL: ${SOLANA_RPC_URL:-https://api.mainnet-beta.solana.com}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - vibestream-network
+
+  # ZK Service
+  zk-service:
+    build:
+      context: ./services/zk-service
+      dockerfile: Dockerfile
+    environment:
+      REDIS_URL: redis://redis:6379
+      RUST_LOG: info
+    depends_on:
+      redis:
+        condition: service_healthy
     networks:
       - vibestream-network
 
 volumes:
   postgres_data:
+  redis_data:
 
 networks:
   vibestream-network:
