@@ -24,6 +24,9 @@ import { ApiClient } from '../../infrastructure/api/ApiClient';
 import { useTranslation } from '../../localization/hooks/useTranslation';
 import { LanguageSelector } from '../../localization/components/LanguageSelector';
 
+// Theme imports
+import { useTheme } from '../../theme';
+
 const { width, height } = Dimensions.get('window');
 
 // Componente de partículas musicales animadas
@@ -61,8 +64,9 @@ const MusicParticle = ({ index }: { index: number }) => {
   return (
     <Animated.View
       style={[
-        styles.musicParticle,
         {
+          position: 'absolute',
+          zIndex: 1,
           opacity: fadeAnim,
           transform: [{ translateY }],
           left: Math.random() * width,
@@ -70,10 +74,170 @@ const MusicParticle = ({ index }: { index: number }) => {
         },
       ]}
     >
-      <Text style={styles.particleText}>♪</Text>
+      <Text style={{
+        fontSize: 20,
+        color: '#6C5CE7',
+        opacity: 0.7,
+      }}>♪</Text>
     </Animated.View>
   );
 };
+
+// Función para crear estilos usando el tema
+const createStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  background: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+  },
+  keyboardContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: theme.spacing.lg,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: theme.spacing.xxl + theme.spacing.md,
+    zIndex: 2,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: theme.spacing.lg,
+  },
+  logoGradient: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: theme.spacing.md,
+    ...theme.shadows.lg,
+    shadowColor: theme.primary,
+  },
+  logoIcon: {
+    fontSize: 40,
+    color: theme.text,
+  },
+  title: {
+    ...theme.styles.titleLarge,
+    textShadowColor: `${theme.primary}80`,
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 10,
+    letterSpacing: 1,
+  },
+  subtitle: {
+    ...theme.styles.titleSmall,
+    color: theme.textSecondary,
+    fontWeight: '300',
+    marginBottom: theme.spacing.lg,
+  },
+  languageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.glassLight,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.xl,
+    marginTop: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.glassMedium,
+  },
+  languageFlag: {
+    fontSize: 16,
+    marginRight: theme.spacing.sm,
+  },
+  languageText: {
+    color: theme.textSecondary,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  musicWave: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    height: 20,
+    gap: 3,
+  },
+  waveBar: {
+    width: 3,
+    backgroundColor: theme.primary,
+    borderRadius: 2,
+    opacity: 0.8,
+  },
+  form: {
+    width: '100%',
+    zIndex: 2,
+  },
+  glassContainer: {
+    backgroundColor: theme.colors.glassLight,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.xl,
+    borderWidth: 1,
+    borderColor: theme.colors.glassMedium,
+    ...theme.shadows.lg,
+  },
+  input: {
+    backgroundColor: theme.colors.glassLight,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.lg,
+    marginBottom: theme.spacing.lg,
+    color: theme.text,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.glassMedium,
+    fontWeight: '500',
+    ...theme.shadows.sm,
+  },
+  buttonContainer: {
+    borderRadius: theme.borderRadius.md,
+    marginTop: theme.spacing.sm,
+    ...theme.shadows.lg,
+    shadowColor: theme.primary,
+  },
+  button: {
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.lg,
+    alignItems: 'center',
+  },
+  buttonDisabled: {
+    shadowOpacity: 0.2,
+  },
+  buttonText: {
+    color: theme.text,
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  toggleButton: {
+    marginTop: theme.spacing.lg + theme.spacing.sm,
+    alignItems: 'center',
+  },
+  toggleText: {
+    color: theme.colors.primaryLight,
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  footer: {
+    alignItems: 'center',
+    marginTop: theme.spacing.xl + theme.spacing.sm,
+    zIndex: 2,
+  },
+  footerGradient: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.xl,
+  },
+  footerText: {
+    color: theme.text,
+    fontSize: 14,
+    fontWeight: '600',
+    opacity: 0.9,
+  },
+});
 
 export default function LoginScreen({ navigation }: any) {
   const [isLogin, setIsLogin] = useState(true);
@@ -85,6 +249,10 @@ export default function LoginScreen({ navigation }: any) {
 
   // Traducciones
   const { t, getCurrentLanguageInfo } = useTranslation();
+  
+  // Tema
+  const theme = useTheme();
+  const styles = createStyles(theme);
 
   // Animaciones
   const logoScale = useRef(new Animated.Value(0.8)).current;
@@ -200,7 +368,7 @@ export default function LoginScreen({ navigation }: any) {
       
       {/* Fondo con gradiente */}
       <LinearGradient
-        colors={['#0f0f23', '#16213e', '#1a1a2e', '#0f3460']}
+        colors={theme.gradients.background}
         style={styles.background}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -226,7 +394,7 @@ export default function LoginScreen({ navigation }: any) {
         >
           <View style={styles.logoContainer}>
             <LinearGradient
-              colors={['#6c5ce7', '#a29bfe', '#fd79a8']}
+              colors={[theme.primary, theme.colors.primaryLight, theme.colors.accentPink]}
               style={styles.logoGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
@@ -247,6 +415,7 @@ export default function LoginScreen({ navigation }: any) {
             <Text style={styles.languageFlag}>{getCurrentLanguageInfo().flag}</Text>
             <Text style={styles.languageText}>{getCurrentLanguageInfo().name}</Text>
           </TouchableOpacity>
+          
           <View style={styles.musicWave}>
             <View style={[styles.waveBar, { height: 4 }]} />
             <View style={[styles.waveBar, { height: 12 }]} />
@@ -272,7 +441,7 @@ export default function LoginScreen({ navigation }: any) {
             <TextInput
               style={styles.input}
               placeholder={t('auth.login.email')}
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={theme.textMuted}
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
@@ -284,7 +453,7 @@ export default function LoginScreen({ navigation }: any) {
               <TextInput
                 style={styles.input}
                 placeholder={t('auth.register.username')}
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor={theme.textMuted}
                 value={username}
                 onChangeText={setUsername}
                 autoCapitalize="none"
@@ -295,7 +464,7 @@ export default function LoginScreen({ navigation }: any) {
             <TextInput
               style={styles.input}
               placeholder={t('auth.login.password')}
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={theme.textMuted}
               value={password}
               onChangeText={setPassword}
               secureTextEntry
@@ -309,7 +478,7 @@ export default function LoginScreen({ navigation }: any) {
               disabled={loading}
             >
               <LinearGradient
-                colors={loading ? ['#666', '#888'] : ['#6c5ce7', '#a29bfe']}
+                colors={loading ? [theme.colors.textDisabled, theme.colors.textMuted] : [theme.primary, theme.colors.primaryLight]}
                 style={styles.button}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
@@ -338,7 +507,7 @@ export default function LoginScreen({ navigation }: any) {
         {/* Footer mejorado */}
         <View style={styles.footer}>
           <LinearGradient
-            colors={['#6c5ce7', '#a29bfe']}
+            colors={[theme.primary, theme.colors.primaryLight]}
             style={styles.footerGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
@@ -363,194 +532,4 @@ export default function LoginScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  background: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-  },
-  keyboardContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 20,
-  },
-  musicParticle: {
-    position: 'absolute',
-    zIndex: 1,
-  },
-  particleText: {
-    fontSize: 20,
-    color: '#6c5ce7',
-    opacity: 0.7,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 50,
-    zIndex: 2,
-  },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  logoGradient: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 15,
-    shadowColor: '#6c5ce7',
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.44,
-    shadowRadius: 10.32,
-    elevation: 16,
-  },
-  logoIcon: {
-    fontSize: 40,
-    color: '#fff',
-  },
-  title: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: '#fff',
-    textShadowColor: 'rgba(108, 92, 231, 0.5)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 10,
-    letterSpacing: 1,
-  },
-  subtitle: {
-    fontSize: 20,
-    color: '#d1d5db',
-    fontWeight: '300',
-    marginBottom: 20,
-  },
-  musicWave: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    height: 20,
-    gap: 3,
-  },
-  waveBar: {
-    width: 3,
-    backgroundColor: '#6c5ce7',
-    borderRadius: 2,
-    opacity: 0.8,
-  },
-  form: {
-    width: '100%',
-    zIndex: 2,
-  },
-  glassContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 24,
-    padding: 30,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.44,
-    shadowRadius: 10.32,
-    elevation: 16,
-  },
-  input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 20,
-    color: '#fff',
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    fontWeight: '500',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  buttonContainer: {
-    borderRadius: 16,
-    marginTop: 10,
-    shadowColor: '#6c5ce7',
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.44,
-    shadowRadius: 10.32,
-    elevation: 16,
-  },
-  button: {
-    borderRadius: 16,
-    padding: 18,
-    alignItems: 'center',
-  },
-  buttonDisabled: {
-    shadowOpacity: 0.2,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  toggleButton: {
-    marginTop: 25,
-    alignItems: 'center',
-  },
-  toggleText: {
-    color: '#a29bfe',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  footer: {
-    alignItems: 'center',
-    marginTop: 40,
-    zIndex: 2,
-  },
-  footerGradient: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  footerText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-    opacity: 0.9,
-  },
-  languageButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  languageFlag: {
-    fontSize: 16,
-    marginRight: 6,
-  },
-  languageText: {
-    color: '#d1d5db',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-}); 
+ 
