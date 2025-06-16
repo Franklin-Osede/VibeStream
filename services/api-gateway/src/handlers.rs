@@ -696,30 +696,100 @@ pub async fn get_user_transactions(
     Json(transactions)
 }
 
-// POST /api/v1/auth/oauth - Registro/Login via OAuth (VERSIÓN SIMPLIFICADA PARA DEBUG)
+// POST /api/v1/auth/oauth - Registro/Login via OAuth
 #[axum::debug_handler]
 pub async fn oauth_register(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Json(request): Json<OAuthRegisterRequest>,
-) -> Result<Json<serde_json::Value>, StatusCode> {
-    tracing::info!("🔐 OAuth request recibido para {} via {}", request.email, request.provider);
+) -> Result<Json<LoginResponse>, StatusCode> {
+    tracing::info!("🔐 OAuth request para {} via {}", request.email, request.provider);
     
-    // Respuesta simplificada para debugging
-    let mock_response = serde_json::json!({
-        "status": "success",
-        "message": "OAuth endpoint funcionando",
-        "received_data": {
-            "email": request.email,
-            "username": request.username,
-            "provider": request.provider,
-            "provider_id": request.provider_id,
-            "name": request.name
-        },
-        "timestamp": chrono::Utc::now().to_rfc3339()
-    });
+    // Primero verificar si el usuario ya existe
+    let existing_user = sqlx::query("SELECT id, username, email, role FROM users WHERE email = $1")
+        .bind(&request.email)
+        .fetch_optional(state.database_pool.get_pool())
+        .await;
     
-    tracing::info!("✅ OAuth respuesta enviada");
-    Ok(Json(mock_response))
+    match existing_user {
+        Ok(Some(row)) => {
+            // Usuario ya existe - hacer login
+            let user_id: uuid::Uuid = row.get("id");
+            let username: String = row.get("username");
+            let email: String = row.get("email");
+            let role: String = row.get("role");
+            
+            let claims = Claims::new(user_id, username.clone(), email.clone(), role.clone());
+            
+            match claims.to_jwt() {
+                Ok(token) => {
+                    tracing::info!("✅ OAuth login exitoso: {}", email);
+                    Ok(Json(LoginResponse {
+                        token,
+                        user: UserInfo { id: user_id.to_string(), username, email, role },
+                    }))
+                }
+                Err(e) => {
+                    tracing::error!("❌ Error generando JWT: {:?}", e);
+                    Err(StatusCode::INTERNAL_SERVER_ERROR)
+                }
+            }
+        }
+        Ok(None) => {
+            // Usuario no existe - crear nuevo con wallet automática
+            let user_id = uuid::Uuid::new_v4();
+            let wallet_address = generate_custodial_wallet(&user_id);
+            
+            let insert_result = sqlx::query(
+                "INSERT INTO users (id, email, username, password_hash, wallet_address, role, provider, provider_id, profile_picture) 
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
+                 RETURNING id, username, email, role"
+            )
+            .bind(user_id)
+            .bind(&request.email)
+            .bind(&request.username)
+            .bind(None::<String>) // No password for OAuth users
+            .bind(&wallet_address)
+            .bind("user")
+            .bind(&request.provider)
+            .bind(&request.provider_id)
+            .bind(&request.profile_picture)
+            .fetch_one(state.database_pool.get_pool())
+            .await;
+            
+            match insert_result {
+                Ok(row) => {
+                    let user_id: uuid::Uuid = row.get("id");
+                    let username: String = row.get("username");
+                    let email: String = row.get("email");
+                    let role: String = row.get("role");
+                    
+                    let claims = Claims::new(user_id, username.clone(), email.clone(), role.clone());
+                    
+                    match claims.to_jwt() {
+                        Ok(token) => {
+                            tracing::info!("✅ OAuth usuario registrado: {} - wallet: {}", email, wallet_address);
+                            Ok(Json(LoginResponse {
+                                token,
+                                user: UserInfo { id: user_id.to_string(), username, email, role },
+                            }))
+                        }
+                        Err(e) => {
+                            tracing::error!("❌ Error generando JWT después de registro: {:?}", e);
+                            Err(StatusCode::INTERNAL_SERVER_ERROR)
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("❌ Error al registrar usuario OAuth: {:?}", e);
+                    Err(StatusCode::INTERNAL_SERVER_ERROR)
+                }
+            }
+        }
+        Err(e) => {
+            tracing::error!("❌ Error en consulta de base de datos: {:?}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
 }
 
 // Función para generar wallet custodiada (simplificada por ahora)

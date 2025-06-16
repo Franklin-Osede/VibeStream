@@ -15,6 +15,15 @@ interface BackendLoginResponse {
   user: BackendUserInfo;
 }
 
+interface OAuthUserData {
+  email: string;
+  username: string;
+  provider: string;
+  provider_id: string;
+  name: string;
+  profile_picture?: string;
+}
+
 interface BackendUserResponse {
   id: string;
   username: string;
