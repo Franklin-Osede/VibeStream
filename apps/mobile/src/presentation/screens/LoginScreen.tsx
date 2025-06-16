@@ -19,6 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { AuthenticateUser, RegisterUser } from '../../application/usecases/AuthenticateUser';
 import { UserRepositoryImpl } from '../../infrastructure/api/UserRepositoryImpl';
 import { ApiClient } from '../../infrastructure/api/ApiClient';
+import { useGoogleAuth, useMicrosoftAuth, GoogleUser } from '../../infrastructure/auth/GoogleAuth';
 
 // Localization imports
 import { useTranslation } from '../../localization/hooks/useTranslation';
@@ -237,6 +238,79 @@ const createStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
     fontWeight: '600',
     opacity: 0.9,
   },
+  oauthSection: {
+    marginBottom: theme.spacing.lg,
+  },
+  oauthTitle: {
+    ...theme.styles.titleSmall,
+    color: theme.textSecondary,
+    fontWeight: '300',
+    marginBottom: theme.spacing.md,
+    textAlign: 'center',
+  },
+  oauthButton: {
+    borderRadius: theme.borderRadius.md,
+    marginBottom: theme.spacing.sm,
+    ...theme.shadows.lg,
+  },
+  oauthIcon: {
+    fontSize: 20,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: theme.textMuted,
+  },
+  dividerText: {
+    marginHorizontal: theme.spacing.md,
+    color: theme.textMuted,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  oauthText: {
+    color: theme.text,
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  googleButton: {
+    borderRadius: theme.borderRadius.lg,
+    overflow: 'hidden',
+    ...theme.shadows.md,
+  },
+  microsoftButton: {
+    borderRadius: theme.borderRadius.lg,
+    overflow: 'hidden',
+    ...theme.shadows.md,
+  },
+  oauthGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.lg,
+  },
+  googleIcon: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#db4437',
+    marginRight: theme.spacing.sm,
+  },
+  microsoftIcon: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginRight: theme.spacing.sm,
+  },
+  oauthButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });
 
 export default function LoginScreen({ navigation }: any) {
@@ -307,7 +381,7 @@ export default function LoginScreen({ navigation }: any) {
         [
           {
             text: 'OK',
-            onPress: () => navigation.replace('Home', { user: result.user })
+            onPress: () => navigation.replace('Main', { user: result.user })
           }
         ]
       );
@@ -344,7 +418,7 @@ export default function LoginScreen({ navigation }: any) {
         [
           {
             text: 'OK',
-            onPress: () => navigation.replace('Home', { user: result.user })
+            onPress: () => navigation.replace('Main', { user: result.user })
           }
         ]
       );
@@ -360,6 +434,42 @@ export default function LoginScreen({ navigation }: any) {
     setEmail('');
     setUsername('');
     setPassword('');
+  };
+
+  const handleMockOAuth = async (provider: 'google' | 'microsoft') => {
+    setLoading(true);
+    try {
+      // Simular delay de OAuth
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Datos mock del usuario según provider
+      const mockUser = {
+        id: `${provider}_${Date.now()}`,
+        email: provider === 'google' ? 'usuario@gmail.com' : 'usuario@outlook.com',
+        username: provider === 'google' ? 'GoogleUser' : 'MicrosoftUser',
+        name: provider === 'google' ? 'Usuario Google' : 'Usuario Microsoft',
+        provider: provider,
+        profilePicture: provider === 'google' 
+          ? 'https://lh3.googleusercontent.com/a/default-user=s96-c' 
+          : 'https://graph.microsoft.com/v1.0/me/photo/$value',
+        role: 'user'
+      };
+
+      Alert.alert(
+        'Bienvenido',
+        `¡Hola ${mockUser.name}! Te registraste con ${provider === 'google' ? 'Google' : 'Microsoft'}`,
+        [
+          {
+            text: 'Continuar',
+            onPress: () => navigation.replace('Onboarding', { user: mockUser })
+          }
+        ]
+      );
+    } catch (error) {
+      Alert.alert('Error', `No se pudo iniciar sesión con ${provider}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -501,6 +611,47 @@ export default function LoginScreen({ navigation }: any) {
                 }
               </Text>
             </TouchableOpacity>
+
+            {/* OAuth Buttons - Mock por ahora */}
+            <View style={styles.oauthSection}>
+              <View style={styles.divider}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>o continúa con</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+                             <TouchableOpacity 
+                 style={[styles.oauthButton, styles.googleButton]}
+                 onPress={() => handleMockOAuth('google')}
+                 disabled={loading}
+               >
+                 <LinearGradient
+                   colors={['#db4437', '#f4b400']}
+                   style={styles.oauthGradient}
+                   start={{ x: 0, y: 0 }}
+                   end={{ x: 1, y: 0 }}
+                 >
+                   <Text style={styles.googleIcon}>G</Text>
+                   <Text style={styles.oauthButtonText}>Continuar con Google</Text>
+                 </LinearGradient>
+               </TouchableOpacity>
+
+               <TouchableOpacity 
+                 style={[styles.oauthButton, styles.microsoftButton]}
+                 onPress={() => handleMockOAuth('microsoft')}
+                 disabled={loading}
+               >
+                 <LinearGradient
+                   colors={['#0078d4', '#40e0d0']}
+                   style={styles.oauthGradient}
+                   start={{ x: 0, y: 0 }}
+                   end={{ x: 1, y: 0 }}
+                 >
+                   <Text style={styles.microsoftIcon}>⊞</Text>
+                   <Text style={styles.oauthButtonText}>Continuar con Microsoft</Text>
+                 </LinearGradient>
+               </TouchableOpacity>
+            </View>
           </View>
         </Animated.View>
 

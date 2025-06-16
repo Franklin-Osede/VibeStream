@@ -75,6 +75,7 @@ async fn main() -> anyhow::Result<()> {
         // Authentication routes
         .route("/api/v1/auth/login", post(handlers::login))
         .route("/api/v1/auth/register", post(handlers::register))
+        .route("/api/v1/auth/oauth", post(handlers::oauth_register))
         .route("/api/v1/auth/profile", get(handlers::get_profile))
         
         // Database routes
@@ -112,6 +113,7 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("🔐 Autenticación:");
     tracing::info!("  POST /api/v1/auth/login - Login usuario");
     tracing::info!("  POST /api/v1/auth/register - Registrar usuario");
+    tracing::info!("  POST /api/v1/auth/oauth - OAuth register/login (Google, Microsoft)");
     tracing::info!("  GET  /api/v1/auth/profile - Perfil usuario (protegido)");
     tracing::info!("📊 Base de datos:");
     tracing::info!("  GET  /api/v1/users - Obtener usuarios");

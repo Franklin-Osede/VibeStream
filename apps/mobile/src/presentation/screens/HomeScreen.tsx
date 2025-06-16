@@ -27,6 +27,7 @@ const MOCK_SONGS = [
     price: '0.05',
     cover: 'https://via.placeholder.com/80x80/6c5ce7/ffffff?text=ED',
     isPlaying: false,
+    hasActiveCampaign: true,
   },
   {
     id: '2',
@@ -36,6 +37,7 @@ const MOCK_SONGS = [
     price: '0.08',
     cover: 'https://via.placeholder.com/80x80/ff6b6b/ffffff?text=MV',
     isPlaying: false,
+    hasActiveCampaign: false,
   },
   {
     id: '3',
@@ -45,6 +47,7 @@ const MOCK_SONGS = [
     price: '0.12',
     cover: 'https://via.placeholder.com/80x80/00d4ff/ffffff?text=DS',
     isPlaying: true,
+    hasActiveCampaign: true,
   },
   {
     id: '4',
@@ -54,6 +57,7 @@ const MOCK_SONGS = [
     price: '0.15',
     cover: 'https://via.placeholder.com/80x80/ffd93d/000000?text=FB',
     isPlaying: false,
+    hasActiveCampaign: false,
   },
 ];
 
@@ -65,6 +69,7 @@ interface Song {
   price: string;
   cover: string;
   isPlaying: boolean;
+  hasActiveCampaign?: boolean;
 }
 
 export default function HomeScreen({ navigation, route }: any) {
@@ -73,7 +78,12 @@ export default function HomeScreen({ navigation, route }: any) {
   const theme = useTheme();
   const [showLanguageSelector, setShowLanguageSelector] = useState(false);
   const [songs, setSongs] = useState(MOCK_SONGS);
-  const [userBalance] = useState('2.45'); // Mock balance
+  
+  // Estados para earnings tracking
+  const [userBalance] = useState('12.47'); // Mock balance en USD
+  const [todayEarnings] = useState('2.34');
+  const [weekEarnings] = useState('18.92');
+  const [totalListenTime] = useState('47'); // horas esta semana
 
   const styles = createStyles(theme);
 
@@ -85,7 +95,7 @@ export default function HomeScreen({ navigation, route }: any) {
     })));
   };
 
-  // Componente para cada canción
+  // Componente para cada canción CON earnings
   const SongItem = ({ item }: { item: Song }) => (
     <TouchableOpacity style={styles.songItem}>
       <Image source={{ uri: item.cover }} style={styles.songCover} />
@@ -93,11 +103,20 @@ export default function HomeScreen({ navigation, route }: any) {
       <View style={styles.songInfo}>
         <Text style={styles.songTitle}>{item.title}</Text>
         <Text style={styles.songArtist}>{item.artist}</Text>
-        <Text style={styles.songDuration}>{t('music.duration', { time: item.duration })}</Text>
+        <Text style={styles.songDuration}>Duración: {item.duration}</Text>
+        
+        {/* EARNINGS DISPLAY - Elemento diferenciador */}
+        <View style={styles.earningsRow}>
+          <Text style={styles.earningsText}>💰 Ganas: $0.02</Text>
+          {item.hasActiveCampaign && (
+            <View style={styles.boostBadge}>
+              <Text style={styles.boostText}>🚀 2x BOOST</Text>
+            </View>
+          )}
+        </View>
       </View>
       
       <View style={styles.songActions}>
-        <Text style={styles.songPrice}>{item.price} ETH</Text>
         <TouchableOpacity
           style={[styles.playButton, item.isPlaying && styles.playButtonActive]}
           onPress={() => togglePlayPause(item.id)}
@@ -122,23 +141,31 @@ export default function HomeScreen({ navigation, route }: any) {
         end={{ x: 1, y: 1 }}
       />
 
-      {/* Header */}
+      {/* Header CON EARNINGS PROMINENTES */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.welcomeText}>{t('home.welcome')}</Text>
+          <Text style={styles.welcomeText}>¡Bienvenido!</Text>
           <Text style={styles.username}>@{user.username}</Text>
+          
+          {/* Stats rápidas */}
+          <View style={styles.quickStats}>
+            <Text style={styles.quickStatsText}>🎵 {totalListenTime}h esta semana</Text>
+          </View>
         </View>
         
         <View style={styles.headerRight}>
-          {/* Balance */}
+          {/* Earnings Balance - MUY PROMINENTE */}
           <LinearGradient
             colors={theme.gradients.gold}
-            style={styles.balanceContainer}
+            style={styles.earningsContainer}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
           >
-            <Text style={styles.balanceLabel}>{t('wallet.balance')}</Text>
-            <Text style={styles.balanceAmount}>{userBalance} ETH</Text>
+            <Text style={styles.earningsLabel}>💰 Disponible</Text>
+            <Text style={styles.earningsAmount}>${userBalance}</Text>
+            <TouchableOpacity style={styles.withdrawButton}>
+              <Text style={styles.withdrawText}>Retirar</Text>
+            </TouchableOpacity>
           </LinearGradient>
           
           {/* Configuración */}
@@ -151,12 +178,43 @@ export default function HomeScreen({ navigation, route }: any) {
         </View>
       </View>
 
+      {/* NUEVA SECCIÓN: Daily Earnings Tracker */}
+      <View style={styles.dailyEarningsSection}>
+        <LinearGradient
+          colors={[theme.colors.success + '20', theme.colors.success + '10']}
+          style={styles.dailyEarningsCard}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+        >
+          <View style={styles.earningsRow}>
+            <View style={styles.earningsColumn}>
+              <Text style={styles.earningsTitle}>Hoy</Text>
+              <Text style={styles.earningsValue}>+${todayEarnings}</Text>
+            </View>
+            <View style={styles.earningsColumn}>
+              <Text style={styles.earningsTitle}>Esta semana</Text>
+              <Text style={styles.earningsValue}>+${weekEarnings}</Text>
+            </View>
+            <TouchableOpacity style={styles.earningsButton}>
+              <Text style={styles.earningsButtonText}>Ver detalles 📊</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <Text style={styles.motivationalText}>
+            ¡Sigue escuchando para ganar más! 🎯
+          </Text>
+        </LinearGradient>
+      </View>
+
       {/* Contenido principal */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         
-        {/* Sección de música destacada */}
+        {/* Sección de música que MÁS PAGA */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('home.featuredMusic')}</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>🔥 Gana más escuchando</Text>
+            <Text style={styles.sectionSubtitle}>Canciones con boost activo</Text>
+          </View>
           
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.featuredContainer}>
@@ -171,6 +229,11 @@ export default function HomeScreen({ navigation, route }: any) {
                     <Image source={{ uri: song.cover }} style={styles.featuredCover} />
                     <Text style={styles.featuredTitle}>{song.title}</Text>
                     <Text style={styles.featuredArtist}>{song.artist}</Text>
+                    
+                    {/* EARNINGS BADGE */}
+                    <View style={styles.earningsBadge}>
+                      <Text style={styles.earningsBadgeText}>💰 $0.04</Text>
+                    </View>
                   </LinearGradient>
                 </TouchableOpacity>
               ))}
@@ -178,9 +241,9 @@ export default function HomeScreen({ navigation, route }: any) {
           </ScrollView>
         </View>
 
-        {/* Sección de tendencias */}
+        {/* Sección de tendencias CON EARNINGS */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('home.trending')}</Text>
+          <Text style={styles.sectionTitle}>Tendencias</Text>
           
           <FlatList
             data={songs}
@@ -191,33 +254,24 @@ export default function HomeScreen({ navigation, route }: any) {
           />
         </View>
 
-        {/* Navegación inferior simulada */}
-        <View style={styles.bottomNavigation}>
+        {/* NUEVA SECCIÓN: Motivational Call-to-Action */}
+        <View style={styles.section}>
           <LinearGradient
-            colors={theme.gradients.surface}
-            style={styles.navGradient}
+            colors={[theme.primary + '15', theme.accent + '15']}
+            style={styles.motivationalCard}
             start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
+            end={{ x: 1, y: 1 }}
           >
-            <TouchableOpacity style={[styles.navItem, styles.navItemActive]}>
-              <Text style={styles.navIcon}>🏠</Text>
-              <Text style={styles.navText}>{t('navigation.home')}</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.navItem}>
-              <Text style={styles.navIcon}>🎵</Text>
-              <Text style={styles.navText}>{t('navigation.music')}</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.navItem}>
-              <Text style={styles.navIcon}>💰</Text>
-              <Text style={styles.navText}>{t('navigation.wallet')}</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.navItem}>
-              <Text style={styles.navIcon}>👤</Text>
-              <Text style={styles.navText}>{t('navigation.profile')}</Text>
-            </TouchableOpacity>
+            <Text style={styles.motivationalTitle}>🎯 Desafío semanal</Text>
+            <Text style={styles.motivationalDescription}>
+              Escucha 10 horas más esta semana y gana $5 extra
+            </Text>
+            <View style={styles.progressContainer}>
+              <Text style={styles.progressText}>Progreso: {totalListenTime}/57 horas</Text>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, { width: `${(parseInt(totalListenTime) / 57) * 100}%` }]} />
+              </View>
+            </View>
           </LinearGradient>
         </View>
 
@@ -287,6 +341,23 @@ const createStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
     color: theme.text,
     fontWeight: '700',
     marginTop: 2,
+  },
+  earningsText: {
+    color: theme.colors.success,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  boostBadge: {
+    backgroundColor: theme.colors.accentPink,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 2,
+    borderRadius: theme.borderRadius.sm,
+    marginLeft: theme.spacing.sm,
+  },
+  boostText: {
+    color: theme.text,
+    fontSize: 10,
+    fontWeight: '700',
   },
   settingsButton: {
     width: 40,
@@ -430,5 +501,133 @@ const createStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
     ...theme.styles.textMuted,
     fontSize: 12,
     fontWeight: '500',
+  },
+  quickStats: {
+    marginTop: theme.spacing.xs,
+  },
+  quickStatsText: {
+    ...theme.styles.textSecondary,
+    fontSize: 14,
+  },
+  earningsContainer: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.lg,
+    alignItems: 'center',
+    minWidth: 100,
+  },
+  earningsLabel: {
+    fontSize: 12,
+    color: theme.text,
+    fontWeight: '500',
+  },
+  earningsAmount: {
+    fontSize: 16,
+    color: theme.text,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  withdrawButton: {
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.glassLight,
+    borderWidth: 1,
+    borderColor: theme.colors.glassMedium,
+  },
+  withdrawText: {
+    ...theme.styles.textSecondary,
+    fontSize: 14,
+  },
+  dailyEarningsSection: {
+    marginBottom: theme.spacing.xl,
+  },
+  dailyEarningsCard: {
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.lg,
+    ...theme.shadows.lg,
+  },
+  earningsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  earningsColumn: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  earningsTitle: {
+    ...theme.styles.textSecondary,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  earningsValue: {
+    ...theme.styles.titleMedium,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  earningsButton: {
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.glassLight,
+    borderWidth: 1,
+    borderColor: theme.colors.glassMedium,
+  },
+  earningsButtonText: {
+    ...theme.styles.textSecondary,
+    fontSize: 14,
+  },
+  motivationalText: {
+    ...theme.styles.textSecondary,
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  motivationalCard: {
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.lg,
+    ...theme.shadows.lg,
+  },
+  motivationalTitle: {
+    ...theme.styles.titleSmall,
+    marginBottom: theme.spacing.sm,
+  },
+  motivationalDescription: {
+    ...theme.styles.textSecondary,
+    fontSize: 14,
+  },
+  progressContainer: {
+    marginBottom: theme.spacing.sm,
+  },
+  progressText: {
+    ...theme.styles.textSecondary,
+    fontSize: 14,
+  },
+  progressBar: {
+    height: 10,
+    backgroundColor: theme.colors.glassLight,
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: theme.colors.success,
+  },
+  sectionHeader: {
+    marginBottom: theme.spacing.md,
+  },
+  sectionSubtitle: {
+    ...theme.styles.textSecondary,
+    fontSize: 14,
+  },
+  earningsBadge: {
+    padding: theme.spacing.xs,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.success,
+    marginTop: theme.spacing.sm,
+  },
+  earningsBadgeText: {
+    ...theme.styles.textPrimary,
+    fontSize: 12,
+    fontWeight: '600',
   },
 }); 

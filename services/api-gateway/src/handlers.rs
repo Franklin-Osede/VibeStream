@@ -103,6 +103,16 @@ pub struct WalletBalanceResponse {
     pub timestamp: String,
 }
 
+#[derive(Deserialize)]
+pub struct OAuthRegisterRequest {
+    pub email: String,
+    pub username: String,
+    pub provider: String,           // "google" | "microsoft"
+    pub provider_id: String,        // ID del usuario en el provider
+    pub name: String,               // Nombre completo del usuario
+    pub profile_picture: Option<String>, // URL de foto de perfil
+}
+
 #[axum::debug_handler]
 pub async fn health_check(State(state): State<AppState>) -> Result<Json<HealthResponse>, StatusCode> {
     let redis_status = match state.message_queue.ping().await {
@@ -684,4 +694,37 @@ pub async fn get_user_transactions(
 
     tracing::info!("✅ Retrieved {} transactions for user {}", transactions.len(), user_id_str);
     Json(transactions)
+}
+
+// POST /api/v1/auth/oauth - Registro/Login via OAuth (VERSIÓN SIMPLIFICADA PARA DEBUG)
+#[axum::debug_handler]
+pub async fn oauth_register(
+    State(_state): State<AppState>,
+    Json(request): Json<OAuthRegisterRequest>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    tracing::info!("🔐 OAuth request recibido para {} via {}", request.email, request.provider);
+    
+    // Respuesta simplificada para debugging
+    let mock_response = serde_json::json!({
+        "status": "success",
+        "message": "OAuth endpoint funcionando",
+        "received_data": {
+            "email": request.email,
+            "username": request.username,
+            "provider": request.provider,
+            "provider_id": request.provider_id,
+            "name": request.name
+        },
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    });
+    
+    tracing::info!("✅ OAuth respuesta enviada");
+    Ok(Json(mock_response))
+}
+
+// Función para generar wallet custodiada (simplificada por ahora)
+fn generate_custodial_wallet(user_id: &uuid::Uuid) -> String {
+    // Por ahora generamos una dirección simulada
+    // En producción, aquí crearías una wallet real de Ethereum/Solana
+    format!("0x{:x}", user_id.as_u128())
 } 

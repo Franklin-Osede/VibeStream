@@ -1,25 +1,23 @@
-# VibeStream Project - Successful Restructuring ✅
+# VibeStream Project - Refactoring ✅
+
+VibeStream is a decentralized music streaming platform using blockchain and zero-knowledge proofs for secure song transactions.
+
 
 ## Old vs New Structure 📊
 
 ### ❌ Previous Structure (Problematic)
 ```
 VibeStream/ (BEFORE)
-├── backend-core/                # 🔴 DUPLICATE - Incomplete stubs
-│   ├── src/
-│   │   ├── middleware/auth.rs   # 9 lines (stub)
-│   │   ├── models/user.rs       # Basic
-│   │   └── zk/circuits/mod.rs   # Empty
 ├── backend/
-│   ├── backend-core/            # 🔴 DUPLICATE - Complete implementation
+│   ├── backend-core/            # 🔴 Code complexity
 │   │   ├── src/
-│   │   │   ├── middleware/auth.rs  # 322 lines (complete)
-│   │   │   ├── models/           # Complete models
+│   │   │   ├── middleware/auth.rs  # 100+ lines (complete)
+│   │   │   ├── models/           # Complete models - principal entities 
 │   │   │   ├── api/              # Complete APIs
 │   │   │   └── services/         # Complete services
-│   ├── circom/                  # 🔴 300+ unused circom files
+│   ├── circom/                  # 🔴 Unused circom files - Allows to create arithmetic circuits for generating privacy-preserving cryptographic proofs.
 │   ├── target/                  # 🔴 Build artifacts
-│   └── node_modules/            # 🔴 Duplicate JS dependencies
+│   └── node_modules/            # 🔴 Leading to Duplicate JS dependencies
 ├── src/                         # 🔴 Legacy monolithic code
 │   ├── api/
 │   ├── middleware/
@@ -30,43 +28,73 @@ VibeStream/ (BEFORE)
 └── node_modules/                # 🔴 Duplicate dependencies
 ```
 
-### ✅ Current Structure (Clean and Functional)
+## Previous Structure Issues 🚨
+
+### 🔴 Critical Problems Resolved
+
+1. **Dependency Conflicts**
+   ```
+   ERROR: tokio v1.14.1 (Solana) vs tokio v1.18+ (Ethereum) vs tokio v1.25+ (Axum)
+   ERROR: zeroize conflicts between SQLx and Solana SDK
+   ERROR: Unable to compile complete project
+   ```
+
+2. **Code Duplication**
+   - `backend-core/`  (duplicate files accross integrations)
+   - `src/` vs `services/` (dependable business logic)
+   - `solana-integration/` vs `services/solana/` (duplicate clients)
+
+3. **Problematic Monolithic Architecture**
+   - Everything in a single binary
+   - Difficult to scale components independently
+   - One error could bring down entire system
+   - Becoming complex and slow testing
+
+4. **Difficult Maintenance**
+   - Updating one dependency broke everything
+   - 5+ minute compilation times
+   - Complex debugging due to tight coupling
+
+## Implemented Architecture 🏗️
+
+
+### ✅ Refactoring to Microservices (Clean and Functional)
 ```
 VibeStream/ (AFTER)
 ├── services/                    # 🎯 Main microservices
-│   ├── api-gateway/            # ✅ API Gateway (Port 3000)
+│   ├── api-gateway/            # ✅ API Gateway (Port 3000) - Central entry point for all client requests
 │   │   ├── src/
-│   │   │   ├── main.rs         # Entry point
-│   │   │   ├── handlers/       # REST endpoints
-│   │   │   ├── middleware/     # Auth, CORS, logging
-│   │   │   └── message_queue/  # Redis integration
-│   │   └── Cargo.toml          # Axum + Redis dependencies
+│   │   │   ├── main.rs         # Starts the Axum web server and handles HTTP routing
+│   │   │   ├── handlers/       # REST endpoints - Contains REST endpoint implementations (health checks, transactions, queue status)
+│   │   │   ├── middleware/     # Auth, CORS, logging - Cross-cutting concerns like authentication, CORS, and request logging
+│   │   │   └── message_queue/  # Redis integration for publishing messages to other services
+│   │   └── Cargo.toml          # Axum + Redis dependencies including Axum web framework and Redis client. Databse in memory that act as message broker
 │   ├── ethereum/               # ✅ Independent Ethereum service
 │   │   ├── src/
-│   │   │   ├── main.rs         # Ethereum worker
-│   │   │   ├── client.rs       # ETH client
-│   │   │   └── handlers.rs     # TX processing
-│   │   └── Cargo.toml          # Tokio 1.18+ + Ethers
+│   │   │   ├── main.rs         # Ethereum worker -Worker process that consumes Ethereum transaction requests from Redis queue
+│   │   │   ├── client.rs       # ETH client -Ethereum client using ethers-rs library for Web3 interactions
+│   │   │   └── handlers.rs     # Transaction processing logic, validation, and blockchain execution
+│   │   └── Cargo.toml          # Tokio 1.18+ + Ethers - Ethereum-specific dependencies (ethers, tokio 1.18+)
 │   ├── solana/                 # ✅ Independent Solana service
 │   │   ├── src/
-│   │   │   ├── main.rs         # Solana worker
-│   │   │   ├── client.rs       # SOL client
-│   │   │   └── service.rs      # TX processing
+│   │   │   ├── main.rs         # Solana worker - Handles all Solana blockchain operations independently
+│   │   │   ├── client.rs       # SOL client - Solana RPC client for blockchain interactions
+│   │   │   └── service.rs      # TX processing - Transaction building, sending, and confirmation logic
 │   │   └── Cargo.toml          # Tokio 1.14 + Solana SDK
 │   └── zk-service/             # ✅ Independent ZK service
 │       ├── src/
-│       │   ├── main.rs         # ZK worker
-│       │   ├── service.rs      # ZK logic
-│       │   └── zkp.rs          # Generation/verification
+│       │   ├── main.rs         # Worker process for ZK proof requests
+│       │   ├── service.rs      # ZK logic -  Orchestrates proof generation workflows
+│       │   └── zkp.rs          # Generation/verification - Core ZK proof implementation (generation and verification)
 │       └── Cargo.toml          # Tokio 1.25+ + ZK libs
 ├── shared/                     # 📦 Shared code
 │   ├── types/                  # ✅ Shared types
 │   │   ├── src/
-│   │   │   ├── blockchain.rs   # Ethereum/Solana enums
-│   │   │   ├── transaction.rs  # Transaction struct
-│   │   │   └── lib.rs          # Public exports
+│   │   │   ├── blockchain.rs   # Ethereum/Solana enums - Blockchain enums (Ethereum, Solana), network types
+│   │   │   ├── transaction.rs  # Transaction struct - Standard transaction request/response structures
+│   │   │   └── lib.rs          # Public exports - Public exports for all shared types
 │   │   └── Cargo.toml          # No external dependencies
-│   └── utils/                  # ✅ Common utilities
+│   └── utils/                  # ✅ Common utilities -  Common utility functions for all services
 ├── apps/                       # 📱 Frontend applications
 │   ├── web/                    # React/Next.js
 │   └── mobile/                 # React Native
@@ -78,182 +106,8 @@ VibeStream/ (AFTER)
 └── docs/                       # 📚 Documentation
 ```
 
-## File-by-File Breakdown 📁
 
-### 🎯 API Gateway Service (`services/api-gateway/`)
-
-api-gateway/
-├── src/
-│   ├── main.rs                 # 🚀 Entry point - starts Axum server on port 3000
-│   ├── handlers/
-│   │   ├── mod.rs             # 📋 Handler module exports
-│   │   ├── health.rs          # ❤️ Health check endpoint (/health)
-│   │   ├── transactions.rs    # 💸 Transaction endpoints (/api/v1/transactions)
-│   │   └── queue_status.rs    # 📊 Queue monitoring (/api/v1/queue-status)
-│   ├── middleware/
-│   │   ├── mod.rs             # 🔧 Middleware module exports
-│   │   ├── cors.rs            # 🌐 CORS configuration for web clients
-│   │   ├── logging.rs         # 📝 Request/response logging with tracing
-│   │   └── auth.rs            # 🔐 JWT authentication (TODO: implement)
-│   ├── message_queue/
-│   │   ├── mod.rs             # 📨 Message queue module exports
-│   │   ├── redis_client.rs    # 🔴 Redis connection and client management
-│   │   ├── publisher.rs       # 📤 Publishes messages to blockchain queues
-│   │   └── consumer.rs        # 📥 Consumes responses from services
-│   └── lib.rs                 # 📚 Library exports and shared types
-└── Cargo.toml                 # 📦 Dependencies: axum, tokio, redis, serde
-```
-
-### ⚡ Ethereum Service (`services/ethereum/`)
-```
-ethereum/
-├── src/
-│   ├── main.rs                # 🚀 Worker entry point - consumes ethereum_queue
-│   ├── client.rs              # 🔗 Ethereum client using ethers-rs
-│   │                          #    - Web3 provider connection
-│   │                          #    - Wallet management
-│   │                          #    - Gas estimation
-│   ├── handlers.rs            # ⚙️ Transaction processing logic
-│   │                          #    - Validates ETH transactions
-│   │                          #    - Executes blockchain calls
-│   │                          #    - Handles errors and retries
-│   └── lib.rs                 # 📚 Service exports and types
-└── Cargo.toml                 # 📦 Dependencies: ethers, tokio 1.18+, redis
-```
-
-### 🌟 Solana Service (`services/solana/`)
-```
-solana/
-├── src/
-│   ├── main.rs                # 🚀 Worker entry point - consumes solana_queue
-│   ├── client.rs              # 🔗 Solana client using solana-client
-│   │                          #    - RPC client connection
-│   │                          #    - Keypair management
-│   │                          #    - Program interactions
-│   ├── service.rs             # ⚙️ Transaction processing logic
-│   │                          #    - Validates SOL transactions
-│   │                          #    - Builds and sends transactions
-│   │                          #    - Handles confirmation
-│   └── lib.rs                 # 📚 Service exports and types
-└── Cargo.toml                 # 📦 Dependencies: solana-client, tokio 1.14, redis
-```
-
-### 🔐 ZK Service (`services/zk-service/`)
-```
-zk-service/
-├── src/
-│   ├── main.rs                # 🚀 Worker entry point - consumes zk_queue
-│   ├── service.rs             # 🧠 ZK service orchestration
-│   │                          #    - Manages proof generation requests
-│   │                          #    - Coordinates with zkp.rs
-│   │                          #    - Handles different proof types
-│   ├── zkp.rs                 # 🔬 Zero-Knowledge proof implementation
-│   │                          #    - ZkProofGenerator: creates proofs
-│   │                          #    - ZkProofVerifier: validates proofs
-│   │                          #    - Solvency proofs (balance >= threshold)
-│   │                          #    - Transaction proofs (can spend amount)
-│   └── lib.rs                 # 📚 Service exports and ZK types
-└── Cargo.toml                 # 📦 Dependencies: tokio 1.25+, redis, ZK libs
-```
-
-### 📦 Shared Types (`shared/types/`)
-```
-types/
-├── src/
-│   ├── lib.rs                 # 📋 Main exports - re-exports all types
-│   ├── blockchain.rs          # ⛓️ Blockchain enums and types
-│   │                          #    - Blockchain enum (Ethereum, Solana)
-│   │                          #    - Network types (Mainnet, Testnet)
-│   │                          #    - Chain-specific configurations
-│   └── transaction.rs         # 💰 Transaction structures
-│                               #    - TransactionRequest struct
-│                               #    - TransactionResponse struct
-│                               #    - Status enums (Pending, Success, Failed)
-└── Cargo.toml                 # 📦 Zero external dependencies - pure Rust types
-```
-
-### 🛠️ Shared Utils (`shared/utils/`)
-```
-utils/
-├── src/
-│   ├── lib.rs                 # 🔧 Utility function exports
-│   ├── crypto.rs              # 🔐 Cryptographic utilities
-│   │                          #    - Hash functions
-│   │                          #    - Signature validation
-│   │                          #    - Key generation helpers
-│   ├── validation.rs          # ✅ Input validation functions
-│   │                          #    - Address validation (ETH/SOL)
-│   │                          #    - Amount validation
-│   │                          #    - Data sanitization
-│   └── time.rs                # ⏰ Time and timestamp utilities
-│                               #    - UTC timestamp generation
-│                               #    - Duration calculations
-│                               #    - Timeout handling
-└── Cargo.toml                 # 📦 Minimal dependencies for utilities
-```
-
-### 🏗️ Infrastructure Files
-```
-infra/docker/
-├── docker-compose.yml         # 🐳 Multi-service Docker setup
-│                               #    - Redis container
-│                               #    - PostgreSQL container
-│                               #    - Service containers
-├── Dockerfile.api-gateway     # 🐳 API Gateway container build
-├── Dockerfile.ethereum        # 🐳 Ethereum service container
-├── Dockerfile.solana          # 🐳 Solana service container
-└── Dockerfile.zk              # 🐳 ZK service container
-```
-
-### 📱 Frontend Applications (Placeholder)
-```
-apps/
-├── web/                       # 🌐 React/Next.js web application
-│   ├── src/
-│   │   ├── components/        # ⚛️ React components
-│   │   ├── pages/             # 📄 Next.js pages
-│   │   ├── hooks/             # 🪝 Custom React hooks
-│   │   └── utils/             # 🔧 Frontend utilities
-│   └── package.json           # 📦 Node.js dependencies
-└── mobile/                    # 📱 React Native mobile app
-    ├── src/
-    │   ├── components/        # ⚛️ React Native components
-    │   ├── screens/           # 📱 Mobile screens
-    │   ├── navigation/        # 🧭 Navigation setup
-    │   └── services/          # 🔗 API service calls
-    └── package.json           # 📦 React Native dependencies
-```
-
-## Previous Structure Issues 🚨
-
-### 🔴 Critical Problems Resolved
-
-1. **Massive Dependency Conflicts**
-   ```
-   ERROR: tokio v1.14.1 (Solana) vs tokio v1.18+ (Ethereum) vs tokio v1.25+ (Axum)
-   ERROR: zeroize conflicts between SQLx and Solana SDK
-   ERROR: Unable to compile complete project
-   ```
-
-2. **Extreme Code Duplication**
-   - `backend-core/` vs `backend/backend-core/` (70+ duplicate files)
-   - `src/` vs `services/` (duplicate business logic)
-   - `solana-integration/` vs `services/solana/` (duplicate clients)
-
-3. **Problematic Monolithic Architecture**
-   - Everything in a single binary
-   - Impossible to scale components independently
-   - One error brings down entire system
-   - Complex and slow testing
-
-4. **Impossible Maintenance**
-   - Updating one dependency broke everything
-   - 5+ minute compilation times
-   - Complex debugging due to tight coupling
-
-## Implemented Architecture 🏗️
-
-### Services Diagram
+### Design Architecture
 ```
                     ┌─────────────────┐
                     │   Frontend      │
@@ -338,7 +192,7 @@ ps aux | grep -E "(api-gateway|ethereum|solana|zk-service)" | grep -v grep
 ### 2. System Health Check
 ```bash
 # Verify API Gateway
-curl -s http://localhost:3000/health | jq .
+curl -s http://localhost:3002/health | jq .
 
 # Expected output:
 # {
@@ -352,7 +206,7 @@ curl -s http://localhost:3000/health | jq .
 ### 3. Queue Status
 ```bash
 # Verify Redis queues
-curl -s http://localhost:3000/api/v1/queue-status | jq .
+curl -s http://localhost:3002/api/v1/queue-status | jq .
 
 # Expected output:
 # {
@@ -368,7 +222,7 @@ curl -s http://localhost:3000/api/v1/queue-status | jq .
 
 ### 4. Ethereum Transaction Test
 ```bash
-curl -X POST http://localhost:3000/api/v1/transactions \
+curl -X POST http://localhost:3002/api/v1/transactions \
   -H "Content-Type: application/json" \
   -d '{
     "blockchain": "Ethereum",
@@ -384,7 +238,7 @@ curl -X POST http://localhost:3000/api/v1/transactions \
 
 ### 5. Solana Transaction Test
 ```bash
-curl -X POST http://localhost:3000/api/v1/transactions \
+curl -X POST http://localhost:3002/api/v1/transactions \
   -H "Content-Type: application/json" \
   -d '{
     "blockchain": "Solana",
@@ -398,35 +252,6 @@ curl -X POST http://localhost:3000/api/v1/transactions \
 # {"message":"Transaction request submitted successfully","request_id":"uuid","status":"pending"}
 ```
 
-### 6. Compile and Run Services
-
-#### API Gateway
-```bash
-cd services/api-gateway
-cargo build
-cargo run  # Port 3000
-```
-
-#### Ethereum Service
-```bash
-cd services/ethereum
-cargo build
-cargo run &  # Background
-```
-
-#### Solana Service
-```bash
-cd services/solana
-cargo build
-cargo run &  # Background
-```
-
-#### ZK Service
-```bash
-cd services/zk-service
-cargo build
-cargo run &  # Background
-```
 
 ## Achieved Benefits 🎯
 
@@ -479,23 +304,6 @@ cargo run &  # Background
 - ✅ **Redis**: Connected and operational
 - ✅ **Message Queues**: 4 queues available
 
-## Next Steps 🚀
-
-### Phase 1: Complete Backend
-1. **Fully implement ZK Service**
-2. **Add JWT authentication**
-3. **Implement database (PostgreSQL)**
-4. **Add metrics and monitoring**
-
-### Phase 2: Frontend Integration
-1. **Connect Web App**
-2. **Implement WebSocket for real-time updates**
-3. **Create monitoring dashboard**
-
-### Phase 3: Production Ready
-1. **CI/CD Pipeline**
-2. **Docker containers**
-3. **Kubernetes deployment**
-4. **Load balancing**
 
 ---
+x
