@@ -37,7 +37,7 @@ export class UserRepositoryImpl implements UserRepository {
 
   async register(userData: CreateUserData): Promise<AuthResult> {
     try {
-      const response = await this.apiClient.post<BackendLoginResponse>('/auth/register', {
+      const response = await this.apiClient.post<BackendLoginResponse>('/api/v1/auth/register', {
         email: userData.email,
         username: userData.username,
         password: userData.password,
@@ -70,7 +70,7 @@ export class UserRepositoryImpl implements UserRepository {
 
   async login(credentials: LoginCredentials): Promise<AuthResult> {
     try {
-      const response = await this.apiClient.post<BackendLoginResponse>('/auth/login', {
+      const response = await this.apiClient.post<BackendLoginResponse>('/api/v1/auth/login', {
         email: credentials.email,
         password: credentials.password
       });
@@ -132,7 +132,7 @@ export class UserRepositoryImpl implements UserRepository {
     }
 
     try {
-      const response = await this.apiClient.get<BackendUserInfo>('/auth/profile');
+      const response = await this.apiClient.get<BackendUserInfo>('/api/v1/auth/profile');
 
       const userProps: UserProps = {
         id: response.id,
@@ -207,5 +207,40 @@ export class UserRepositoryImpl implements UserRepository {
   async getUserTransactions(userId: string): Promise<any[]> {
     // Endpoint real: GET /api/v1/user/transactions
     return this.apiClient.get<any[]>(`/user/transactions`);
+  }
+
+  async oauthLogin(oauthData: OAuthUserData): Promise<AuthResult> {
+    try {
+      const response = await this.apiClient.post<BackendLoginResponse>('/api/v1/auth/oauth', {
+        email: oauthData.email,
+        username: oauthData.username,
+        provider: oauthData.provider,
+        provider_id: oauthData.provider_id,
+        name: oauthData.name,
+        profile_picture: oauthData.profile_picture
+      });
+
+      const userProps: UserProps = {
+        id: response.user.id,
+        email: response.user.email,
+        username: response.user.username,
+        role: response.user.role as 'user' | 'artist' | 'admin',
+        walletAddress: undefined, // Wallet se crea automáticamente en backend
+        isVerified: true, // OAuth users are pre-verified
+        createdAt: new Date()
+      };
+
+      const user = User.create(userProps);
+      
+      // Save token
+      await this.apiClient.setAuthToken(response.token);
+
+      return {
+        user,
+        token: response.token
+      };
+    } catch (error: any) {
+      throw new Error(`OAuth login failed: ${error.message}`);
+    }
   }
 } 

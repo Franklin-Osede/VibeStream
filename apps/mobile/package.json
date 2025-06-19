@@ -5,8 +5,8 @@
   "scripts": {
     "start": "expo start",
     "dev": "expo start --dev-client --clear",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "tunnel": "expo start --tunnel",
     "clear": "expo start --clear"
@@ -21,7 +21,6 @@
     "expo": "~51.0.28",
     "expo-crypto": "~13.0.2",
     "expo-linear-gradient": "~13.0.2",
-    "expo-secure-store": "^14.2.3",
     "expo-status-bar": "~1.12.1",
     "react": "18.2.0",
     "react-native": "0.74.5",
@@ -32,9 +31,7 @@
     "react-native-url-polyfill": "~2.0.0",
     "expo-constants": "~16.0.2",
     "@expo/vector-icons": "^14.0.2",
-    "expo-auth-session": "~5.5.2",
-    "expo-web-browser": "~13.0.3",
-    "expo-google-app-auth": "~8.3.0"
+    "expo-router": "~3.5.24"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

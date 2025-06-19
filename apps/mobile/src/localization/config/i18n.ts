@@ -1,73 +1,41 @@
-import i18next from 'i18next';
-import { initReactI18next } from 'react-i18next';
-import * as RNLocalize from 'react-native-localize';
+// Simple mock para i18n sin dependencias externas
+import en from '../translations/en';
 
-// Importar traducciones
-import en from '../translations/en.json';
-import es from '../translations/es.json';
-import pt from '../translations/pt.json';
-import it from '../translations/it.json';
-import fr from '../translations/fr.json';
-
-// Recursos de traducciones
-const resources = {
-  en: { translation: en },
-  es: { translation: es },
-  pt: { translation: pt },
-  it: { translation: it },
-  fr: { translation: fr },
+// Tipo para las traducciones
+type Translations = {
+  [locale: string]: any;
 };
 
-// Idiomas soportados
-export const SUPPORTED_LANGUAGES = [
-  { code: 'en', name: 'English', flag: '🇺🇸' },
-  { code: 'es', name: 'Español', flag: '🇪🇸' },
-  { code: 'pt', name: 'Português', flag: '🇧🇷' },
-  { code: 'it', name: 'Italiano', flag: '🇮🇹' },
-  { code: 'fr', name: 'Français', flag: '🇫🇷' },
-];
-
-// Detectar idioma del dispositivo
-const getDeviceLanguage = (): string => {
-  const locales = RNLocalize.getLocales();
-  if (locales.length > 0) {
-    const deviceLanguage = locales[0].languageCode;
-    // Verificar si el idioma del dispositivo está soportado
-    const supportedCodes = SUPPORTED_LANGUAGES.map(lang => lang.code);
-    return supportedCodes.includes(deviceLanguage) ? deviceLanguage : 'en';
-  }
-  return 'en'; // Fallback a inglés
-};
-
-// Configuración de i18next
-i18next
-  .use(initReactI18next)
-  .init({
-    resources,
-    lng: getDeviceLanguage(), // Idioma inicial basado en el dispositivo
-    fallbackLng: 'en', // Idioma de respaldo
-    debug: __DEV__, // Solo en desarrollo
+// Implementación simple de i18n
+const i18n = {
+  translations: { en } as Translations,
+  locale: 'en',
+  defaultLocale: 'en',
+  
+  // Método simple para obtener traducciones
+  t: (key: string): string => {
+    const keys = key.split('.');
+    let result: any = i18n.translations[i18n.locale];
     
-    interpolation: {
-      escapeValue: false, // React ya escapa por seguridad
-    },
-    
-    // Configuración de namespace
-    defaultNS: 'translation',
-    
-    // Configuración de detección
-    detection: {
-      order: ['localStorage', 'navigator'],
-      caches: ['localStorage'],
-    },
-    
-    // Configuración de respaldo
-    saveMissing: __DEV__, // Solo en desarrollo
-    missingKeyHandler: (lng, ns, key) => {
-      if (__DEV__) {
-        console.warn(`Missing translation key: ${key} for language: ${lng}`);
+    for (const k of keys) {
+      if (result && typeof result === 'object' && k in result) {
+        result = result[k];
+      } else {
+        // Fallback al inglés si no se encuentra
+        let fallback: any = i18n.translations[i18n.defaultLocale];
+        for (const fbk of keys) {
+          if (fallback && typeof fallback === 'object' && fbk in fallback) {
+            fallback = fallback[fbk];
+          } else {
+            return key; // Retorna la clave si no se encuentra
+          }
+        }
+        return typeof fallback === 'string' ? fallback : key;
       }
-    },
-  });
+    }
+    
+    return typeof result === 'string' ? result : key;
+  }
+};
 
-export default i18next; 
+export default i18n; 
