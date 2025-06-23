@@ -2,6 +2,9 @@ const { getDefaultConfig } = require('expo/metro-config');
 
 const config = getDefaultConfig(__dirname);
 
+// Configuración específica para expo-router
+config.resolver.unstable_enableSymlinks = true;
+
 // Habilitamos Fast Refresh para mejor experiencia de desarrollo
 config.server = {
   ...config.server,
@@ -18,6 +21,7 @@ config.server = {
 // Optimizamos la resolución de módulos
 config.resolver = {
   ...config.resolver,
+  unstable_enableSymlinks: true,
   assetExts: [...config.resolver.assetExts, 'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'],
 };
 
