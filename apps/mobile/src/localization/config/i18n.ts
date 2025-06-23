@@ -1,41 +1,28 @@
-// Simple mock para i18n sin dependencias externas
+import React, { createContext } from 'react';
 import en from '../translations/en';
 
-// Tipo para las traducciones
-type Translations = {
-  [locale: string]: any;
-};
+// Interface para el contexto
+export interface I18nContextType {
+  t: (key: string, params?: Record<string, string | number>) => string;
+  language: string;
+  setLanguage: (lang: string) => void;
+  availableLanguages: string[];
+}
 
-// Implementación simple de i18n
+// Crear el contexto
+export const I18nContext = createContext<I18nContextType>({
+  t: (key: string) => key,
+  language: 'es',
+  setLanguage: () => {},
+  availableLanguages: ['en', 'es']
+});
+
+// Simple mock para i18n sin dependencias externas
 const i18n = {
-  translations: { en } as Translations,
-  locale: 'en',
+  translations: { en },
+  locale: 'es',
   defaultLocale: 'en',
-  
-  // Método simple para obtener traducciones
-  t: (key: string): string => {
-    const keys = key.split('.');
-    let result: any = i18n.translations[i18n.locale];
-    
-    for (const k of keys) {
-      if (result && typeof result === 'object' && k in result) {
-        result = result[k];
-      } else {
-        // Fallback al inglés si no se encuentra
-        let fallback: any = i18n.translations[i18n.defaultLocale];
-        for (const fbk of keys) {
-          if (fallback && typeof fallback === 'object' && fbk in fallback) {
-            fallback = fallback[fbk];
-          } else {
-            return key; // Retorna la clave si no se encuentra
-          }
-        }
-        return typeof fallback === 'string' ? fallback : key;
-      }
-    }
-    
-    return typeof result === 'string' ? result : key;
-  }
+  t: (key: string): string => key
 };
 
 export default i18n; 

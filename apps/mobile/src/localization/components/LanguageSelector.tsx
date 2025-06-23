@@ -9,7 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useTranslation } from '../hooks/useTranslation';
+import { useTranslation } from '../index';
 
 interface LanguageSelectorProps {
   visible: boolean;
@@ -22,13 +22,13 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   onClose,
   onLanguageChange,
 }) => {
-  const { getCurrentLanguage, getSupportedLanguages, changeLanguage, t } = useTranslation();
-  const [selectedLanguage, setSelectedLanguage] = useState(getCurrentLanguage());
+  const { language, availableLanguages, setLanguage, t } = useTranslation();
+  const [selectedLanguage, setSelectedLanguage] = useState(language);
 
   const handleLanguageSelect = async (languageCode: string) => {
     try {
       setSelectedLanguage(languageCode);
-      await changeLanguage(languageCode);
+      setLanguage(languageCode);
       onLanguageChange?.(languageCode);
       onClose();
     } catch (error) {
@@ -87,7 +87,10 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
 
           <View style={styles.content}>
             <FlatList
-              data={getSupportedLanguages()}
+              data={[
+                { code: 'es', name: 'Español', flag: '🇪🇸' },
+                { code: 'en', name: 'English', flag: '🇺🇸' }
+              ]}
               renderItem={renderLanguageItem}
               keyExtractor={(item) => item.code}
               showsVerticalScrollIndicator={false}

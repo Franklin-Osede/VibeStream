@@ -415,7 +415,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>) => StyleSheet.create({
   },
   albumImageContainer: {
     position: 'relative',
-    ...theme.shadows.xl,
+    ...theme.shadows.lg,
   },
   albumImage: {
     width: width * 0.75,
