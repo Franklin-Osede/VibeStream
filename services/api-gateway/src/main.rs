@@ -5,13 +5,20 @@ use axum::{
 use tower::ServiceBuilder;
 use tower_http::{trace::TraceLayer, cors::CorsLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use std::sync::Arc;
 
-mod handlers;
-mod services;
-mod auth;
-// mod blockchain; // Comentado temporalmente
+use api_gateway::handlers;
+use api_gateway::services::{AppState, MessageQueue, DatabasePool};
+use api_gateway::auth;
+// use api_gateway::blockchain; // optional
 
-use services::{AppState, MessageQueue, DatabasePool};
+use api_gateway::shared::application::bus::InMemoryCommandBus;
+use api_gateway::bounded_contexts::campaign::application::commands::{CreateCampaign, CreateCampaignHandler};
+use api_gateway::bounded_contexts::campaign::infrastructure::in_memory_repository::InMemoryCampaignRepository;
+use api_gateway::bounded_contexts::campaign::presentation as campaign_api;
+use api_gateway::bounded_contexts::user::application::commands::{RegisterUser, RegisterUserHandler};
+use api_gateway::bounded_contexts::user::infrastructure::in_memory_repository::InMemoryUserRepository;
+use api_gateway::bounded_contexts::user::presentation as user_api;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -54,11 +61,39 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("📨 Conectando a Redis...");
     let message_queue = MessageQueue::new(&redis_url).await?;
     
-    // Crear estado compartido (sin blockchain por ahora)
-    let app_state = AppState { 
+    let use_inmemory = std::env::var("USE_INMEMORY").unwrap_or_else(|_| "true".into()) == "true";
+
+    // Create in-memory Command Bus and register default handlers
+    let command_bus = Arc::new(InMemoryCommandBus::new());
+
+    // Campaign repository selection
+    if use_inmemory {
+        let campaign_repo = InMemoryCampaignRepository::new();
+        let campaign_handler = CreateCampaignHandler { repo: campaign_repo };
+        command_bus.register::<CreateCampaign, _>(campaign_handler).await;
+    } else {
+        let campaign_repo = api_gateway::bounded_contexts::campaign::infrastructure::postgres_repository::CampaignPostgresRepository::new(database_pool.get_pool().clone());
+        let campaign_handler = CreateCampaignHandler { repo: campaign_repo };
+        command_bus.register::<CreateCampaign, _>(campaign_handler).await;
+    }
+
+    // User repository selection
+    if use_inmemory {
+        let user_repo = InMemoryUserRepository::new();
+        let user_handler = RegisterUserHandler { repo: user_repo };
+        command_bus.register::<RegisterUser, _>(user_handler).await;
+    } else {
+        // TODO: implement UserPostgresRepository and use it
+        let user_repo = InMemoryUserRepository::new();
+        let user_handler = RegisterUserHandler { repo: user_repo };
+        command_bus.register::<RegisterUser, _>(user_handler).await;
+    }
+
+    // Create shared state
+    let app_state = AppState {
         message_queue,
         database_pool,
-        // blockchain_clients, // Comentado temporalmente
+        command_bus: command_bus.clone(),
     };
 
     // Crear router con todas las rutas
@@ -71,6 +106,9 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/transactions", post(handlers::process_transaction))
         .route("/api/v1/balance/:blockchain/:address", get(handlers::get_balance))
         .route("/api/v1/queue-status", get(handlers::queue_status))
+        // Campaign routes powered by Command Bus
+        .nest("/api/v1", campaign_api::routes())
+        .nest("/api/v1", user_api::routes())
         
         // Authentication routes
         .route("/api/v1/auth/login", post(handlers::login))
@@ -80,7 +118,7 @@ async fn main() -> anyhow::Result<()> {
         
         // Database routes
         .route("/api/v1/users", get(handlers::get_users))
-        .route("/api/v1/users", post(handlers::create_user))
+        // .route("/api/v1/users", post(handlers::create_user))
         .route("/api/v1/songs", get(handlers::get_songs))
         .route("/api/v1/songs", post(handlers::create_song))
         
@@ -117,7 +155,6 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("  GET  /api/v1/auth/profile - Perfil usuario (protegido)");
     tracing::info!("📊 Base de datos:");
     tracing::info!("  GET  /api/v1/users - Obtener usuarios");
-    tracing::info!("  POST /api/v1/users - Crear usuario");
     tracing::info!("  GET  /api/v1/songs - Obtener canciones");
     tracing::info!("  POST /api/v1/songs - Crear canción");
     tracing::info!("⛓️ Blockchain (simulado):");

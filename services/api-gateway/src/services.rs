@@ -2,6 +2,8 @@ use redis::{AsyncCommands, Client, Connection};
 use vibestream_types::*;
 use async_trait::async_trait;
 use sqlx::{PgPool, postgres::PgPoolOptions};
+use std::sync::Arc;
+use crate::shared::application::bus::InMemoryCommandBus;
 
 // Nuevo struct para manejar la base de datos
 #[derive(Clone)]
@@ -269,5 +271,6 @@ impl MessageQueue {
 pub struct AppState {
     pub message_queue: MessageQueue,
     pub database_pool: DatabasePool,
+    pub command_bus: Arc<InMemoryCommandBus>,
     // pub blockchain_clients: crate::blockchain::BlockchainClients, // Comentado temporalmente
 } 
