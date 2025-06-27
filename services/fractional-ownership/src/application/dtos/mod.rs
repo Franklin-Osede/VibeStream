@@ -3,7 +3,7 @@
 
 use uuid::Uuid;
 use serde::{Deserialize, Serialize};
-use crate::domain::value_objects::RevenueAmount;
+use crate::domain::value_objects::{RevenueAmount, OwnershipPercentage};
 
 /// Command para comprar acciones
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -49,14 +49,63 @@ pub struct TransferSharesResult {
     pub transaction_status: String,
 }
 
-/// Command para crear una canción fraccionada
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateFractionalSongCommand {
-    pub song_id: Uuid, // Referencia al Song Context
+/// Request para crear una nueva canción fraccionada
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateFractionalSongRequest {
+    pub song_id: Uuid,
     pub artist_id: Uuid,
     pub title: String,
     pub total_shares: u32,
-    pub initial_share_price: f64,
+    
+    // 🆕 ARTIST CONTROL FIELDS
+    pub artist_reserved_shares: u32,        // Cuántas shares se queda el artista
+    pub artist_revenue_percentage: f64,     // % adicional de ingresos para el artista (0.0-1.0)
+    
+    pub initial_price_per_share: f64,
+    
+    // 🆕 OPTIONAL CAMPAIGN SETTINGS
+    pub max_shares_per_user: Option<u32>,   // Límite por usuario
+    pub campaign_duration_days: Option<u32>, // Duración de la campaña
+    pub funding_goal: Option<f64>,          // Meta de financiamiento
+}
+
+impl CreateFractionalSongRequest {
+    /// Validar request del artista
+    pub fn validate(&self) -> Result<(), String> {
+        if self.total_shares == 0 {
+            return Err("Total shares must be greater than 0".to_string());
+        }
+
+        if self.artist_reserved_shares > self.total_shares {
+            return Err("Artist reserved shares cannot exceed total shares".to_string());
+        }
+
+        if self.artist_revenue_percentage < 0.0 || self.artist_revenue_percentage > 1.0 {
+            return Err("Artist revenue percentage must be between 0% and 100%".to_string());
+        }
+
+        if self.initial_price_per_share <= 0.0 {
+            return Err("Initial price per share must be greater than 0".to_string());
+        }
+
+        // Validar que al menos 10% esté disponible para fans
+        let fan_percentage = (self.total_shares - self.artist_reserved_shares) as f64 / self.total_shares as f64;
+        if fan_percentage < 0.1 {
+            return Err("At least 10% of shares must be available for fans".to_string());
+        }
+
+        Ok(())
+    }
+
+    /// Calcular shares disponibles para fans
+    pub fn fan_available_shares(&self) -> u32 {
+        self.total_shares - self.artist_reserved_shares
+    }
+
+    /// Calcular potencial funding total
+    pub fn potential_funding(&self) -> f64 {
+        self.fan_available_shares() as f64 * self.initial_price_per_share
+    }
 }
 
 /// Resultado de crear canción fraccionada
@@ -104,31 +153,60 @@ pub struct GetUserPortfolioQuery {
     pub include_detailed_breakdown: bool,
 }
 
-/// Resultado del portfolio de usuario
+/// Response del portfolio de usuario
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UserPortfolioResult {
+pub struct UserPortfolioResponse {
     pub user_id: Uuid,
-    pub total_investment_value: RevenueAmount,
-    pub total_current_value: RevenueAmount,
-    pub total_earnings: RevenueAmount,
-    pub overall_roi_percentage: f64,
-    pub songs_count: u32,
-    pub songs_breakdown: Vec<SongPortfolioItem>,
+    pub total_investment: f64,
+    pub total_earnings: f64,
+    pub total_portfolio_value: f64,
+    pub songs: Vec<PortfolioSongInfo>,
+    pub performance_metrics: PerformanceMetrics,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SongPortfolioItem {
-    pub fractional_song_id: Uuid,
+pub struct PortfolioSongInfo {
     pub song_id: Uuid,
-    pub title: String,
-    pub artist_id: Uuid,
+    pub song_title: String,
+    pub ownership_percentage: OwnershipPercentage,
+    pub current_value: f64,
+    pub total_earnings: f64,
     pub shares_owned: u32,
-    pub ownership_percentage: f64,
-    pub original_investment: RevenueAmount,
-    pub current_value: RevenueAmount,
-    pub earnings_to_date: RevenueAmount,
-    pub roi_percentage: f64,
-    pub last_revenue_date: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PerformanceMetrics {
+    pub total_roi_percentage: f64,
+    pub best_performing_song: Option<Uuid>,
+    pub worst_performing_song: Option<Uuid>,
+    pub average_monthly_earnings: f64,
+}
+
+/// Request para comprar shares
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PurchaseSharesRequest {
+    pub fractional_song_id: Uuid,
+    pub buyer_id: Uuid,
+    pub shares_quantity: u32,
+    pub auto_confirm: bool,
+}
+
+/// Request para transferir shares
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransferSharesRequest {
+    pub fractional_song_id: Uuid,
+    pub from_user_id: Uuid,
+    pub to_user_id: Uuid,
+    pub shares_quantity: u32,
+    pub price_per_share: f64,
+}
+
+/// Request para distribuir revenue
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DistributeRevenueRequest {
+    pub fractional_song_id: Uuid,
+    pub total_revenue: f64,
+    pub revenue_source: String,
 }
 
 /// Query para obtener información de una canción fraccionada
@@ -139,46 +217,77 @@ pub struct GetFractionalSongQuery {
     pub include_transaction_history: bool,
 }
 
-/// Resultado de información de canción fraccionada
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FractionalSongResult {
-    pub fractional_song_id: Uuid,
+/// Response con información completa de una canción fraccionada
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FractionalSongResponse {
+    pub id: Uuid,
     pub song_id: Uuid,
     pub artist_id: Uuid,
     pub title: String,
+    
+    // Shares information
     pub total_shares: u32,
     pub available_shares: u32,
-    pub sold_percentage: f64,
-    pub current_share_price: f64,
-    pub total_revenue: RevenueAmount,
-    pub market_value: RevenueAmount,
+    pub current_price_per_share: f64,
+    
+    // 🆕 ARTIST CONTROL INFO
+    pub artist_reserved_shares: u32,
+    pub fan_available_shares: u32,
+    pub artist_revenue_percentage: f64,
+    pub artist_ownership_percentage: f64,   // Calculated field
+    pub max_fan_ownership_percentage: f64,  // Calculated field
+    
+    // 🆕 CAMPAIGN INFO
+    pub potential_fan_funding: f64,         // fan_available_shares * price
+    pub current_funding_raised: f64,        // sold_shares * price
+    pub funding_completion_percentage: f64, // % of fan shares sold
+    
+    // 🆕 MARKET STATS
+    pub total_shareholders: u32,
+    pub avg_shares_per_holder: f64,
+    pub price_change_24h: Option<f64>,
+    
     pub created_at: chrono::DateTime<chrono::Utc>,
-    pub updated_at: chrono::DateTime<chrono::Utc>,
-    pub ownership_breakdown: Option<Vec<OwnershipItem>>,
-    pub recent_transactions: Option<Vec<TransactionItem>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OwnershipItem {
-    pub user_id: Uuid,
-    pub shares_owned: u32,
-    pub ownership_percentage: f64,
-    pub investment_value: RevenueAmount,
-    pub purchase_date: chrono::DateTime<chrono::Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TransactionItem {
-    pub transaction_id: Uuid,
-    pub transaction_type: String, // "Purchase" | "Transfer"
-    pub buyer_id: Option<Uuid>,
-    pub seller_id: Option<Uuid>,
-    pub shares_quantity: u32,
-    pub price_per_share: f64,
-    pub total_amount: RevenueAmount,
-    pub status: String,
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    pub completed_at: Option<chrono::DateTime<chrono::Utc>>,
+impl FractionalSongResponse {
+    /// Constructor desde FractionalSong entity
+    pub fn from_entity(song: &crate::domain::entities::FractionalSong, total_shareholders: u32) -> Self {
+        let sold_shares = song.fan_available_shares() - song.available_shares();
+        let current_funding_raised = sold_shares as f64 * song.current_price_per_share().amount();
+        let potential_fan_funding = song.fan_available_shares() as f64 * song.current_price_per_share().amount();
+        
+        Self {
+            id: song.id(),
+            song_id: song.song_id(),
+            artist_id: song.artist_id(),
+            title: song.title().to_string(),
+            
+            total_shares: song.total_shares(),
+            available_shares: song.available_shares(),
+            current_price_per_share: song.current_price_per_share().amount(),
+            
+            artist_reserved_shares: song.artist_reserved_shares(),
+            fan_available_shares: song.fan_available_shares(),
+            artist_revenue_percentage: song.artist_revenue_percentage(),
+            artist_ownership_percentage: song.artist_ownership_percentage(),
+            max_fan_ownership_percentage: song.max_fan_ownership_percentage(),
+            
+            potential_fan_funding,
+            current_funding_raised,
+            funding_completion_percentage: if song.fan_available_shares() > 0 {
+                (sold_shares as f64 / song.fan_available_shares() as f64) * 100.0
+            } else { 0.0 },
+            
+            total_shareholders,
+            avg_shares_per_holder: if total_shareholders > 0 {
+                sold_shares as f64 / total_shareholders as f64
+            } else { 0.0 },
+            price_change_24h: None, // TODO: Implementar con price history
+            
+            created_at: song.created_at(),
+        }
+    }
 }
 
 /// Query para buscar canciones fraccionadas

@@ -19,13 +19,17 @@ pub struct FractionalOwnershipAggregate {
 
 impl FractionalOwnershipAggregate {
     /// Crear un nuevo aggregate para una canción fraccionada
-    pub fn new(fractional_song: FractionalSong) -> Self {
-        FractionalOwnershipAggregate {
+    pub fn new(fractional_song: FractionalSong, ownerships: HashMap<Uuid, ShareOwnership>) -> Result<Self, FractionalOwnershipError> {
+        let aggregate = FractionalOwnershipAggregate {
             fractional_song,
-            ownerships: HashMap::new(),
+            ownerships,
             pending_transactions: HashMap::new(),
             uncommitted_events: Vec::new(),
-        }
+        };
+        
+        // Verificar integridad al crear
+        aggregate.verify_integrity()?;
+        Ok(aggregate)
     }
 
     /// Cargar aggregate existente con datos de repositorio
@@ -33,7 +37,7 @@ impl FractionalOwnershipAggregate {
         fractional_song: FractionalSong,
         ownerships: Vec<ShareOwnership>,
         transactions: Vec<ShareTransaction>,
-    ) -> Self {
+    ) -> Result<Self, FractionalOwnershipError> {
         let ownerships_map: HashMap<Uuid, ShareOwnership> = ownerships
             .into_iter()
             .map(|ownership| (ownership.user_id(), ownership))
@@ -45,12 +49,10 @@ impl FractionalOwnershipAggregate {
             .map(|transaction| (transaction.id(), transaction))
             .collect();
 
-        FractionalOwnershipAggregate {
-            fractional_song,
-            ownerships: ownerships_map,
-            pending_transactions: pending_transactions_map,
-            uncommitted_events: Vec::new(),
-        }
+        let mut aggregate = Self::new(fractional_song, ownerships_map)?;
+        aggregate.pending_transactions = pending_transactions_map;
+        
+        Ok(aggregate)
     }
 
     // Getters
@@ -118,9 +120,9 @@ impl FractionalOwnershipAggregate {
             .ok_or_else(|| FractionalOwnershipError::ValidationError("ID de comprador faltante".to_string()))?;
 
         // Crear o actualizar ownership
-        if let Some(existing_ownership) = self.ownerships.get_mut(&buyer_id) {
+        if self.ownerships.contains_key(&buyer_id) {
             // El usuario ya tiene acciones, agregar más
-            self.update_existing_ownership(existing_ownership, transaction.shares_quantity())?;
+            self.update_existing_ownership(buyer_id, transaction.shares_quantity())?;
         } else {
             // Nuevo ownership
             let ownership = ShareOwnership::new(
@@ -211,6 +213,8 @@ impl FractionalOwnershipAggregate {
         initial_price_per_share: SharePrice,
         artist_reserved_percentage: OwnershipPercentage,
     ) -> Result<Self, FractionalOwnershipError> {
+        let price_value = initial_price_per_share.value();
+        
         let fractional_song = FractionalSong::new(
             song_id,
             artist_id,
@@ -219,7 +223,7 @@ impl FractionalOwnershipAggregate {
             initial_price_per_share,
         )?;
 
-        let mut aggregate = Self::new(fractional_song);
+        let mut aggregate = Self::new(fractional_song, HashMap::new())?;
 
         // Crear ownership inicial para el artista
         let artist_ownership = ShareOwnership::new(
@@ -227,7 +231,7 @@ impl FractionalOwnershipAggregate {
             song_id,
             (total_shares as f64 * artist_reserved_percentage.as_f64()) as u32,
             total_shares,
-            initial_price_per_share,
+            SharePrice::new(price_value)?,
         )?;
 
         aggregate.ownerships.insert(artist_id, artist_ownership);
@@ -292,7 +296,10 @@ impl FractionalOwnershipAggregate {
     }
 
     /// Funciones auxiliares privadas
-    fn update_existing_ownership(&mut self, ownership: &mut ShareOwnership, additional_shares: u32) -> Result<(), FractionalOwnershipError> {
+    fn update_existing_ownership(&mut self, user_id: Uuid, additional_shares: u32) -> Result<(), FractionalOwnershipError> {
+        let ownership = self.ownerships.get(&user_id)
+            .ok_or_else(|| FractionalOwnershipError::ValidationError("Usuario no encontrado".to_string()))?;
+        
         let new_total_shares = ownership.shares_owned() + additional_shares;
         
         // Crear nuevo ownership con los shares actualizados
@@ -304,7 +311,7 @@ impl FractionalOwnershipAggregate {
             ownership.purchase_price().clone(),
         )?;
 
-        *ownership = new_ownership;
+        self.ownerships.insert(user_id, new_ownership);
         Ok(())
     }
 
@@ -361,7 +368,7 @@ mod tests {
     #[test]
     fn should_create_aggregate_correctly() {
         let fractional_song = create_test_fractional_song();
-        let aggregate = FractionalOwnershipAggregate::new(fractional_song.clone());
+        let aggregate = FractionalOwnershipAggregate::new(fractional_song.clone(), HashMap::new()).unwrap();
 
         assert_eq!(aggregate.fractional_song().id(), fractional_song.id());
         assert_eq!(aggregate.ownerships().len(), 0);
@@ -371,7 +378,7 @@ mod tests {
     #[test]
     fn should_purchase_shares_successfully() {
         let fractional_song = create_test_fractional_song();
-        let mut aggregate = FractionalOwnershipAggregate::new(fractional_song);
+        let mut aggregate = FractionalOwnershipAggregate::new(fractional_song, HashMap::new()).unwrap();
 
         let buyer_id = Uuid::new_v4();
         let transaction_id = aggregate.purchase_shares(buyer_id, 100).unwrap();
@@ -385,7 +392,7 @@ mod tests {
     #[test]
     fn should_confirm_purchase_and_create_ownership() {
         let fractional_song = create_test_fractional_song();
-        let mut aggregate = FractionalOwnershipAggregate::new(fractional_song);
+        let mut aggregate = FractionalOwnershipAggregate::new(fractional_song, HashMap::new()).unwrap();
 
         let buyer_id = Uuid::new_v4();
         let transaction_id = aggregate.purchase_shares(buyer_id, 100).unwrap();
@@ -405,7 +412,7 @@ mod tests {
     #[test]
     fn should_distribute_revenue_proportionally() {
         let fractional_song = create_test_fractional_song();
-        let mut aggregate = FractionalOwnershipAggregate::new(fractional_song);
+        let mut aggregate = FractionalOwnershipAggregate::new(fractional_song, HashMap::new()).unwrap();
 
         // Crear dos propietarios
         let buyer1_id = Uuid::new_v4();
@@ -436,7 +443,7 @@ mod tests {
     #[test]
     fn should_maintain_integrity() {
         let fractional_song = create_test_fractional_song();
-        let mut aggregate = FractionalOwnershipAggregate::new(fractional_song);
+        let mut aggregate = FractionalOwnershipAggregate::new(fractional_song, HashMap::new()).unwrap();
 
         let buyer_id = Uuid::new_v4();
         let transaction_id = aggregate.purchase_shares(buyer_id, 100).unwrap();
@@ -449,7 +456,7 @@ mod tests {
     #[test]
     fn should_reject_excessive_share_purchase() {
         let fractional_song = create_test_fractional_song();
-        let mut aggregate = FractionalOwnershipAggregate::new(fractional_song);
+        let mut aggregate = FractionalOwnershipAggregate::new(fractional_song, HashMap::new()).unwrap();
 
         let buyer_id = Uuid::new_v4();
         let result = aggregate.purchase_shares(buyer_id, 1001);

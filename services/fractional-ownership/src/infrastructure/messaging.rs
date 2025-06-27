@@ -1,6 +1,7 @@
 // Sistema de mensajería para eventos de dominio
 use crate::domain::events::*;
 use crate::domain::errors::FractionalOwnershipError;
+use async_trait::async_trait;
 
 pub struct MessageBus {
     // TODO: Implementar sistema de mensajería real (Redis, RabbitMQ, etc.)
@@ -30,18 +31,22 @@ impl MessageBus {
     }
 }
 
-pub trait EventPublisher {
-    async fn publish(&self, event: DomainEvent) -> Result<(), FractionalOwnershipError>;
+/// Trait para publicar eventos de dominio a sistemas externos
+#[async_trait]
+pub trait EventPublisher: Send + Sync {
+    async fn publish(&self, event: Box<dyn DomainEvent>) -> Result<(), FractionalOwnershipError>;
 }
 
-impl EventPublisher for MessageBus {
-    async fn publish(&self, event: DomainEvent) -> Result<(), FractionalOwnershipError> {
-        match event.event_type.as_str() {
-            "SharePurchased" => println!("Publishing SharePurchased"),
-            "ShareTransferred" => println!("Publishing ShareTransferred"), 
-            "RevenueDistributed" => println!("Publishing RevenueDistributed"),
-            _ => println!("Publishing unknown event: {}", event.event_type),
-        }
+/// Implementación Mock para desarrollo y testing
+pub struct MockEventPublisher;
+
+#[async_trait]
+impl EventPublisher for MockEventPublisher {
+    async fn publish(&self, event: Box<dyn DomainEvent>) -> Result<(), FractionalOwnershipError> {
+        // Log del evento en desarrollo
+        println!("📡 Mock Event Published: {} at {}", 
+                event.event_type(), 
+                event.occurred_at());
         Ok(())
     }
 } 

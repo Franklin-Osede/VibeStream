@@ -1,7 +1,10 @@
-use crate::domain::value_objects::RevenueAmount;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 use std::fmt::Debug;
+
+use crate::domain::errors::FractionalOwnershipError;
+use crate::domain::value_objects::RevenueAmount;
 
 /// Trait base para todos los eventos de dominio
 pub trait DomainEvent: Debug + Send + Sync {
@@ -235,44 +238,32 @@ impl DomainEvent for SharePriceUpdated {
     fn event_version(&self) -> u32 { 1 }
 }
 
-/// Dispatcher para manejar eventos de dominio
-#[derive(Default)]
-pub struct DomainEventDispatcher {
-    handlers: Vec<Box<dyn DomainEventHandler>>,
+/// Enum para handlers específicos que permite dyn compatibility
+pub enum DomainEventHandlerWrapper {
+    SharePurchase(SharePurchaseEventHandler),
+    RevenueDistribution(RevenueDistributionEventHandler),
 }
 
-impl DomainEventDispatcher {
-    pub fn new() -> Self {
-        DomainEventDispatcher {
-            handlers: Vec::new(),
+impl DomainEventHandlerWrapper {
+    pub async fn handle(&self, event: &dyn DomainEvent) -> Result<(), FractionalOwnershipError> {
+        match self {
+            DomainEventHandlerWrapper::SharePurchase(handler) => handler.handle(event).await,
+            DomainEventHandlerWrapper::RevenueDistribution(handler) => handler.handle(event).await,
         }
     }
-
-    pub fn register_handler(&mut self, handler: Box<dyn DomainEventHandler>) {
-        self.handlers.push(handler);
-    }
-
-    pub async fn dispatch(&self, event: Box<dyn DomainEvent>) -> Result<(), String> {
-        for handler in &self.handlers {
-            if handler.interested_in().contains(&event.event_type()) {
-                handler.handle(event.as_ref()).await?;
-            }
+    
+    pub fn interested_in(&self) -> Vec<String> {
+        match self {
+            DomainEventHandlerWrapper::SharePurchase(handler) => handler.interested_in(),
+            DomainEventHandlerWrapper::RevenueDistribution(handler) => handler.interested_in(),
         }
-        Ok(())
-    }
-
-    pub async fn dispatch_multiple(&self, events: Vec<Box<dyn DomainEvent>>) -> Result<(), String> {
-        for event in events {
-            self.dispatch(event).await?;
-        }
-        Ok(())
     }
 }
 
-/// Trait para handlers de eventos de dominio
+/// Trait para manejar eventos de dominio
 pub trait DomainEventHandler: Send + Sync {
-    async fn handle(&self, event: &dyn DomainEvent) -> Result<(), String>;
-    fn interested_in(&self) -> Vec<&'static str>;
+    fn handle(&self, event: &dyn DomainEvent) -> impl std::future::Future<Output = Result<(), FractionalOwnershipError>> + Send;
+    fn interested_in(&self) -> Vec<String>;
 }
 
 /// Handler específico para eventos de compra de acciones
@@ -287,19 +278,21 @@ impl SharePurchaseEventHandler {
 }
 
 impl DomainEventHandler for SharePurchaseEventHandler {
-    async fn handle(&self, event: &dyn DomainEvent) -> Result<(), String> {
-        match event.event_type() {
-            "SharePurchased" => {
-                // Lógica para manejar compra de acciones
-                // Ejemplo: Notificar al usuario, actualizar métricas, etc.
-                println!("Manejando evento de compra de acciones: {:?}", event.aggregate_id());
-                Ok(())
+    fn handle(&self, event: &dyn DomainEvent) -> impl std::future::Future<Output = Result<(), FractionalOwnershipError>> + Send {
+        async move {
+            match event.event_type() {
+                "SharePurchased" => {
+                    // Lógica para manejar compra de acciones
+                    // Ejemplo: Notificar al usuario, actualizar métricas, etc.
+                    println!("Manejando evento de compra de acciones: {:?}", event.aggregate_id());
+                    Ok(())
+                }
+                _ => Ok(())
             }
-            _ => Ok(())
         }
     }
 
-    fn interested_in(&self) -> Vec<&'static str> {
+    fn interested_in(&self) -> Vec<String> {
         vec!["SharePurchased"]
     }
 }
@@ -316,19 +309,21 @@ impl RevenueDistributionEventHandler {
 }
 
 impl DomainEventHandler for RevenueDistributionEventHandler {
-    async fn handle(&self, event: &dyn DomainEvent) -> Result<(), String> {
-        match event.event_type() {
-            "RevenueDistributed" => {
-                // Lógica para manejar distribución de ingresos
-                // Ejemplo: Procesar pagos, actualizar balances de usuarios, etc.
-                println!("Manejando evento de distribución de ingresos: {:?}", event.aggregate_id());
-                Ok(())
+    fn handle(&self, event: &dyn DomainEvent) -> impl std::future::Future<Output = Result<(), FractionalOwnershipError>> + Send {
+        async move {
+            match event.event_type() {
+                "RevenueDistributed" => {
+                    // Lógica para manejar distribución de ingresos
+                    // Ejemplo: Procesar pagos, actualizar balances de usuarios, etc.
+                    println!("Manejando evento de distribución de ingresos: {:?}", event.aggregate_id());
+                    Ok(())
+                }
+                _ => Ok(())
             }
-            _ => Ok(())
         }
     }
 
-    fn interested_in(&self) -> Vec<&'static str> {
+    fn interested_in(&self) -> Vec<String> {
         vec!["RevenueDistributed"]
     }
 }
@@ -380,7 +375,7 @@ mod tests {
     #[tokio::test]
     async fn should_dispatch_events_to_handlers() {
         let mut dispatcher = DomainEventDispatcher::new();
-        dispatcher.register_handler(Box::new(SharePurchaseEventHandler::new()));
+        dispatcher.register_handler(DomainEventHandlerWrapper::SharePurchase(Box::new(SharePurchaseEventHandler::new())));
 
         let song_id = Uuid::new_v4();
         let buyer_id = Uuid::new_v4();

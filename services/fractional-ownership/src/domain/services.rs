@@ -216,7 +216,7 @@ impl RiskAnalysisService {
             risk_level,
             risk_score: total_risk_score,
             risk_factors,
-            recommendation: Self::generate_risk_recommendation(risk_level, &risk_factors),
+            recommendation: Self::generate_risk_recommendation(&risk_level, &risk_factors),
         }
     }
 
@@ -240,7 +240,7 @@ impl RiskAnalysisService {
         hhi
     }
 
-    fn generate_risk_recommendation(risk_level: RiskLevel, risk_factors: &[RiskFactor]) -> String {
+    fn generate_risk_recommendation(risk_level: &RiskLevel, risk_factors: &[RiskFactor]) -> String {
         match risk_level {
             RiskLevel::Low => "Inversión de bajo riesgo. Adecuada para portafolios conservadores.".to_string(),
             RiskLevel::Medium => format!(

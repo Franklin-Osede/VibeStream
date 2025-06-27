@@ -52,28 +52,50 @@ pub struct SharePrice {
 impl SharePrice {
     pub fn new(amount: f64) -> Result<Self, FractionalOwnershipError> {
         if amount <= 0.0 {
-            return Err(FractionalOwnershipError::InvalidPrice(
-                format!("Precio de acción inválido: {}. Debe ser mayor a 0", amount)
+            return Err(FractionalOwnershipError::BusinessRuleViolation(
+                "El precio por acción debe ser mayor a 0".to_string()
             ));
         }
-        Ok(Self { amount })
+        
+        if amount > 1_000_000.0 {
+            return Err(FractionalOwnershipError::BusinessRuleViolation(
+                "El precio por acción no puede exceder $1,000,000".to_string()
+            ));
+        }
+        
+        Ok(SharePrice { amount })
     }
-
-    pub fn from_amount(amount: f64) -> Result<Self, FractionalOwnershipError> {
-        Self::new(amount)
-    }
-
+    
     pub fn value(&self) -> f64 {
         self.amount
     }
-
+    
+    pub fn amount(&self) -> f64 {
+        self.amount
+    }
+    
     pub fn as_f64(&self) -> f64 {
         self.amount
     }
-
+    
+    pub fn multiply(&self, factor: f64) -> Result<Self, FractionalOwnershipError> {
+        Self::new(self.amount * factor)
+    }
+    
     pub fn multiply_by_quantity(&self, quantity: u32) -> Result<RevenueAmount, FractionalOwnershipError> {
         let total_amount = self.amount * quantity as f64;
         RevenueAmount::new(total_amount)
+    }
+    
+    pub fn add(&self, other: &SharePrice) -> Result<Self, FractionalOwnershipError> {
+        Self::new(self.amount + other.amount)
+    }
+    
+    pub fn percentage_change(&self, other: &SharePrice) -> f64 {
+        if self.amount == 0.0 {
+            return 0.0;
+        }
+        ((other.amount - self.amount) / self.amount) * 100.0
     }
 }
 
@@ -86,44 +108,46 @@ pub struct RevenueAmount {
 impl RevenueAmount {
     pub fn new(amount: f64) -> Result<Self, FractionalOwnershipError> {
         if amount < 0.0 {
-            return Err(FractionalOwnershipError::InvalidAmount(
-                format!("Cantidad de ingresos no puede ser negativa: {}", amount)
+            return Err(FractionalOwnershipError::BusinessRuleViolation(
+                "El monto de ingresos no puede ser negativo".to_string()
             ));
         }
-        Ok(Self { amount })
+        
+        Ok(RevenueAmount { amount })
     }
-
-    pub fn from_amount(amount: f64) -> Result<Self, FractionalOwnershipError> {
-        Self::new(amount)
-    }
-
+    
     pub fn value(&self) -> f64 {
         self.amount
     }
-
+    
+    pub fn amount(&self) -> f64 {
+        self.amount
+    }
+    
     pub fn as_f64(&self) -> f64 {
         self.amount
     }
-
-    pub fn add(&self, other: &RevenueAmount) -> Result<RevenueAmount, FractionalOwnershipError> {
-        RevenueAmount::new(self.amount + other.amount)
+    
+    pub fn add(&self, other: &RevenueAmount) -> Result<Self, FractionalOwnershipError> {
+        Self::new(self.amount + other.amount)
     }
-
-    pub fn subtract(&self, other: &RevenueAmount) -> Result<RevenueAmount, FractionalOwnershipError> {
+    
+    pub fn multiply(&self, factor: f64) -> Result<Self, FractionalOwnershipError> {
+        Self::new(self.amount * factor)
+    }
+    
+    pub fn multiply_by_quantity(&self, quantity: u32) -> Result<RevenueAmount, FractionalOwnershipError> {
+        let total_amount = self.amount * quantity as f64;
+        RevenueAmount::new(total_amount)
+    }
+    
+    pub fn subtract(&self, other: &RevenueAmount) -> Result<Self, FractionalOwnershipError> {
         if self.amount < other.amount {
-            return Err(FractionalOwnershipError::InvalidOperation(
-                "No se puede sustraer más de lo disponible".to_string()
+            return Err(FractionalOwnershipError::BusinessRuleViolation(
+                "No se puede restar más ingresos de los disponibles".to_string()
             ));
         }
-        RevenueAmount::new(self.amount - other.amount)
-    }
-
-    pub fn multiply(&self, multiplier: f64) -> Result<RevenueAmount, FractionalOwnershipError> {
-        RevenueAmount::new(self.amount * multiplier)
-    }
-
-    pub fn is_zero(&self) -> bool {
-        self.amount == 0.0
+        Self::new(self.amount - other.amount)
     }
 }
 

@@ -8,19 +8,25 @@ use crate::domain::errors::FractionalOwnershipError;
 use uuid::Uuid;
 use std::collections::HashMap;
 
-/// Entidad que representa una canción con participaciones fraccionadas
-#[derive(Debug, Clone, PartialEq)]
+/// Entidad principal: Canción que puede ser comprada fraccionalmente
+#[derive(Debug, Clone)]
 pub struct FractionalSong {
     id: Uuid,
-    song_id: Uuid, // Referencia al Song Context
+    song_id: Uuid, // Referencia al Song del Music Context
     artist_id: Uuid,
     title: String,
     total_shares: u32,
-    available_shares: u32,
-    share_price: SharePrice,
-    total_revenue: RevenueAmount,
+    
+    // 🆕 ARTIST CONTROL FIELDS
+    artist_reserved_shares: u32,    // Shares que se queda el artista
+    fan_available_shares: u32,      // Shares disponibles para fans
+    artist_revenue_percentage: f64, // % de ingresos que va al artista (además de sus shares)
+    
+    available_shares: u32, // Shares actualmente disponibles para compra
+    current_price_per_share: SharePrice,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
+    accumulated_revenue: RevenueAmount,
 }
 
 impl FractionalSong {
@@ -45,11 +51,57 @@ impl FractionalSong {
             artist_id,
             title,
             total_shares,
+            artist_reserved_shares: 0,
+            fan_available_shares: total_shares,
+            artist_revenue_percentage: 0.0,
             available_shares: total_shares,
-            share_price,
-            total_revenue: RevenueAmount::new(0.0)?,
+            current_price_per_share: share_price,
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            accumulated_revenue: RevenueAmount::new(0.0)?,
+        })
+    }
+
+    /// Constructor mejorado con control artístico
+    pub fn new_with_artist_control(
+        id: Uuid,
+        song_id: Uuid,
+        artist_id: Uuid,
+        title: String,
+        total_shares: u32,
+        artist_reserved_shares: u32,
+        artist_revenue_percentage: f64, // 0.0 a 1.0 (0% a 100%)
+        share_price: SharePrice,
+    ) -> Result<Self, FractionalOwnershipError> {
+        // Validaciones de negocio
+        if artist_reserved_shares > total_shares {
+            return Err(FractionalOwnershipError::BusinessRuleViolation(
+                "Artist reserved shares cannot exceed total shares".to_string()
+            ));
+        }
+
+        if artist_revenue_percentage < 0.0 || artist_revenue_percentage > 1.0 {
+            return Err(FractionalOwnershipError::BusinessRuleViolation(
+                "Artist revenue percentage must be between 0% and 100%".to_string()
+            ));
+        }
+
+        let fan_available_shares = total_shares - artist_reserved_shares;
+
+        Ok(FractionalSong {
+            id,
+            song_id,
+            artist_id,
+            title,
+            total_shares,
+            artist_reserved_shares,
+            fan_available_shares,
+            artist_revenue_percentage,
+            available_shares: fan_available_shares,
+            current_price_per_share: share_price,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            accumulated_revenue: RevenueAmount::new(0.0)?,
         })
     }
 
@@ -60,9 +112,8 @@ impl FractionalSong {
     pub fn title(&self) -> &str { &self.title }
     pub fn total_shares(&self) -> u32 { self.total_shares }
     pub fn available_shares(&self) -> u32 { self.available_shares }
-    pub fn share_price(&self) -> &SharePrice { &self.share_price }
-    pub fn current_price_per_share(&self) -> &SharePrice { &self.share_price } // Alias para compatibilidad
-    pub fn total_revenue(&self) -> &RevenueAmount { &self.total_revenue }
+    pub fn share_price(&self) -> &SharePrice { &self.current_price_per_share }
+    pub fn current_price_per_share(&self) -> &SharePrice { &self.current_price_per_share }
     pub fn created_at(&self) -> DateTime<Utc> { self.created_at }
     pub fn updated_at(&self) -> DateTime<Utc> { self.updated_at }
 
@@ -99,15 +150,22 @@ impl FractionalSong {
 
     /// Lógica de dominio: Agregar ingresos y actualizar precio
     pub fn add_revenue(&mut self, amount: RevenueAmount) -> Result<(), FractionalOwnershipError> {
-        self.total_revenue = RevenueAmount::new(self.total_revenue.value() + amount.value())?;
-        
-        // Aumentar el precio de las acciones basado en los ingresos
-        let revenue_multiplier = 1.0 + (amount.value() / 1000.0); // Cada $1000 aumenta 1% el precio
-        let new_price = self.share_price.value() * revenue_multiplier;
-        self.share_price = SharePrice::new(new_price)?;
-        
-        self.updated_at = Utc::now();
+        self.accumulated_revenue = self.accumulated_revenue.add(&amount)?;
         Ok(())
+    }
+    
+    pub fn total_revenue(&self) -> &RevenueAmount {
+        &self.accumulated_revenue
+    }
+    
+    // Método para calcular el precio actual dinámico basado en performance
+    pub fn calculate_dynamic_price(&self) -> SharePrice {
+        let base_price = self.current_price_per_share.as_f64();
+        let revenue_factor = 1.0 + (self.accumulated_revenue.as_f64() / 10000.0); // Factor basado en ingresos
+        let demand_factor = 1.0 + (self.sold_shares() as f64 / self.total_shares as f64) * 0.5; // Factor de demanda
+        
+        let new_price = base_price * revenue_factor * demand_factor;
+        SharePrice::new(new_price).unwrap_or_else(|_| self.current_price_per_share.clone())
     }
 
     /// Verificar si la canción está completamente vendida
@@ -119,6 +177,51 @@ impl FractionalSong {
     pub fn sold_percentage(&self) -> f64 {
         let sold_shares = self.total_shares - self.available_shares;
         (sold_shares as f64 / self.total_shares as f64) * 100.0
+    }
+
+    // 🆕 ARTIST CONTROL GETTERS
+    pub fn artist_reserved_shares(&self) -> u32 { self.artist_reserved_shares }
+    pub fn fan_available_shares(&self) -> u32 { self.fan_available_shares }
+    pub fn artist_revenue_percentage(&self) -> f64 { self.artist_revenue_percentage }
+    
+    /// Calcular ownership percentage del artista
+    pub fn artist_ownership_percentage(&self) -> f64 {
+        self.artist_reserved_shares as f64 / self.total_shares as f64
+    }
+    
+    /// Calcular máximo ownership percentage que pueden tener los fans
+    pub fn max_fan_ownership_percentage(&self) -> f64 {
+        self.fan_available_shares as f64 / self.total_shares as f64
+    }
+
+    /// Validar si una compra es permitida según las reglas del artista
+    pub fn can_purchase_shares(&self, quantity: u32) -> Result<(), FractionalOwnershipError> {
+        if quantity > self.available_shares {
+            return Err(FractionalOwnershipError::BusinessRuleViolation(
+                format!("Only {} shares available for purchase", self.available_shares)
+            ));
+        }
+
+        // Regla adicional: No se puede comprar más del 10% del total en una sola transacción
+        let max_single_purchase = (self.total_shares as f64 * 0.10) as u32;
+        if quantity > max_single_purchase {
+            return Err(FractionalOwnershipError::BusinessRuleViolation(
+                format!("Cannot purchase more than {}% of total shares in single transaction", 10)
+            ));
+        }
+
+        Ok(())
+    }
+
+    /// Calcular distribución de ingresos entre artista y shareholders
+    pub fn calculate_revenue_distribution(&self, total_revenue: &RevenueAmount) -> (RevenueAmount, RevenueAmount) {
+        let artist_share = total_revenue.value() * self.artist_revenue_percentage;
+        let shareholders_share = total_revenue.value() - artist_share;
+        
+        (
+            RevenueAmount::new(artist_share).unwrap_or_else(|_| RevenueAmount::new(0.0).unwrap()),
+            RevenueAmount::new(shareholders_share).unwrap_or_else(|_| RevenueAmount::new(0.0).unwrap())
+        )
     }
 }
 
@@ -170,25 +273,21 @@ impl ShareOwnership {
     pub fn fractional_song_id(&self) -> Uuid { self.fractional_song_id }
     pub fn song_id(&self) -> Uuid { self.fractional_song_id }
     pub fn shares_owned(&self) -> u32 { self.shares_owned }
-    pub fn ownership_percentage(&self) -> &OwnershipPercentage { &self.ownership_percentage }
-    pub fn percentage(&self) -> &OwnershipPercentage { &self.ownership_percentage } // Alias para compatibilidad
-    pub fn song_id(&self) -> Uuid { self.fractional_song_id } // Alias para compatibilidad
     pub fn percentage(&self) -> &OwnershipPercentage { &self.ownership_percentage }
     pub fn purchase_price(&self) -> &SharePrice { &self.purchase_price }
-    pub fn total_earnings(&self) -> &RevenueAmount { &self.total_earnings }
     pub fn purchase_date(&self) -> DateTime<Utc> { self.purchase_date }
     pub fn last_earning_date(&self) -> Option<DateTime<Utc>> { self.last_earning_date }
-
-    /// Lógica de dominio: Agregar ganancias por royalties
-    pub fn add_earnings(&mut self, amount: RevenueAmount) -> Result<(), FractionalOwnershipError> {
-        self.total_earnings = RevenueAmount::new(self.total_earnings.value() + amount.value())?;
-        self.last_earning_date = Some(Utc::now());
+    pub fn total_earnings(&self) -> &RevenueAmount { &self.total_earnings }
+    
+    // Métodos de negocio
+    pub fn add_earnings(&mut self, revenue: RevenueAmount) -> Result<(), FractionalOwnershipError> {
+        self.total_earnings = self.total_earnings.add(&revenue)?;
         Ok(())
     }
-
-    /// Lógica de dominio: Calcular ganancias basadas en porcentaje de ownership
-    pub fn calculate_revenue_share(&self, total_revenue: &RevenueAmount) -> Result<RevenueAmount, FractionalOwnershipError> {
-        self.ownership_percentage.calculate_revenue_share(total_revenue)
+    
+    pub fn calculate_current_value(&self, current_price_per_share: &SharePrice) -> RevenueAmount {
+        let current_value = current_price_per_share.as_f64() * self.shares_owned as f64;
+        RevenueAmount::new(current_value).unwrap_or_else(|_| RevenueAmount::new(0.0).unwrap())
     }
 
     /// Verificar si ha recibido ganancias recientemente

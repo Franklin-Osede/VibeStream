@@ -176,6 +176,7 @@ impl EventStore for InMemoryEventStore {
         }
 
         let mut new_version = current_version;
+        let events_count = events.len();
         for event_data in events {
             new_version += 1;
             let recorded_event = RecordedEvent {
@@ -193,7 +194,7 @@ impl EventStore for InMemoryEventStore {
         }
 
         self.global_position.fetch_add(
-            events.len() as u64,
+            events_count as u64,
             std::sync::atomic::Ordering::SeqCst,
         );
 

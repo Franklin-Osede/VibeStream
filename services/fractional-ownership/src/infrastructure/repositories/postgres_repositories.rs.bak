@@ -1,6 +1,6 @@
 // Implementaciones de repositorios con PostgreSQL
 use crate::domain::aggregates::FractionalOwnershipAggregate;
-use crate::domain::entities::{FractionalSong, ShareOwnership, ShareTransaction, TransactionType, TransactionStatus};
+use crate::domain::entities::{FractionalSong, ShareOwnership, ShareTransaction};
 use crate::domain::repositories::{
     FractionalOwnershipRepository, ShareOwnershipRepository, ShareTransactionRepository,
     FractionalOwnershipAnalyticsRepository, UserPortfolioSummary, TrendingSong, 
@@ -15,19 +15,11 @@ use uuid::Uuid;
 use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
-use rust_decimal::prelude::FromPrimitive;
-use bigdecimal::BigDecimal;
-use std::str::FromStr;
 
-/// Helper function to convert BigDecimal to f64 safely
-fn bigdecimal_to_f64(decimal: BigDecimal) -> Result<f64, FractionalOwnershipError> {
-    decimal.to_string().parse::<f64>()
-        .map_err(|_| FractionalOwnershipError::InfrastructureError("Error converting BigDecimal to f64".to_string()))
-}
-
-/// Helper function to convert f64 to BigDecimal
-fn f64_to_bigdecimal(value: f64) -> BigDecimal {
-    BigDecimal::from_str(&value.to_string()).unwrap_or_default()
+/// Helper function to convert Decimal to f64 safely
+fn decimal_to_f64(decimal: Decimal) -> Result<f64, FractionalOwnershipError> {
+    decimal.try_into()
+        .map_err(|_| FractionalOwnershipError::InfrastructureError("Error converting decimal to f64".to_string()))
 }
 
 /// Implementación PostgreSQL del FractionalOwnershipRepository
@@ -62,11 +54,13 @@ impl PostgresFractionalOwnershipRepository {
         };
 
         // Crear la entidad FractionalSong - convertir DECIMAL a f64
-        let price_value: f64 = bigdecimal_to_f64(song_row.current_price_per_share)?;
+        let price_value: f64 = song_row.current_price_per_share.try_into()
+            .map_err(|_| FractionalOwnershipError::InfrastructureError("Error convirtiendo precio".to_string()))?;
         let price = SharePrice::new(price_value)
             .map_err(|e| FractionalOwnershipError::BusinessRuleViolation(format!("Invalid price: {}", e)))?;
 
-        let artist_revenue_pct: f64 = song_row.artist_revenue_percentage.map(bigdecimal_to_f64).transpose()?.unwrap_or(0.0);
+        let artist_revenue_pct: f64 = song_row.artist_revenue_percentage.try_into()
+            .map_err(|_| FractionalOwnershipError::InfrastructureError("Error convirtiendo revenue percentage".to_string()))?;
 
         let song = FractionalSong::new_with_artist_control(
             song_row.id,
@@ -91,7 +85,8 @@ impl PostgresFractionalOwnershipRepository {
 
         let mut ownerships = HashMap::new();
         for row in ownership_rows {
-            let purchase_price_value: f64 = bigdecimal_to_f64(row.purchase_price)?;
+            let purchase_price_value: f64 = row.purchase_price.try_into()
+                .map_err(|_| FractionalOwnershipError::InfrastructureError("Error convirtiendo purchase price".to_string()))?;
             
             let ownership = ShareOwnership::new(
                 row.user_id,
@@ -143,9 +138,9 @@ impl FractionalOwnershipRepository for PostgresFractionalOwnershipRepository {
             song.total_shares() as i32,
             song.artist_reserved_shares() as i32,
             song.fan_available_shares() as i32,
-            f64_to_bigdecimal(song.artist_revenue_percentage()).unwrap_or_default(),
+            song.artist_revenue_percentage(),
             song.available_shares() as i32,
-            f64_to_bigdecimal(song.current_price_per_share().value()).unwrap_or_default(),
+            song.current_price_per_share().value(),
             song.created_at(),
             song.updated_at()
         )
@@ -166,8 +161,8 @@ impl FractionalOwnershipRepository for PostgresFractionalOwnershipRepository {
                 ownership.user_id(),
                 ownership.fractional_song_id(),
                 ownership.shares_owned() as i32,
-                f64_to_bigdecimal(ownership.purchase_price().value()).unwrap_or_default(),
-                f64_to_bigdecimal(ownership.total_earnings().value()).unwrap_or_default(),
+                ownership.purchase_price().value(),
+                ownership.total_earnings().value(),
                 ownership.purchase_date(),
                 ownership.last_earning_date()
             )
@@ -204,7 +199,7 @@ impl FractionalOwnershipRepository for PostgresFractionalOwnershipRepository {
                 row.fractional_song_id,
                 row.shares_owned as u32,
                 row.total_shares as u32,
-                SharePrice::new(bigdecimal_to_f64(row.purchase_price)?)
+                SharePrice::new(row.purchase_price as f64)
                     .map_err(|e| FractionalOwnershipError::BusinessRuleViolation(format!("Invalid price: {}", e)))?,
             )?;
             ownerships.push(ownership);
@@ -226,7 +221,7 @@ impl FractionalOwnershipRepository for PostgresFractionalOwnershipRepository {
 
         match row {
             Some(row) => {
-                let revenue = RevenueAmount::new(bigdecimal_to_f64(row.total_earnings)?)
+                let revenue = RevenueAmount::new(row.total_earnings as f64)
                     .map_err(|e| FractionalOwnershipError::BusinessRuleViolation(format!("Invalid revenue: {}", e)))?;
                 Ok(Some(revenue))
             }
@@ -340,7 +335,7 @@ impl ShareOwnershipRepository for PostgresShareOwnershipRepository {
                     row.fractional_song_id,
                     row.shares_owned as u32,
                     row.total_shares as u32,
-                    SharePrice::new(bigdecimal_to_f64(row.purchase_price)?)
+                    SharePrice::new(row.purchase_price as f64)
                         .map_err(|e| FractionalOwnershipError::BusinessRuleViolation(format!("Invalid price: {}", e)))?,
                 )?;
                 Ok(Some(ownership))
@@ -371,7 +366,7 @@ impl ShareOwnershipRepository for PostgresShareOwnershipRepository {
                 row.fractional_song_id,
                 row.shares_owned as u32,
                 row.total_shares as u32,
-                SharePrice::new(bigdecimal_to_f64(row.purchase_price)?)
+                SharePrice::new(row.purchase_price as f64)
                     .map_err(|e| FractionalOwnershipError::BusinessRuleViolation(format!("Invalid price: {}", e)))?,
             )?;
             ownerships.push(ownership);
@@ -402,7 +397,7 @@ impl ShareOwnershipRepository for PostgresShareOwnershipRepository {
                 row.fractional_song_id,
                 row.shares_owned as u32,
                 row.total_shares as u32,
-                SharePrice::new(bigdecimal_to_f64(row.purchase_price)?)
+                SharePrice::new(row.purchase_price as f64)
                     .map_err(|e| FractionalOwnershipError::BusinessRuleViolation(format!("Invalid price: {}", e)))?,
             )?;
             ownerships.push(ownership);
@@ -424,8 +419,8 @@ impl ShareOwnershipRepository for PostgresShareOwnershipRepository {
             ownership.user_id(),
             ownership.fractional_song_id(),
             ownership.shares_owned() as i32,
-            f64_to_bigdecimal(ownership.purchase_price().value()).unwrap_or_default(),
-            f64_to_bigdecimal(ownership.total_earnings().value()).unwrap_or_default(),
+            ownership.purchase_price().value(),
+            ownership.total_earnings().value(),
             ownership.purchase_date(),
             ownership.last_earning_date()
         )
@@ -476,20 +471,20 @@ impl ShareTransactionRepository for PostgresShareTransactionRepository {
 
         match row {
             Some(row) => {
-                let transaction = match row.transaction_type.as_ref().map(|s| s.as_str()) {
-                    Some("purchase") => ShareTransaction::new_purchase(
+                let transaction = match row.transaction_type.as_str() {
+                    "purchase" => ShareTransaction::new_purchase(
                         row.buyer_id.ok_or_else(|| FractionalOwnershipError::BusinessRuleViolation("Purchase transaction must have buyer_id".to_string()))?,
                         row.fractional_song_id,
                         row.shares_quantity as u32,
-                        SharePrice::new(row.price_per_share.map(bigdecimal_to_f64).transpose()?.unwrap_or(0.0))
+                        SharePrice::new(row.price_per_share as f64)
                             .map_err(|e| FractionalOwnershipError::BusinessRuleViolation(format!("Invalid price: {}", e)))?,
                     )?,
-                    Some("transfer") => ShareTransaction::new_transfer(
+                    "transfer" => ShareTransaction::new_transfer(
                         row.buyer_id.ok_or_else(|| FractionalOwnershipError::BusinessRuleViolation("Transfer transaction must have buyer_id".to_string()))?,
                         row.seller_id.ok_or_else(|| FractionalOwnershipError::BusinessRuleViolation("Transfer transaction must have seller_id".to_string()))?,
                         row.fractional_song_id,
                         row.shares_quantity as u32,
-                        SharePrice::new(row.price_per_share.map(bigdecimal_to_f64).transpose()?.unwrap_or(0.0))
+                        SharePrice::new(row.price_per_share as f64)
                             .map_err(|e| FractionalOwnershipError::BusinessRuleViolation(format!("Invalid price: {}", e)))?,
                     )?,
                     _ => return Err(FractionalOwnershipError::BusinessRuleViolation("Invalid transaction type".to_string())),
@@ -520,8 +515,8 @@ impl ShareTransactionRepository for PostgresShareTransactionRepository {
             transaction.seller_id(),
             transaction.fractional_song_id(),
             transaction.shares_quantity() as i32,
-            f64_to_bigdecimal(transaction.price_per_share().value()).unwrap_or_default(),
-            f64_to_bigdecimal(transaction.total_amount().value()).unwrap_or_default(),
+            transaction.price_per_share().value(),
+            transaction.total_amount().value(),
             transaction_type_str,
             format!("{:?}", transaction.status()).to_lowercase(),
             transaction.created_at(),
@@ -550,20 +545,20 @@ impl ShareTransactionRepository for PostgresShareTransactionRepository {
 
         let mut transactions = Vec::new();
         for row in rows {
-            let transaction = match row.transaction_type.as_ref().map(|s| s.as_str()) {
-                Some("purchase") => ShareTransaction::new_purchase(
+            let transaction = match row.transaction_type.as_str() {
+                "purchase" => ShareTransaction::new_purchase(
                     row.buyer_id.ok_or_else(|| FractionalOwnershipError::BusinessRuleViolation("Purchase transaction must have buyer_id".to_string()))?,
                     row.fractional_song_id,
                     row.shares_quantity as u32,
-                    SharePrice::new(row.price_per_share.map(bigdecimal_to_f64).transpose()?.unwrap_or(0.0))
+                    SharePrice::new(row.price_per_share as f64)
                         .map_err(|e| FractionalOwnershipError::BusinessRuleViolation(format!("Invalid price: {}", e)))?,
                 )?,
-                Some("transfer") => ShareTransaction::new_transfer(
+                "transfer" => ShareTransaction::new_transfer(
                     row.buyer_id.ok_or_else(|| FractionalOwnershipError::BusinessRuleViolation("Transfer transaction must have buyer_id".to_string()))?,
                     row.seller_id.ok_or_else(|| FractionalOwnershipError::BusinessRuleViolation("Transfer transaction must have seller_id".to_string()))?,
                     row.fractional_song_id,
                     row.shares_quantity as u32,
-                    SharePrice::new(row.price_per_share.map(bigdecimal_to_f64).transpose()?.unwrap_or(0.0))
+                    SharePrice::new(row.price_per_share as f64)
                         .map_err(|e| FractionalOwnershipError::BusinessRuleViolation(format!("Invalid price: {}", e)))?,
                 )?,
                 _ => return Err(FractionalOwnershipError::BusinessRuleViolation("Invalid transaction type".to_string())),
@@ -589,20 +584,20 @@ impl ShareTransactionRepository for PostgresShareTransactionRepository {
 
         let mut transactions = Vec::new();
         for row in rows {
-            let transaction = match row.transaction_type.as_ref().map(|s| s.as_str()) {
-                Some("purchase") => ShareTransaction::new_purchase(
+            let transaction = match row.transaction_type.as_str() {
+                "purchase" => ShareTransaction::new_purchase(
                     row.buyer_id.ok_or_else(|| FractionalOwnershipError::BusinessRuleViolation("Purchase transaction must have buyer_id".to_string()))?,
                     row.fractional_song_id,
                     row.shares_quantity as u32,
-                    SharePrice::new(row.price_per_share.map(bigdecimal_to_f64).transpose()?.unwrap_or(0.0))
+                    SharePrice::new(row.price_per_share as f64)
                         .map_err(|e| FractionalOwnershipError::BusinessRuleViolation(format!("Invalid price: {}", e)))?,
                 )?,
-                Some("transfer") => ShareTransaction::new_transfer(
+                "transfer" => ShareTransaction::new_transfer(
                     row.buyer_id.ok_or_else(|| FractionalOwnershipError::BusinessRuleViolation("Transfer transaction must have buyer_id".to_string()))?,
                     row.seller_id.ok_or_else(|| FractionalOwnershipError::BusinessRuleViolation("Transfer transaction must have seller_id".to_string()))?,
                     row.fractional_song_id,
                     row.shares_quantity as u32,
-                    SharePrice::new(row.price_per_share.map(bigdecimal_to_f64).transpose()?.unwrap_or(0.0))
+                    SharePrice::new(row.price_per_share as f64)
                         .map_err(|e| FractionalOwnershipError::BusinessRuleViolation(format!("Invalid price: {}", e)))?,
                 )?,
                 _ => return Err(FractionalOwnershipError::BusinessRuleViolation("Invalid transaction type".to_string())),
@@ -631,20 +626,20 @@ impl ShareTransactionRepository for PostgresShareTransactionRepository {
 
         let mut transactions = Vec::new();
         for row in rows {
-            let transaction = match row.transaction_type.as_ref().map(|s| s.as_str()) {
-                Some("purchase") => ShareTransaction::new_purchase(
+            let transaction = match row.transaction_type.as_str() {
+                "purchase" => ShareTransaction::new_purchase(
                     row.buyer_id.ok_or_else(|| FractionalOwnershipError::BusinessRuleViolation("Purchase transaction must have buyer_id".to_string()))?,
                     row.fractional_song_id,
                     row.shares_quantity as u32,
-                    SharePrice::new(row.price_per_share.map(bigdecimal_to_f64).transpose()?.unwrap_or(0.0))
+                    SharePrice::new(row.price_per_share as f64)
                         .map_err(|e| FractionalOwnershipError::BusinessRuleViolation(format!("Invalid price: {}", e)))?,
                 )?,
-                Some("transfer") => ShareTransaction::new_transfer(
+                "transfer" => ShareTransaction::new_transfer(
                     row.buyer_id.ok_or_else(|| FractionalOwnershipError::BusinessRuleViolation("Transfer transaction must have buyer_id".to_string()))?,
                     row.seller_id.ok_or_else(|| FractionalOwnershipError::BusinessRuleViolation("Transfer transaction must have seller_id".to_string()))?,
                     row.fractional_song_id,
                     row.shares_quantity as u32,
-                    SharePrice::new(row.price_per_share.map(bigdecimal_to_f64).transpose()?.unwrap_or(0.0))
+                    SharePrice::new(row.price_per_share as f64)
                         .map_err(|e| FractionalOwnershipError::BusinessRuleViolation(format!("Invalid price: {}", e)))?,
                 )?,
                 _ => return Err(FractionalOwnershipError::BusinessRuleViolation("Invalid transaction type".to_string())),

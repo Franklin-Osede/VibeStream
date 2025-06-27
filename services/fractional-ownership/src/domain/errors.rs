@@ -79,4 +79,7 @@ pub enum FractionalOwnershipError {
     
     #[error("Business rule violation: {0}")]
     BusinessRuleViolation(String),
+    
+    #[error("Infrastructure error: {0}")]
+    InfrastructureError(String),
 } 
