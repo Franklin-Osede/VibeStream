@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 use sqlx::PgPool;
+use bigdecimal::ToPrimitive;
 
 use crate::bounded_contexts::campaign::domain::{Campaign, CampaignRepository};
 use crate::shared::domain::repositories::RepoResult;
@@ -30,8 +31,8 @@ impl CampaignRepository for CampaignPostgresRepository {
             artist_id: r.artist_id,
             nft_contract: r.nft_contract,
             period: crate::bounded_contexts::campaign::domain::value_objects::DateRange::new(r.start_date, r.end_date).unwrap(),
-            multiplier: r.multiplier as f64,
-            is_active: r.is_active,
+            multiplier: r.multiplier.to_f64().unwrap_or(1.0),
+            is_active: r.is_active.unwrap_or(false),
         }))
     }
 
@@ -45,6 +46,7 @@ impl CampaignRepository for CampaignPostgresRepository {
             campaign.period.start,
             campaign.period.end,
             campaign.multiplier as f32,
+            // is_active may be null in DB; default to false
             campaign.is_active,
         )
         .execute(&self.pool)

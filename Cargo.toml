@@ -4,7 +4,8 @@ members = [
     # Servicios con tokio compatible (1.18+)
     "services/ethereum",
     "services/api-gateway", 
-    "services/zk-service"
+    "services/zk-service",
+    "services/fractional-ownership"
     # Nota: solana-service se manejará independientemente por ahora
 ]
 

@@ -83,8 +83,7 @@ async fn main() -> anyhow::Result<()> {
         let user_handler = RegisterUserHandler { repo: user_repo };
         command_bus.register::<RegisterUser, _>(user_handler).await;
     } else {
-        // TODO: implement UserPostgresRepository and use it
-        let user_repo = InMemoryUserRepository::new();
+        let user_repo = api_gateway::bounded_contexts::user::infrastructure::postgres_repository::UserPostgresRepository::new(database_pool.get_pool().clone());
         let user_handler = RegisterUserHandler { repo: user_repo };
         command_bus.register::<RegisterUser, _>(user_handler).await;
     }
