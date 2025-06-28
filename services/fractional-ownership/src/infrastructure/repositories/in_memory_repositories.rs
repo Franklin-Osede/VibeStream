@@ -20,10 +20,20 @@ impl InMemoryFractionalOwnershipRepository {
             aggregates: Arc::new(Mutex::new(HashMap::new())),
         }
     }
+
+    pub async fn add_aggregate(&self, aggregate: FractionalOwnershipAggregate) {
+        let mut aggregates = self.aggregates.lock().await;
+        aggregates.insert(aggregate.fractional_song().id(), aggregate);
+    }
 }
 
 #[async_trait]
 impl FractionalOwnershipRepository for InMemoryFractionalOwnershipRepository {
+    async fn get_by_id(&self, song_id: Uuid) -> Result<Option<FractionalOwnershipAggregate>, FractionalOwnershipError> {
+        let aggregates = self.aggregates.lock().await;
+        Ok(aggregates.get(&song_id).cloned())
+    }
+
     async fn load_aggregate(&self, song_id: &Uuid) -> Result<Option<FractionalOwnershipAggregate>, FractionalOwnershipError> {
         let aggregates = self.aggregates.lock().await;
         Ok(aggregates.get(song_id).cloned())
@@ -33,6 +43,40 @@ impl FractionalOwnershipRepository for InMemoryFractionalOwnershipRepository {
         let mut aggregates = self.aggregates.lock().await;
         aggregates.insert(aggregate.fractional_song().id(), aggregate.clone());
         Ok(())
+    }
+
+    async fn save(&self, aggregate: &FractionalOwnershipAggregate) -> Result<(), FractionalOwnershipError> {
+        self.save_aggregate(aggregate).await
+    }
+
+    async fn delete(&self, song_id: Uuid) -> Result<(), FractionalOwnershipError> {
+        let mut aggregates = self.aggregates.lock().await;
+        aggregates.remove(&song_id);
+        Ok(())
+    }
+
+    async fn find_by_artist_id(&self, artist_id: Uuid) -> Result<Vec<FractionalOwnershipAggregate>, FractionalOwnershipError> {
+        let aggregates = self.aggregates.lock().await;
+        let result = aggregates
+            .values()
+            .filter(|aggregate| aggregate.fractional_song().artist_id() == artist_id)
+            .cloned()
+            .collect();
+        Ok(result)
+    }
+
+    async fn get_all_paginated(&self, page: u32, size: u32) -> Result<Vec<FractionalOwnershipAggregate>, FractionalOwnershipError> {
+        let aggregates = self.aggregates.lock().await;
+        let skip = (page * size) as usize;
+        let take = size as usize;
+        
+        let result = aggregates
+            .values()
+            .skip(skip)
+            .take(take)
+            .cloned()
+            .collect();
+        Ok(result)
     }
 
     async fn get_user_ownerships(&self, user_id: &Uuid) -> Result<Vec<ShareOwnership>, FractionalOwnershipError> {
@@ -48,8 +92,15 @@ impl FractionalOwnershipRepository for InMemoryFractionalOwnershipRepository {
         Ok(user_ownerships)
     }
 
-    async fn get_user_revenue_for_song(&self, _user_id: &Uuid, _song_id: &Uuid) -> Result<Option<RevenueAmount>, FractionalOwnershipError> {
-        // TODO: Implementar lógica de ingresos en memoria
-        Ok(Some(RevenueAmount::new(0.0)?))
+    async fn get_user_revenue_for_song(&self, user_id: &Uuid, song_id: &Uuid) -> Result<Option<RevenueAmount>, FractionalOwnershipError> {
+        let aggregates = self.aggregates.lock().await;
+        
+        if let Some(aggregate) = aggregates.get(song_id) {
+            if let Some(ownership) = aggregate.ownerships().get(user_id) {
+                return Ok(Some(ownership.total_earnings().clone()));
+            }
+        }
+        
+        Ok(None)
     }
 } 

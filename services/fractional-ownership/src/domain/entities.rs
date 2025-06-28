@@ -179,6 +179,11 @@ impl FractionalSong {
         (sold_shares as f64 / self.total_shares as f64) * 100.0
     }
 
+    /// Obtener número de acciones vendidas
+    pub fn sold_shares(&self) -> u32 {
+        self.total_shares - self.available_shares
+    }
+
     // 🆕 ARTIST CONTROL GETTERS
     pub fn artist_reserved_shares(&self) -> u32 { self.artist_reserved_shares }
     pub fn fan_available_shares(&self) -> u32 { self.fan_available_shares }
@@ -549,7 +554,7 @@ mod tests {
 
             assert_eq!(ownership.user_id(), user_id);
             assert_eq!(ownership.shares_owned(), 100);
-            assert_eq!(ownership.ownership_percentage().value(), 10.0);
+            assert_eq!(ownership.percentage().value(), 10.0);
         }
 
         #[test]

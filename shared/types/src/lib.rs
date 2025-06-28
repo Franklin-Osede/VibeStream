@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use async_trait::async_trait;
 
 pub mod blockchain;
 pub mod messages;
@@ -22,6 +23,19 @@ pub use models::{
 pub use uuid::Uuid;
 pub use chrono::{DateTime, Utc};
 pub use rust_decimal::Decimal;
+
+// CQRS Command Pattern
+/// Representa un comando que muta el estado del sistema.
+pub trait Command: Send + Sync {}
+
+/// Un manejador de comando.
+#[async_trait]
+pub trait CommandHandler<C: Command>: Send + Sync {
+    type Output: Send + 'static;
+    type Error: Send + 'static;
+
+    async fn handle(&self, command: C) -> std::result::Result<Self::Output, Self::Error>;
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RequestId(pub Uuid);

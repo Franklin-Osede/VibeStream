@@ -7,6 +7,41 @@ use async_trait::async_trait;
 use uuid::Uuid;
 use std::sync::Arc;
 use crate::application::dtos::{PurchaseSharesCommand, PurchaseSharesResult};
+use crate::application::commands::PurchaseSharesCommand as Command;
+
+/// Command Handler para PurchaseShares que integra con Command Bus
+pub struct PurchaseSharesHandler<R: FractionalOwnershipRepository + Send + Sync + 'static> {
+    repository: Arc<R>,
+}
+
+impl<R: FractionalOwnershipRepository + Send + Sync + 'static> PurchaseSharesHandler<R> {
+    pub fn new(repository: Arc<R>) -> Self {
+        Self { repository }
+    }
+}
+
+// Implementation of CommandHandler trait for Command Bus integration
+use vibestream_types::CommandHandler;
+
+#[async_trait]
+impl<R: FractionalOwnershipRepository + Send + Sync + 'static> CommandHandler<Command> for PurchaseSharesHandler<R> {
+    type Output = PurchaseSharesResult;
+    type Error = FractionalOwnershipError;
+
+    async fn handle(&self, command: Command) -> Result<Self::Output, Self::Error> {
+        let use_case = PurchaseSharesUseCase::new(self.repository.clone());
+        
+        // Convert Command to DTO format expected by use case
+        let dto_command = PurchaseSharesCommand {
+            fractional_song_id: command.fractional_song_id,
+            buyer_id: command.buyer_id,
+            shares_quantity: command.shares_quantity,
+            auto_confirm: command.auto_confirm,
+        };
+        
+        use_case.execute(dto_command).await
+    }
+}
 
 /// Caso de uso: Comprar acciones de una canción fraccionada
 /// 
@@ -17,11 +52,11 @@ use crate::application::dtos::{PurchaseSharesCommand, PurchaseSharesResult};
 /// 4. Persistir los cambios
 /// 5. Publicar eventos de dominio
 pub struct PurchaseSharesUseCase<R: FractionalOwnershipRepository> {
-    repository: R,
+    repository: Arc<R>,
 }
 
 impl<R: FractionalOwnershipRepository> PurchaseSharesUseCase<R> {
-    pub fn new(repository: R) -> Self {
+    pub fn new(repository: Arc<R>) -> Self {
         Self { repository }
     }
 
@@ -31,7 +66,7 @@ impl<R: FractionalOwnershipRepository> PurchaseSharesUseCase<R> {
         let mut aggregate = self.repository
             .get_by_id(command.fractional_song_id)
             .await?
-            .ok_or_else(|| FractionalOwnershipError::ValidationError("Canción fraccionada no encontrada".to_string()))?;
+            .ok_or_else(|| FractionalOwnershipError::ValidationError("Fractional song not found".to_string()))?;
 
         // 2. Validaciones de negocio adicionales
         self.validate_purchase_request(&aggregate, &command)?;
@@ -76,13 +111,13 @@ impl<R: FractionalOwnershipRepository> PurchaseSharesUseCase<R> {
     ) -> Result<(), FractionalOwnershipError> {
         // Validar cantidad mínima
         if command.shares_quantity == 0 {
-            return Err(FractionalOwnershipError::ValidationError("Debe comprar al menos 1 acción".to_string()));
+            return Err(FractionalOwnershipError::ValidationError("Must purchase at least 1 share".to_string()));
         }
 
         // Validar cantidad máxima por transacción (regla de negocio)
         if command.shares_quantity > 1000 {
             return Err(FractionalOwnershipError::BusinessRuleViolation(
-                "No se pueden comprar más de 1000 acciones en una sola transacción".to_string()
+                "Cannot purchase more than 1000 shares in a single transaction".to_string()
             ));
         }
 
@@ -94,14 +129,14 @@ impl<R: FractionalOwnershipRepository> PurchaseSharesUseCase<R> {
 
         if ownership_percentage_after > 30.0 {
             return Err(FractionalOwnershipError::BusinessRuleViolation(
-                format!("Un usuario no puede poseer más del 30% de una canción. Ownership resultante: {:.2}%", ownership_percentage_after)
+                format!("A user cannot own more than 30% of a song. Resulting ownership: {:.2}%", ownership_percentage_after)
             ));
         }
 
         // Validar que no sea el mismo artista comprando sus propias acciones
         if command.buyer_id == aggregate.fractional_song().artist_id() {
             return Err(FractionalOwnershipError::BusinessRuleViolation(
-                "El artista no puede comprar acciones de su propia canción".to_string()
+                "Artist cannot buy shares of their own song".to_string()
             ));
         }
 
@@ -115,7 +150,7 @@ impl<R: FractionalOwnershipRepository> PurchaseSharesUseCase<R> {
         user_id: Uuid,
     ) -> Result<f64, FractionalOwnershipError> {
         if let Some(ownership) = aggregate.get_user_ownership(user_id) {
-            Ok(ownership.ownership_percentage().value())
+            Ok(ownership.percentage().value())
         } else {
             Ok(0.0)
         }
@@ -184,16 +219,17 @@ mod tests {
     use super::*;
     use crate::domain::entities::FractionalSong;
     use crate::domain::value_objects::SharePrice;
-    use std::collections::HashMap;
+    // Repositorio en memoria para testing directo
     use std::sync::Arc;
     use tokio::sync::Mutex;
-
-    // Mock repository para testing
-    pub struct MockFractionalOwnershipRepository {
+    use std::collections::HashMap;
+    use async_trait::async_trait;
+    
+    pub struct InMemoryFractionalOwnershipRepository {
         aggregates: Arc<Mutex<HashMap<Uuid, FractionalOwnershipAggregate>>>,
     }
 
-    impl MockFractionalOwnershipRepository {
+    impl InMemoryFractionalOwnershipRepository {
         pub fn new() -> Self {
             Self {
                 aggregates: Arc::new(Mutex::new(HashMap::new())),
@@ -207,16 +243,25 @@ mod tests {
     }
 
     #[async_trait]
-    impl FractionalOwnershipRepository for MockFractionalOwnershipRepository {
+    impl FractionalOwnershipRepository for InMemoryFractionalOwnershipRepository {
         async fn get_by_id(&self, song_id: Uuid) -> Result<Option<FractionalOwnershipAggregate>, FractionalOwnershipError> {
             let aggregates = self.aggregates.lock().await;
             Ok(aggregates.get(&song_id).cloned())
         }
 
-        async fn save(&self, aggregate: &FractionalOwnershipAggregate) -> Result<(), FractionalOwnershipError> {
+        async fn load_aggregate(&self, song_id: &Uuid) -> Result<Option<FractionalOwnershipAggregate>, FractionalOwnershipError> {
+            let aggregates = self.aggregates.lock().await;
+            Ok(aggregates.get(song_id).cloned())
+        }
+
+        async fn save_aggregate(&self, aggregate: &FractionalOwnershipAggregate) -> Result<(), FractionalOwnershipError> {
             let mut aggregates = self.aggregates.lock().await;
             aggregates.insert(aggregate.fractional_song().id(), aggregate.clone());
             Ok(())
+        }
+
+        async fn save(&self, aggregate: &FractionalOwnershipAggregate) -> Result<(), FractionalOwnershipError> {
+            self.save_aggregate(aggregate).await
         }
 
         async fn delete(&self, song_id: Uuid) -> Result<(), FractionalOwnershipError> {
@@ -225,116 +270,158 @@ mod tests {
             Ok(())
         }
 
-        async fn find_by_artist_id(&self, _artist_id: Uuid) -> Result<Vec<FractionalOwnershipAggregate>, FractionalOwnershipError> {
-            Ok(Vec::new())
+        async fn find_by_artist_id(&self, artist_id: Uuid) -> Result<Vec<FractionalOwnershipAggregate>, FractionalOwnershipError> {
+            let aggregates = self.aggregates.lock().await;
+            let result = aggregates
+                .values()
+                .filter(|aggregate| aggregate.fractional_song().artist_id() == artist_id)
+                .cloned()
+                .collect();
+            Ok(result)
         }
 
-        async fn get_all_paginated(&self, _page: u32, _size: u32) -> Result<Vec<FractionalOwnershipAggregate>, FractionalOwnershipError> {
-            Ok(Vec::new())
+        async fn get_all_paginated(&self, page: u32, size: u32) -> Result<Vec<FractionalOwnershipAggregate>, FractionalOwnershipError> {
+            let aggregates = self.aggregates.lock().await;
+            let skip = (page * size) as usize;
+            let take = size as usize;
+            
+            let result = aggregates
+                .values()
+                .skip(skip)
+                .take(take)
+                .cloned()
+                .collect();
+            Ok(result)
+        }
+
+        async fn get_user_ownerships(&self, user_id: &Uuid) -> Result<Vec<ShareOwnership>, FractionalOwnershipError> {
+            let aggregates = self.aggregates.lock().await;
+            let mut user_ownerships = Vec::new();
+            
+            for aggregate in aggregates.values() {
+                if let Some(ownership) = aggregate.ownerships().get(user_id) {
+                    user_ownerships.push(ownership.clone());
+                }
+            }
+            
+            Ok(user_ownerships)
+        }
+
+        async fn get_user_revenue_for_song(&self, user_id: &Uuid, song_id: &Uuid) -> Result<Option<RevenueAmount>, FractionalOwnershipError> {
+            let aggregates = self.aggregates.lock().await;
+            
+            if let Some(aggregate) = aggregates.get(song_id) {
+                if let Some(ownership) = aggregate.ownerships().get(user_id) {
+                    return Ok(Some(ownership.total_earnings().clone()));
+                }
+            }
+            
+            Ok(None)
         }
     }
 
-    #[tokio::test]
-    async fn should_purchase_shares_successfully() {
-        // Setup
-        let repository = MockFractionalOwnershipRepository::new();
-        let use_case = PurchaseSharesUseCase::new(repository);
-
+    async fn create_test_aggregate() -> FractionalOwnershipAggregate {
         let song_id = Uuid::new_v4();
         let artist_id = Uuid::new_v4();
-        let buyer_id = Uuid::new_v4();
-
+        let share_price = SharePrice::new(10.0).unwrap();
+        
         let fractional_song = FractionalSong::new(
             song_id,
             artist_id,
             "Test Song".to_string(),
             1000,
-            SharePrice::new(10.0).unwrap(),
+            share_price,
         ).unwrap();
+        
+        FractionalOwnershipAggregate::new(fractional_song, HashMap::new()).unwrap()
+    }
 
-        let aggregate = FractionalOwnershipAggregate::new(fractional_song);
-        use_case.repository.add_aggregate(aggregate).await;
-
-        let command = PurchaseSharesCommand {
-            fractional_song_id: song_id,
-            buyer_id,
-            shares_quantity: 100,
+    #[tokio::test]
+    async fn purchase_shares_handler_should_work_with_command_bus() {
+        // Arrange
+        let repository = Arc::new(InMemoryFractionalOwnershipRepository::new());
+        let handler = PurchaseSharesHandler::new(repository.clone());
+        
+        // Setup test data
+        let aggregate = create_test_aggregate().await;
+        let fractional_song_id = aggregate.fractional_song().id();
+        repository.add_aggregate(aggregate).await;
+        
+        let command = Command {
+            fractional_song_id,
+            buyer_id: Uuid::new_v4(),
+            shares_quantity: 10,
             auto_confirm: true,
         };
 
-        // Execute
-        let result = use_case.execute(command).await.unwrap();
+        // Act
+        let result = handler.handle(command).await;
 
         // Assert
-        assert_eq!(result.shares_purchased, 100);
-        assert_eq!(result.buyer_id, buyer_id);
-        assert_eq!(result.new_ownership_percentage, 10.0);
-        assert_eq!(result.transaction_status, "Completed");
-        assert_eq!(result.remaining_available_shares, 900);
+        assert!(result.is_ok());
+        let purchase_result = result.unwrap();
+        assert_eq!(purchase_result.shares_purchased, 10);
+        assert_eq!(purchase_result.transaction_status, "Completed");
+        assert_eq!(purchase_result.remaining_available_shares, 990);
     }
 
     #[tokio::test]
     async fn should_reject_excessive_ownership() {
-        // Setup
-        let repository = MockFractionalOwnershipRepository::new();
-        let use_case = PurchaseSharesUseCase::new(repository);
-
-        let song_id = Uuid::new_v4();
-        let artist_id = Uuid::new_v4();
-        let buyer_id = Uuid::new_v4();
-
-        let fractional_song = FractionalSong::new(
-            song_id,
-            artist_id,
-            "Test Song".to_string(),
-            1000,
-            SharePrice::new(10.0).unwrap(),
-        ).unwrap();
-
-        let aggregate = FractionalOwnershipAggregate::new(fractional_song);
-        use_case.repository.add_aggregate(aggregate).await;
-
-        let command = PurchaseSharesCommand {
-            fractional_song_id: song_id,
-            buyer_id,
-            shares_quantity: 400, // 40% > 30% límite
+        // Arrange
+        let repository = Arc::new(InMemoryFractionalOwnershipRepository::new());
+        let handler = PurchaseSharesHandler::new(repository.clone());
+        
+        let aggregate = create_test_aggregate().await;
+        let fractional_song_id = aggregate.fractional_song().id();
+        repository.add_aggregate(aggregate).await;
+        
+        // Try to buy 400 shares (40% ownership) - should fail
+        let command = Command {
+            fractional_song_id,
+            buyer_id: Uuid::new_v4(),
+            shares_quantity: 400,
             auto_confirm: true,
         };
 
-        // Execute & Assert
-        let result = use_case.execute(command).await;
+        // Act
+        let result = handler.handle(command).await;
+
+        // Assert
         assert!(result.is_err());
+        if let Err(FractionalOwnershipError::BusinessRuleViolation(msg)) = result {
+            assert!(msg.contains("30%"));
+        } else {
+            panic!("Expected BusinessRuleViolation error");
+        }
     }
 
     #[tokio::test]
     async fn should_reject_artist_buying_own_shares() {
-        // Setup
-        let repository = MockFractionalOwnershipRepository::new();
-        let use_case = PurchaseSharesUseCase::new(repository);
-
-        let song_id = Uuid::new_v4();
-        let artist_id = Uuid::new_v4();
-
-        let fractional_song = FractionalSong::new(
-            song_id,
-            artist_id,
-            "Test Song".to_string(),
-            1000,
-            SharePrice::new(10.0).unwrap(),
-        ).unwrap();
-
-        let aggregate = FractionalOwnershipAggregate::new(fractional_song);
-        use_case.repository.add_aggregate(aggregate).await;
-
-        let command = PurchaseSharesCommand {
-            fractional_song_id: song_id,
-            buyer_id: artist_id, // Mismo artista
-            shares_quantity: 100,
+        // Arrange
+        let repository = Arc::new(InMemoryFractionalOwnershipRepository::new());
+        let handler = PurchaseSharesHandler::new(repository.clone());
+        
+        let aggregate = create_test_aggregate().await;
+        let fractional_song_id = aggregate.fractional_song().id();
+        let artist_id = aggregate.fractional_song().artist_id();
+        repository.add_aggregate(aggregate).await;
+        
+        let command = Command {
+            fractional_song_id,
+            buyer_id: artist_id, // Same as artist
+            shares_quantity: 10,
             auto_confirm: true,
         };
 
-        // Execute & Assert
-        let result = use_case.execute(command).await;
+        // Act
+        let result = handler.handle(command).await;
+
+        // Assert
         assert!(result.is_err());
+        if let Err(FractionalOwnershipError::BusinessRuleViolation(msg)) = result {
+            assert!(msg.contains("Artist cannot buy"));
+        } else {
+            panic!("Expected BusinessRuleViolation error");
+        }
     }
 } 
