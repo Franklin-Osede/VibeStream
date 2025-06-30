@@ -13,12 +13,24 @@ use api_gateway::auth;
 // use api_gateway::blockchain; // optional
 
 use api_gateway::shared::application::bus::InMemoryCommandBus;
-use api_gateway::bounded_contexts::campaign::application::commands::{CreateCampaign, CreateCampaignHandler};
-use api_gateway::bounded_contexts::campaign::infrastructure::in_memory_repository::InMemoryCampaignRepository;
-use api_gateway::bounded_contexts::campaign::presentation as campaign_api;
-use api_gateway::bounded_contexts::user::application::commands::{RegisterUser, RegisterUserHandler};
-use api_gateway::bounded_contexts::user::infrastructure::in_memory_repository::InMemoryUserRepository;
-use api_gateway::bounded_contexts::user::presentation as user_api;
+
+// Temporarily commented out contexts
+// use api_gateway::bounded_contexts::campaign::application::commands::{CreateCampaign, CreateCampaignHandler};
+// use api_gateway::bounded_contexts::campaign::infrastructure::in_memory_repository::InMemoryCampaignRepository;
+// use api_gateway::bounded_contexts::campaign::presentation as campaign_api;
+// use api_gateway::bounded_contexts::user::application::commands::{RegisterUser, RegisterUserHandler};
+// use api_gateway::bounded_contexts::user::infrastructure::in_memory_repository::InMemoryUserRepository;
+// use api_gateway::bounded_contexts::user::presentation as user_api;
+
+// New working contexts
+use api_gateway::bounded_contexts::music::presentation::controllers::{create_music_routes};
+use api_gateway::bounded_contexts::listen_reward::presentation::controllers::{
+    create_listen_session_routes, create_reward_routes
+};
+// Campaign Context routes
+use api_gateway::bounded_contexts::campaign::presentation::routes::{create_campaign_routes};
+// Campaign Context routes
+use api_gateway::bounded_contexts::campaign::presentation::routes::{create_campaign_routes};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -44,7 +56,7 @@ async fn main() -> anyhow::Result<()> {
     let database_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| {
             tracing::warn!("⚠️ DATABASE_URL no encontrada, usando configuración por defecto");
-            "postgresql://vibestream:dev_password_123_change_in_production@localhost:5432/vibestream".to_string()
+            "postgresql://vibestream:dev_password_123_change_in_production@localhost:5433/vibestream".to_string()
         });
     
     let redis_url = std::env::var("REDIS_URL")
@@ -66,27 +78,27 @@ async fn main() -> anyhow::Result<()> {
     // Create in-memory Command Bus and register default handlers
     let command_bus = Arc::new(InMemoryCommandBus::new());
 
-    // Campaign repository selection
-    if use_inmemory {
-        let campaign_repo = InMemoryCampaignRepository::new();
-        let campaign_handler = CreateCampaignHandler { repo: campaign_repo };
-        command_bus.register::<CreateCampaign, _>(campaign_handler).await;
-    } else {
-        let campaign_repo = api_gateway::bounded_contexts::campaign::infrastructure::postgres_repository::CampaignPostgresRepository::new(database_pool.get_pool().clone());
-        let campaign_handler = CreateCampaignHandler { repo: campaign_repo };
-        command_bus.register::<CreateCampaign, _>(campaign_handler).await;
-    }
+    // Temporarily disabled - Campaign repository selection
+    // if use_inmemory {
+    //     let campaign_repo = InMemoryCampaignRepository::new();
+    //     let campaign_handler = CreateCampaignHandler { repo: campaign_repo };
+    //     command_bus.register::<CreateCampaign, _>(campaign_handler).await;
+    // } else {
+    //     let campaign_repo = api_gateway::bounded_contexts::campaign::infrastructure::postgres_repository::CampaignPostgresRepository::new(database_pool.get_pool().clone());
+    //     let campaign_handler = CreateCampaignHandler { repo: campaign_repo };
+    //     command_bus.register::<CreateCampaign, _>(campaign_handler).await;
+    // }
 
-    // User repository selection
-    if use_inmemory {
-        let user_repo = InMemoryUserRepository::new();
-        let user_handler = RegisterUserHandler { repo: user_repo };
-        command_bus.register::<RegisterUser, _>(user_handler).await;
-    } else {
-        let user_repo = api_gateway::bounded_contexts::user::infrastructure::postgres_repository::UserPostgresRepository::new(database_pool.get_pool().clone());
-        let user_handler = RegisterUserHandler { repo: user_repo };
-        command_bus.register::<RegisterUser, _>(user_handler).await;
-    }
+    // Temporarily disabled - User repository selection
+    // if use_inmemory {
+    //     let user_repo = InMemoryUserRepository::new();
+    //     let user_handler = RegisterUserHandler { repo: user_repo };
+    //     command_bus.register::<RegisterUser, _>(user_handler).await;
+    // } else {
+    //     let user_repo = api_gateway::bounded_contexts::user::infrastructure::postgres_repository::UserPostgresRepository::new(database_pool.get_pool().clone());
+    //     let user_handler = RegisterUserHandler { repo: user_repo };
+    //     command_bus.register::<RegisterUser, _>(user_handler).await;
+    // }
 
     // Create shared state
     let app_state = AppState {
@@ -105,9 +117,14 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/transactions", post(handlers::process_transaction))
         .route("/api/v1/balance/:blockchain/:address", get(handlers::get_balance))
         .route("/api/v1/queue-status", get(handlers::queue_status))
-        // Campaign routes powered by Command Bus
-        .nest("/api/v1", campaign_api::routes())
-        .nest("/api/v1", user_api::routes())
+        
+        // New DDD Contexts - Working independently
+        .nest("/api/v1/music", create_music_routes())
+        .nest("/api/v1/listen", create_listen_session_routes())
+        .nest("/api/v1/rewards", create_reward_routes())
+        
+        // Campaign Context routes - NEW!
+        .nest("/api/v1", create_campaign_routes())
         
         // Authentication routes
         .route("/api/v1/auth/login", post(handlers::login))
@@ -147,15 +164,53 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("  POST /api/v1/transactions - Procesar transacciones");
     tracing::info!("  GET  /api/v1/balance/:blockchain/:address - Obtener balance");
     tracing::info!("  GET  /api/v1/queue-status - Estado de colas Redis");
+    
+    tracing::info!("🎵 Music Context:");
+    tracing::info!("  POST /api/v1/music/songs - Upload canción");
+    tracing::info!("  GET  /api/v1/music/songs/discover - Descubrir música");
+    tracing::info!("  GET  /api/v1/music/songs/trending - Canciones trending");
+    tracing::info!("  GET  /api/v1/music/songs/recommendations/:user_id - Recomendaciones");
+    tracing::info!("  GET  /api/v1/music/health - Health check");
+    
+    tracing::info!("🎧 Listen & Reward Context:");
+    tracing::info!("  POST /api/v1/listen/sessions - Iniciar sesión de escucha");
+    tracing::info!("  POST /api/v1/listen/sessions/:id/complete - Completar sesión");
+    tracing::info!("  GET  /api/v1/listen/sessions/:id - Estado de sesión");
+    tracing::info!("  GET  /api/v1/listen/users/:id/sessions - Sesiones del usuario");
+    tracing::info!("  GET  /api/v1/listen/health - Health check");
+    
+    tracing::info!("💰 Reward Distribution Context:");
+    tracing::info!("  POST /api/v1/rewards/pools - Crear pool de recompensas");
+    tracing::info!("  GET  /api/v1/rewards/pools/:id - Estado del pool");
+    tracing::info!("  POST /api/v1/rewards/distributions/queue - Encolar distribución");
+    tracing::info!("  POST /api/v1/rewards/distributions/:id/process - Procesar distribución");
+    tracing::info!("  GET  /api/v1/rewards/users/:id/rewards - Resumen de recompensas");
+    tracing::info!("  GET  /api/v1/rewards/artists/:id/royalties - Royalties del artista");
+    tracing::info!("  GET  /api/v1/rewards/analytics - Analytics de distribución");
+    tracing::info!("  GET  /api/v1/rewards/health - Health check");
+    
+    tracing::info!("🎯 Campaign Context - NEW:");
+    tracing::info!("  POST /api/v1/campaigns - Crear campaña");
+    tracing::info!("  GET  /api/v1/campaigns - Obtener campañas activas");
+    tracing::info!("  GET  /api/v1/campaigns/:id - Obtener campaña por ID");
+    tracing::info!("  POST /api/v1/campaigns/:id/activate - Activar campaña");
+    tracing::info!("  POST /api/v1/campaigns/:id/purchase - Comprar NFT");
+    tracing::info!("  GET  /api/v1/campaigns/:id/analytics - Analytics de campaña");
+    tracing::info!("  POST /api/v1/campaigns/:id/end - Finalizar campaña");
+    tracing::info!("  GET  /api/v1/campaigns/artist/:artist_id - Campañas por artista");
+    tracing::info!("  GET  /api/v1/campaigns/health - Health check");
+    
     tracing::info!("🔐 Autenticación:");
     tracing::info!("  POST /api/v1/auth/login - Login usuario");
     tracing::info!("  POST /api/v1/auth/register - Registrar usuario");
     tracing::info!("  POST /api/v1/auth/oauth - OAuth register/login (Google, Microsoft)");
     tracing::info!("  GET  /api/v1/auth/profile - Perfil usuario (protegido)");
+    
     tracing::info!("📊 Base de datos:");
     tracing::info!("  GET  /api/v1/users - Obtener usuarios");
     tracing::info!("  GET  /api/v1/songs - Obtener canciones");
     tracing::info!("  POST /api/v1/songs - Crear canción");
+    
     tracing::info!("⛓️ Blockchain (simulado):");
     tracing::info!("  GET  /api/v1/wallet/balance/:blockchain/:address - Balance de wallet");
     tracing::info!("  POST /api/v1/songs/:song_id/purchase - Comprar canción");

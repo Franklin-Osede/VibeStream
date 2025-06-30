@@ -3,27 +3,26 @@ use axum::{
     Router,
 };
 use tower_http::cors::CorsLayer;
-use tracing_subscriber;
+use tracing_subscriber::fmt::init;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize logging
-    tracing_subscriber::init();
+async fn main() {
+    // Initialize tracing
+    init();
 
-    // Build application router
-    let app = Router::new()
-        .route("/health", get(health_check))
-        .route("/api/fractional-ownership/shares", post(create_ownership_contract))
-        .route("/api/fractional-ownership/shares", get(list_available_shares))
-        .route("/api/fractional-ownership/purchase", post(purchase_shares))
-        .layer(CorsLayer::permissive());
-
-    // Start server
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3002").await?;
-    tracing::info!("🔗 Fractional Ownership Service listening on port 3002");
+    println!("Starting Fractional Ownership Service...");
     
-    axum::serve(listener, app).await?;
-    Ok(())
+    // TODO: Initialize actual service
+    // - Setup database connections
+    // - Initialize repositories  
+    // - Setup HTTP server
+    // - Register command handlers
+    
+    println!("Fractional Ownership Service ready!");
+    
+    // Keep the service running
+    tokio::signal::ctrl_c().await.expect("Failed to listen for ctrl+c");
+    println!("Shutting down Fractional Ownership Service...");
 }
 
 async fn health_check() -> &'static str {

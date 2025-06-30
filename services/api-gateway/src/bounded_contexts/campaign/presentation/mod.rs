@@ -9,6 +9,12 @@ use crate::services::AppState;
 
 use super::application::commands::{CreateCampaign, CreateCampaignResult};
 
+pub mod controllers;
+pub mod routes;
+
+pub use controllers::*;
+pub use routes::*;
+
 #[derive(Deserialize)]
 struct CreateCampaignRequest {
     artist_id: String,

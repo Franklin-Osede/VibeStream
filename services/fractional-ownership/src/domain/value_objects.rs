@@ -221,6 +221,121 @@ impl ExpirationDate {
     }
 }
 
+/// Límites de ownership configurables para el sistema
+#[derive(Debug, Clone, PartialEq)]
+pub struct OwnershipLimits {
+    max_individual_ownership_percentage: f64,
+    max_shares_per_transaction: u32,
+    artist_can_own_shares: bool,
+}
+
+impl Default for OwnershipLimits {
+    /// Configuración por defecto: límites conservadores
+    fn default() -> Self {
+        Self::conservative()
+    }
+}
+
+impl OwnershipLimits {
+    /// Crear límites de ownership con validación
+    pub fn new(
+        max_individual_ownership_percentage: f64,
+        max_shares_per_transaction: u32,
+        artist_can_own_shares: bool,
+    ) -> Result<Self, FractionalOwnershipError> {
+        if max_individual_ownership_percentage <= 0.0 || max_individual_ownership_percentage > 100.0 {
+            return Err(FractionalOwnershipError::ValidationError(
+                format!("Maximum individual ownership percentage must be between 0 and 100, got {}", max_individual_ownership_percentage)
+            ));
+        }
+
+        if max_shares_per_transaction == 0 {
+            return Err(FractionalOwnershipError::ValidationError(
+                "Maximum shares per transaction must be greater than 0".to_string()
+            ));
+        }
+
+        Ok(Self {
+            max_individual_ownership_percentage,
+            max_shares_per_transaction,
+            artist_can_own_shares,
+        })
+    }
+
+    /// Crear límites conservadores (30% max ownership, 1000 shares por transacción, artista no puede comprar)
+    pub fn conservative() -> Self {
+        Self {
+            max_individual_ownership_percentage: 30.0,
+            max_shares_per_transaction: 1000,
+            artist_can_own_shares: false,
+        }
+    }
+
+    /// Crear límites liberales (50% max ownership, 5000 shares por transacción, artista puede comprar)
+    pub fn liberal() -> Self {
+        Self {
+            max_individual_ownership_percentage: 50.0,
+            max_shares_per_transaction: 5000,
+            artist_can_own_shares: true,
+        }
+    }
+
+    /// Crear límites muy restrictivos (10% max ownership, 100 shares por transacción)
+    pub fn restrictive() -> Self {
+        Self {
+            max_individual_ownership_percentage: 10.0,
+            max_shares_per_transaction: 100,
+            artist_can_own_shares: false,
+        }
+    }
+
+    /// Máximo porcentaje de ownership individual permitido
+    pub fn max_individual_ownership_percentage(&self) -> f64 {
+        self.max_individual_ownership_percentage
+    }
+
+    /// Máximo número de shares por transacción
+    pub fn max_shares_per_transaction(&self) -> u32 {
+        self.max_shares_per_transaction
+    }
+
+    /// Si el artista puede comprar shares de su propia canción
+    pub fn artist_can_own_shares(&self) -> bool {
+        self.artist_can_own_shares
+    }
+
+    /// Validar si un porcentaje de ownership está dentro de los límites
+    pub fn validate_ownership_percentage(&self, percentage: f64) -> Result<(), FractionalOwnershipError> {
+        if percentage > self.max_individual_ownership_percentage {
+            return Err(FractionalOwnershipError::OwnershipExceedsLimit {
+                current: percentage,
+                additional: 0.0,
+            });
+        }
+        Ok(())
+    }
+
+    /// Validar si una cantidad de shares está dentro de los límites por transacción
+    pub fn validate_shares_per_transaction(&self, shares: u32) -> Result<(), FractionalOwnershipError> {
+        if shares > self.max_shares_per_transaction {
+            return Err(FractionalOwnershipError::ValidationError(
+                format!("Cannot purchase more than {} shares in a single transaction", self.max_shares_per_transaction)
+            ));
+        }
+        Ok(())
+    }
+
+    /// Validar si un artista puede comprar shares de su propia canción
+    pub fn validate_artist_purchase(&self, is_artist_purchase: bool) -> Result<(), FractionalOwnershipError> {
+        if is_artist_purchase && !self.artist_can_own_shares {
+            return Err(FractionalOwnershipError::BusinessRuleViolation(
+                "Artist cannot buy shares of their own song under current ownership limits".to_string()
+            ));
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -316,5 +431,161 @@ mod tests {
             let share = percentage.calculate_revenue_share(&revenue).unwrap();
             assert_eq!(share.value(), 5.0);
         }
+    }
+
+    #[test]
+    fn ownership_limits_should_validate_percentage_bounds() {
+        // Test: Porcentaje debe estar entre 0 y 100
+        let result_zero = OwnershipLimits::new(0.0, 1000, false);
+        assert!(result_zero.is_err());
+
+        let result_negative = OwnershipLimits::new(-10.0, 1000, false);
+        assert!(result_negative.is_err());
+
+        let result_over_hundred = OwnershipLimits::new(101.0, 1000, false);
+        assert!(result_over_hundred.is_err());
+
+        // Casos válidos
+        let result_valid = OwnershipLimits::new(50.0, 1000, false);
+        assert!(result_valid.is_ok());
+
+        let result_edge_low = OwnershipLimits::new(0.01, 1000, false);
+        assert!(result_edge_low.is_ok());
+
+        let result_edge_high = OwnershipLimits::new(100.0, 1000, false);
+        assert!(result_edge_high.is_ok());
+    }
+
+    #[test]
+    fn ownership_limits_should_validate_shares_per_transaction() {
+        // Test: Shares por transacción debe ser mayor que 0
+        let result_zero = OwnershipLimits::new(50.0, 0, false);
+        assert!(result_zero.is_err());
+
+        // Caso válido
+        let result_valid = OwnershipLimits::new(50.0, 1, false);
+        assert!(result_valid.is_ok());
+
+        let result_large = OwnershipLimits::new(50.0, 10000, false);
+        assert!(result_large.is_ok());
+    }
+
+    #[test]
+    fn ownership_limits_presets_should_work() {
+        // Test presets conservadores
+        let conservative = OwnershipLimits::conservative();
+        assert_eq!(conservative.max_individual_ownership_percentage(), 30.0);
+        assert_eq!(conservative.max_shares_per_transaction(), 1000);
+        assert!(!conservative.artist_can_own_shares());
+
+        // Test presets liberales
+        let liberal = OwnershipLimits::liberal();
+        assert_eq!(liberal.max_individual_ownership_percentage(), 50.0);
+        assert_eq!(liberal.max_shares_per_transaction(), 5000);
+        assert!(liberal.artist_can_own_shares());
+
+        // Test presets restrictivos
+        let restrictive = OwnershipLimits::restrictive();
+        assert_eq!(restrictive.max_individual_ownership_percentage(), 10.0);
+        assert_eq!(restrictive.max_shares_per_transaction(), 100);
+        assert!(!restrictive.artist_can_own_shares());
+    }
+
+    #[test]
+    fn ownership_limits_should_validate_ownership_percentage() {
+        let limits = OwnershipLimits::conservative(); // 30% max
+
+        // Test: Porcentaje válido
+        let result_valid = limits.validate_ownership_percentage(25.0);
+        assert!(result_valid.is_ok());
+
+        let result_edge = limits.validate_ownership_percentage(30.0);
+        assert!(result_edge.is_ok());
+
+        // Test: Porcentaje excede límite
+        let result_exceed = limits.validate_ownership_percentage(35.0);
+        assert!(matches!(result_exceed, Err(FractionalOwnershipError::OwnershipExceedsLimit { .. })));
+    }
+
+    #[test]
+    fn ownership_limits_should_validate_shares_per_transaction_limits() {
+        let limits = OwnershipLimits::conservative(); // 1000 shares max
+
+        // Test: Cantidad válida
+        let result_valid = limits.validate_shares_per_transaction(500);
+        assert!(result_valid.is_ok());
+
+        let result_edge = limits.validate_shares_per_transaction(1000);
+        assert!(result_edge.is_ok());
+
+        // Test: Cantidad excede límite
+        let result_exceed = limits.validate_shares_per_transaction(1500);
+        assert!(result_exceed.is_err());
+        if let Err(FractionalOwnershipError::ValidationError(msg)) = result_exceed {
+            assert!(msg.contains("1000"));
+        }
+    }
+
+    #[test]
+    fn ownership_limits_should_validate_artist_purchase_rules() {
+        // Test con límites que NO permiten al artista comprar
+        let conservative = OwnershipLimits::conservative();
+        
+        let result_non_artist = conservative.validate_artist_purchase(false);
+        assert!(result_non_artist.is_ok());
+
+        let result_artist = conservative.validate_artist_purchase(true);
+        assert!(result_artist.is_err());
+        if let Err(FractionalOwnershipError::BusinessRuleViolation(msg)) = result_artist {
+            assert!(msg.contains("Artist cannot buy shares"));
+        }
+
+        // Test con límites que SÍ permiten al artista comprar
+        let liberal = OwnershipLimits::liberal();
+        
+        let result_artist_allowed = liberal.validate_artist_purchase(true);
+        assert!(result_artist_allowed.is_ok());
+
+        let result_non_artist_allowed = liberal.validate_artist_purchase(false);
+        assert!(result_non_artist_allowed.is_ok());
+    }
+
+    #[test]
+    fn ownership_limits_should_have_different_configurations() {
+        let conservative = OwnershipLimits::conservative();
+        let liberal = OwnershipLimits::liberal();
+        let restrictive = OwnershipLimits::restrictive();
+
+        // Test que sean diferentes
+        assert_ne!(conservative, liberal);
+        assert_ne!(conservative, restrictive);
+        assert_ne!(liberal, restrictive);
+
+        // Test ordenación por restricción
+        assert!(restrictive.max_individual_ownership_percentage() < conservative.max_individual_ownership_percentage());
+        assert!(conservative.max_individual_ownership_percentage() < liberal.max_individual_ownership_percentage());
+    }
+
+    #[test]
+    fn ownership_limits_custom_configuration_should_work() {
+        // Test configuración personalizada
+        let custom = OwnershipLimits::new(15.5, 250, true).unwrap();
+        
+        assert_eq!(custom.max_individual_ownership_percentage(), 15.5);
+        assert_eq!(custom.max_shares_per_transaction(), 250);
+        assert!(custom.artist_can_own_shares());
+
+        // Test validación con configuración personalizada
+        let valid_percentage = custom.validate_ownership_percentage(10.0);
+        assert!(valid_percentage.is_ok());
+
+        let invalid_percentage = custom.validate_ownership_percentage(20.0);
+        assert!(invalid_percentage.is_err());
+
+        let valid_shares = custom.validate_shares_per_transaction(200);
+        assert!(valid_shares.is_ok());
+
+        let invalid_shares = custom.validate_shares_per_transaction(300);
+        assert!(invalid_shares.is_err());
     }
 } 
