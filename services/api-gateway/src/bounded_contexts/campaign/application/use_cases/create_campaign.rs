@@ -5,6 +5,7 @@ use uuid::Uuid;
 use crate::shared::domain::errors::AppError;
 use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
 use crate::bounded_contexts::campaign::domain::aggregates::CampaignAggregate;
+use crate::bounded_contexts::campaign::domain::value_objects::CampaignId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateCampaignCommand {

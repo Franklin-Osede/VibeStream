@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 use crate::bounded_contexts::campaign::domain::value_objects::CampaignId;
 
@@ -144,7 +143,7 @@ mod tests {
 
     fn create_valid_command() -> ActivateCampaignCommand {
         ActivateCampaignCommand {
-            campaign_id: Uuid::new_v4().to_string(),
+            campaign_id: "12345678-1234-5678-1234-567812345678".to_string(),
             nft_contract_address: "0x1234567890123456789012345678901234567890".to_string(),
             blockchain_network: "ethereum".to_string(),
         }

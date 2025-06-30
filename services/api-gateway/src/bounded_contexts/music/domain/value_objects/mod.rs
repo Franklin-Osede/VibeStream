@@ -87,25 +87,33 @@ impl AlbumTitle {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct ArtistId(Uuid);
+pub struct ArtistId {
+    value: Uuid,
+}
 
 impl ArtistId {
     pub fn new() -> Self {
-        Self(Uuid::new_v4())
+        Self {
+            value: Uuid::new_v4(),
+        }
     }
 
-    pub fn from_uuid(id: Uuid) -> Self {
-        Self(id)
+    pub fn from_uuid(uuid: Uuid) -> Self {
+        Self { value: uuid }
     }
 
-    pub fn from_string(id_str: &str) -> Result<Self, String> {
-        Uuid::parse_str(id_str)
-            .map(Self::from_uuid)
-            .map_err(|_| "Invalid UUID format".to_string())
+    pub fn from_string(s: &str) -> Result<Self, String> {
+        let uuid = Uuid::parse_str(s)
+            .map_err(|e| format!("Invalid UUID format: {}", e))?;
+        Ok(Self::from_uuid(uuid))
     }
 
     pub fn value(&self) -> Uuid {
-        self.0
+        self.value
+    }
+
+    pub fn to_string(&self) -> String {
+        self.value.to_string()
     }
 }
 

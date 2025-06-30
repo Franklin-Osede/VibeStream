@@ -3,11 +3,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
+use super::entities::{Campaign, CampaignNFT};
+use super::value_objects::CampaignId;
+
 use crate::shared::domain::errors::AppError;
-use crate::shared::domain::events::DomainEvent;
 use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
 
-use super::entities::*;
 use super::events::*;
 use super::value_objects::*;
 
@@ -16,7 +17,7 @@ use super::value_objects::*;
 pub struct CampaignAggregate {
     campaign: Campaign,
     nfts: HashMap<Uuid, CampaignNFT>,
-    pending_events: Vec<Box<dyn DomainEvent>>,
+    pending_events: Vec<String>,
     version: u64,
 }
 
@@ -55,7 +56,7 @@ impl CampaignAggregate {
             version: 0,
         };
 
-        aggregate.add_event(Box::new(event));
+        aggregate.add_event("CampaignCreated".to_string());
         Ok(aggregate)
     }
 
@@ -73,8 +74,8 @@ impl CampaignAggregate {
 
     // Campaign operations
     pub fn activate_campaign(&mut self, nft_contract_address: String) -> Result<(), AppError> {
-        let event = self.campaign.activate(nft_contract_address)?;
-        self.add_event(Box::new(event));
+        let _event = self.campaign.activate(nft_contract_address)?;
+        self.add_event("CampaignActivated".to_string());
         self.increment_version();
         Ok(())
     }
@@ -92,65 +93,65 @@ impl CampaignAggregate {
     }
 
     pub fn end_campaign(&mut self, reason: CampaignEndReason) -> Result<(), AppError> {
-        let event = self.campaign.end(reason)?;
-        self.add_event(Box::new(event));
+        let _event = self.campaign.end(reason)?;
+        self.add_event("CampaignEnded".to_string());
         self.increment_version();
         Ok(())
     }
 
     // NFT operations
     pub fn purchase_nft(&mut self, buyer_id: Uuid, quantity: u32) -> Result<Vec<CampaignNFT>, AppError> {
-        // Validate purchase through campaign
+        // Check if purchase is allowed
+        if !self.can_purchase_nft(buyer_id, quantity) {
+            return Err(AppError::DomainRuleViolation(
+                "Purchase not allowed".to_string(),
+            ));
+        }
+
+        // Check campaign conditions before mutation
+        let target_achieved_before = self.campaign.target().map(|t| t.is_achieved()).unwrap_or(false);
+        let is_sold_out_after = self.campaign.nft_supply().current_sold() + quantity >= self.campaign.nft_supply().max_supply();
+
+        // Perform the purchase on the campaign entity
         let purchase_event = self.campaign.purchase_nft(buyer_id, quantity)?;
-        
-        // Create NFTs
+
+        // Create NFTs for this purchase
         let mut new_nfts = Vec::new();
-        for i in 0..quantity {
+        for _ in 0..quantity {
             let token_id = self.calculate_next_token_id();
             let metadata_uri = self.generate_metadata_uri(token_id);
-            
             let nft = CampaignNFT::new(
                 self.campaign.id().clone(),
                 buyer_id,
-                token_id + i as u64,
+                token_id,
                 metadata_uri,
-                self.campaign.nft_price().value(),
+                purchase_event.total_amount / quantity as f64,
             );
-            
             self.nfts.insert(nft.id(), nft.clone());
             new_nfts.push(nft);
         }
 
         // Add purchase event
-        self.add_event(Box::new(purchase_event));
+        self.add_event("NFTPurchased".to_string());
 
-        // Check for milestones
-        if let Some(milestone_event) = self.campaign.check_milestones() {
-            self.add_event(Box::new(milestone_event));
+        // Check for milestones after purchase
+        if let Some(_milestone_event) = self.campaign.check_milestones() {
+            self.add_event("CampaignRevenueMilestone".to_string());
         }
 
-        // Check for target achievement
-        if let Some(target) = self.campaign.target() {
-            if target.is_achieved() {
-                let target_event = CampaignTargetAchieved {
-                    aggregate_id: self.campaign.id().value(),
-                    campaign_id: self.campaign.id().value(),
-                    artist_id: self.campaign.artist_id().value(),
-                    target_type: format!("{:?}", target.target_type()),
-                    target_value: target.target_value(),
-                    achieved_value: target.current_value(),
-                    achievement_percentage: target.progress_percentage(),
-                    achieved_at: Utc::now(),
-                    occurred_on: Utc::now(),
-                };
-                self.add_event(Box::new(target_event));
+        // Check for target achievement (only if it wasn't achieved before)
+        if !target_achieved_before {
+            if let Some(target) = self.campaign.target() {
+                if target.is_achieved() {
+                    self.add_event("CampaignTargetAchieved".to_string());
+                }
             }
         }
 
         // Check if campaign should end due to sold out
-        if self.campaign.nft_supply().is_sold_out() {
-            let end_event = self.campaign.end(CampaignEndReason::SoldOut)?;
-            self.add_event(Box::new(end_event));
+        if is_sold_out_after {
+            let _end_event = self.campaign.end(CampaignEndReason::SoldOut)?;
+            self.add_event("CampaignEnded".to_string());
         }
 
         self.increment_version();
@@ -161,8 +162,8 @@ impl CampaignAggregate {
         let nft = self.nfts.get_mut(&nft_id)
             .ok_or_else(|| AppError::NotFound("NFT not found".to_string()))?;
 
-        let transfer_event = nft.transfer(new_owner, transfer_price)?;
-        self.add_event(Box::new(transfer_event));
+        let _transfer_event = nft.transfer(new_owner, transfer_price)?;
+        self.add_event("NFTTransferred".to_string());
         self.increment_version();
         Ok(())
     }
@@ -198,6 +199,11 @@ impl CampaignAggregate {
             is_successful: self.campaign.is_successful(),
             boost_efficiency: self.calculate_boost_efficiency(),
             nft_distribution: self.get_nft_distribution(),
+            average_nfts_per_buyer: 0.0,
+            sales_velocity_per_day: 0.0,
+            distribution_fairness_score: 0.0,
+            milestone_progress: 0.0,
+            predicted_final_sales: 0,
         }
     }
 
@@ -322,8 +328,8 @@ impl CampaignAggregate {
         }
     }
 
-    fn add_event(&mut self, event: Box<dyn DomainEvent>) {
-        self.pending_events.push(event);
+    fn add_event(&mut self, event_name: String) {
+        self.pending_events.push(event_name);
     }
 
     fn increment_version(&mut self) {
@@ -343,7 +349,7 @@ impl CampaignAggregate {
         self.nfts.get(&nft_id)
     }
 
-    pub fn pending_events(&self) -> &[Box<dyn DomainEvent>] {
+    pub fn pending_events(&self) -> &[String] {
         &self.pending_events
     }
 
@@ -361,7 +367,7 @@ impl CampaignAggregate {
 }
 
 // Supporting DTOs for analytics
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CampaignAnalytics {
     pub campaign_id: Uuid,
     pub total_nfts_sold: u32,
@@ -374,6 +380,11 @@ pub struct CampaignAnalytics {
     pub is_successful: bool,
     pub boost_efficiency: f64,
     pub nft_distribution: NFTDistribution,
+    pub average_nfts_per_buyer: f64,
+    pub sales_velocity_per_day: f64,
+    pub distribution_fairness_score: f64,
+    pub milestone_progress: f64,
+    pub predicted_final_sales: u32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

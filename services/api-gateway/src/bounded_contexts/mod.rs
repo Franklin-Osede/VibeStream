@@ -1,6 +1,6 @@
 // Temporarily commented out due to database issues
-// pub mod campaign;
-// pub mod user;
+pub mod campaign;
+pub mod user;
 
 // New Music Context - working independently
 pub mod music;

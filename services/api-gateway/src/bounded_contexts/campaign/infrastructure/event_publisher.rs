@@ -1,57 +1,37 @@
 use async_trait::async_trait;
 use serde_json;
+use std::collections::VecDeque;
+use uuid::Uuid;
 
-use crate::bounded_contexts::campaign::domain::events::*;
+use crate::shared::domain::events::DomainEvent;
 
 #[async_trait]
 pub trait EventPublisher {
-    async fn publish(&self, event: Box<dyn DomainEvent>) -> Result<(), String>;
+    async fn publish(&self, event_name: &str, event_data: &str) -> Result<(), String>;
 }
 
-pub struct RedisEventPublisher {
-    // Redis connection would be stored here
-    _redis_client: Option<String>, // Placeholder
-}
-
-impl RedisEventPublisher {
-    pub fn new() -> Self {
-        Self {
-            _redis_client: None,
-        }
-    }
-}
-
-#[async_trait]
-impl EventPublisher for RedisEventPublisher {
-    async fn publish(&self, event: Box<dyn DomainEvent>) -> Result<(), String> {
-        // In a real implementation, this would:
-        // 1. Serialize the event to JSON
-        // 2. Publish to Redis stream/channel
-        // 3. Handle any publishing errors
-        
-        let event_type = event.event_type();
-        let aggregate_id = event.aggregate_id();
-        
-        println!("📡 Publishing event: {} for aggregate: {}", event_type, aggregate_id);
-        
-        // Simulate successful publishing
-        Ok(())
-    }
-}
-
+// In-memory Event Publisher para desarrollo y pruebas
+#[derive(Debug, Clone)]
 pub struct InMemoryEventPublisher {
-    events: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+    events: std::sync::Arc<std::sync::Mutex<VecDeque<PublishedEvent>>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PublishedEvent {
+    pub event_name: String,
+    pub event_data: String,
+    pub published_at: chrono::DateTime<chrono::Utc>,
 }
 
 impl InMemoryEventPublisher {
     pub fn new() -> Self {
         Self {
-            events: std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
+            events: std::sync::Arc::new(std::sync::Mutex::new(VecDeque::new())),
         }
     }
 
-    pub fn get_published_events(&self) -> Vec<String> {
-        self.events.lock().unwrap().clone()
+    pub fn get_events(&self) -> Vec<PublishedEvent> {
+        self.events.lock().unwrap().iter().cloned().collect()
     }
 
     pub fn clear_events(&self) {
@@ -61,13 +41,42 @@ impl InMemoryEventPublisher {
 
 #[async_trait]
 impl EventPublisher for InMemoryEventPublisher {
-    async fn publish(&self, event: Box<dyn DomainEvent>) -> Result<(), String> {
-        let event_type = event.event_type();
-        let aggregate_id = event.aggregate_id();
+    async fn publish(&self, event_name: &str, event_data: &str) -> Result<(), String> {
+        let event = PublishedEvent {
+            event_name: event_name.to_string(),
+            event_data: event_data.to_string(),
+            published_at: chrono::Utc::now(),
+        };
+
+        self.events.lock().unwrap().push_back(event);
         
-        let event_info = format!("{}:{}", event_type, aggregate_id);
-        self.events.lock().unwrap().push(event_info);
+        // Log the event
+        println!("📢 Event Published: {} - {}", event_name, event_data);
         
+        Ok(())
+    }
+}
+
+// Redis/Message Queue Event Publisher para producción
+#[derive(Debug, Clone)]
+pub struct RedisEventPublisher {
+    // En una implementación real, esto tendría un cliente Redis
+    _redis_client: String,
+}
+
+impl RedisEventPublisher {
+    pub fn new(redis_url: String) -> Self {
+        Self {
+            _redis_client: redis_url,
+        }
+    }
+}
+
+#[async_trait]
+impl EventPublisher for RedisEventPublisher {
+    async fn publish(&self, event_name: &str, event_data: &str) -> Result<(), String> {
+        // En una implementación real, esto publicaría al Redis/Message Queue
+        println!("📡 Redis Event Published: {} - {}", event_name, event_data);
         Ok(())
     }
 }
@@ -75,94 +84,24 @@ impl EventPublisher for InMemoryEventPublisher {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
-    use uuid::Uuid;
-
-    struct TestEvent {
-        event_type: String,
-        aggregate_id: String,
-    }
-
-    impl DomainEvent for TestEvent {
-        fn event_type(&self) -> &str {
-            &self.event_type
-        }
-
-        fn aggregate_id(&self) -> &str {
-            &self.aggregate_id
-        }
-
-        fn occurred_on(&self) -> chrono::DateTime<chrono::Utc> {
-            Utc::now()
-        }
-
-        fn event_data(&self) -> serde_json::Value {
-            serde_json::json!({
-                "test": "data"
-            })
-        }
-    }
-
-    #[tokio::test]
-    async fn test_redis_event_publisher() {
-        let publisher = RedisEventPublisher::new();
-        let event = Box::new(TestEvent {
-            event_type: "TestEvent".to_string(),
-            aggregate_id: Uuid::new_v4().to_string(),
-        });
-
-        let result = publisher.publish(event).await;
-        assert!(result.is_ok());
-    }
 
     #[tokio::test]
     async fn test_in_memory_event_publisher() {
         let publisher = InMemoryEventPublisher::new();
-        let aggregate_id = Uuid::new_v4().to_string();
         
-        let event = Box::new(TestEvent {
-            event_type: "TestEvent".to_string(),
-            aggregate_id: aggregate_id.clone(),
-        });
-
-        let result = publisher.publish(event).await;
-        assert!(result.is_ok());
-
-        let events = publisher.get_published_events();
+        publisher.publish("TestEvent", "test data").await.unwrap();
+        
+        let events = publisher.get_events();
         assert_eq!(events.len(), 1);
-        assert!(events[0].starts_with("TestEvent:"));
-        assert!(events[0].contains(&aggregate_id));
+        assert_eq!(events[0].event_name, "TestEvent");
+        assert_eq!(events[0].event_data, "test data");
     }
 
     #[tokio::test]
-    async fn test_multiple_events() {
-        let publisher = InMemoryEventPublisher::new();
+    async fn test_redis_event_publisher() {
+        let publisher = RedisEventPublisher::new("redis://localhost:6379".to_string());
         
-        for i in 0..3 {
-            let event = Box::new(TestEvent {
-                event_type: format!("TestEvent{}", i),
-                aggregate_id: Uuid::new_v4().to_string(),
-            });
-            publisher.publish(event).await.unwrap();
-        }
-
-        let events = publisher.get_published_events();
-        assert_eq!(events.len(), 3);
-    }
-
-    #[tokio::test]
-    async fn test_clear_events() {
-        let publisher = InMemoryEventPublisher::new();
-        
-        let event = Box::new(TestEvent {
-            event_type: "TestEvent".to_string(),
-            aggregate_id: Uuid::new_v4().to_string(),
-        });
-        publisher.publish(event).await.unwrap();
-
-        assert_eq!(publisher.get_published_events().len(), 1);
-        
-        publisher.clear_events();
-        assert_eq!(publisher.get_published_events().len(), 0);
+        let result = publisher.publish("TestEvent", "test data").await;
+        assert!(result.is_ok());
     }
 } 

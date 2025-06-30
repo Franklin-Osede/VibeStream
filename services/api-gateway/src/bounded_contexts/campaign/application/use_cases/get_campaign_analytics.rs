@@ -1,8 +1,7 @@
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 use crate::bounded_contexts::campaign::domain::value_objects::CampaignId;
-use crate::bounded_contexts::campaign::domain::aggregates::CampaignAnalytics;
+use crate::bounded_contexts::campaign::domain::aggregates::{CampaignAnalytics, NFTDistribution};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GetCampaignAnalyticsQuery {
@@ -86,23 +85,37 @@ impl GetCampaignAnalyticsUseCase {
 
     fn simulate_analytics(&self) -> CampaignAnalytics {
         CampaignAnalytics {
+            campaign_id: uuid::Uuid::new_v4(),
             total_nfts_sold: 450,
             total_revenue: 4500.0,
-            unique_buyers: 380,
-            average_nfts_per_buyer: 1.18,
             completion_percentage: 45.0,
+            unique_buyers: 380,
+            average_purchase_amount: 11.84,
+            sales_velocity: 30.0,
             days_remaining: 15,
+            is_successful: false,
+            boost_efficiency: 2.1,
+            nft_distribution: NFTDistribution {
+                total_owners: 380,
+                max_nfts_per_owner: 5,
+                average_nfts_per_owner: 1.18,
+                distribution_fairness: 0.85,
+            },
+            average_nfts_per_buyer: 1.18,
             sales_velocity_per_day: 30.0,
             distribution_fairness_score: 0.85,
-            boost_efficiency: 2.1,
             milestone_progress: 0.45,
-            predicted_final_sales: Some(850),
+            predicted_final_sales: 850,
         }
     }
 
     fn generate_predictions(&self, analytics: &CampaignAnalytics) -> CampaignPredictions {
         let days_to_completion = if analytics.sales_velocity_per_day > 0.0 {
-            let remaining_sales = analytics.predicted_final_sales.unwrap_or(1000) - analytics.total_nfts_sold;
+            let remaining_sales = if analytics.predicted_final_sales > analytics.total_nfts_sold {
+                analytics.predicted_final_sales - analytics.total_nfts_sold
+            } else {
+                0
+            };
             (remaining_sales as f64 / analytics.sales_velocity_per_day).ceil() as i64
         } else {
             analytics.days_remaining as i64
@@ -116,8 +129,8 @@ impl GetCampaignAnalyticsUseCase {
 
         CampaignPredictions {
             projected_completion_date,
-            projected_final_sales: analytics.predicted_final_sales.unwrap_or(800),
-            projected_revenue: analytics.predicted_final_sales.unwrap_or(800) as f64 * 10.0,
+            projected_final_sales: analytics.predicted_final_sales,
+            projected_revenue: analytics.predicted_final_sales as f64 * 10.0,
             confidence_score: if analytics.total_nfts_sold > 100 { 0.85 } else { 0.65 },
             key_factors: vec![
                 "Current sales velocity".to_string(),
@@ -161,7 +174,7 @@ mod tests {
 
     fn create_valid_query() -> GetCampaignAnalyticsQuery {
         GetCampaignAnalyticsQuery {
-            campaign_id: Uuid::new_v4().to_string(),
+            campaign_id: uuid::Uuid::new_v4().to_string(),
             include_predictions: true,
             include_optimization_suggestions: true,
         }

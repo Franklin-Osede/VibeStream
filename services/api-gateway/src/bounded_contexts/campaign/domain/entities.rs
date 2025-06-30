@@ -216,10 +216,12 @@ impl Campaign {
         self.updated_at = Utc::now();
 
         // Update target progress if exists
+        let current_revenue = self.calculate_current_revenue(); // Calculate before mutable borrow
+        
         if let Some(ref mut target) = self.target {
             match target.target_type() {
                 TargetType::Revenue => {
-                    target.update_progress(self.calculate_current_revenue());
+                    target.update_progress(current_revenue);
                 }
                 TargetType::NFTsSold => {
                     target.update_progress(self.nft_supply.current_sold() as f64);
@@ -276,24 +278,25 @@ impl Campaign {
         }
     }
 
-    pub fn check_milestones(&self) -> Option<CampaignRevenueMilestone> {
+    pub fn check_milestones(&mut self) -> Option<CampaignRevenueMilestone> {
+        // Calculate revenue before mutable borrow
         let current_revenue = self.calculate_current_revenue();
-        let target_revenue = self.target.as_ref()?.target_value();
         
-        let percentage = (current_revenue / target_revenue * 100.0) as u32;
-        let milestone_percentages = [25, 50, 75, 100];
-        
-        for &milestone in &milestone_percentages {
-            if percentage >= milestone {
+        if let Some(ref mut target) = self.target {
+            target.update_progress(current_revenue);
+            
+            // Check for milestone achievements
+            let progress = target.progress_percentage();
+            if progress >= 25.0 && progress < 50.0 {
                 return Some(CampaignRevenueMilestone {
                     aggregate_id: self.id.value(),
                     campaign_id: self.id.value(),
                     artist_id: self.artist_id.value(),
-                    milestone_amount: target_revenue * (milestone as f64 / 100.0),
+                    milestone_amount: target.value() * 0.25,
                     current_revenue,
-                    milestone_percentage: milestone,
-                    achieved_at: self.updated_at,
-                    occurred_on: self.updated_at,
+                    milestone_percentage: 25,
+                    achieved_at: Utc::now(),
+                    occurred_on: Utc::now(),
                 });
             }
         }

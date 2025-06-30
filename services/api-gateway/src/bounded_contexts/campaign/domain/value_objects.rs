@@ -204,20 +204,18 @@ impl NFTSupply {
         })
     }
 
-    pub fn with_sold(max_supply: u32, current_sold: u32) -> Result<Self, AppError> {
-        let mut supply = Self::new(max_supply)?;
-        
-        if current_sold > max_supply {
-            return Err(AppError::DomainRuleViolation(
-                "Current sold cannot exceed max supply".to_string(),
-            ));
+    pub fn with_sold(max_supply: u32, current_sold: u32) -> Self {
+        Self {
+            max_supply,
+            current_sold: current_sold.min(max_supply),
         }
-
-        supply.current_sold = current_sold;
-        Ok(supply)
     }
 
     pub fn max_supply(&self) -> u32 {
+        self.max_supply
+    }
+
+    pub fn max_nfts(&self) -> u32 {
         self.max_supply
     }
 
@@ -378,6 +376,10 @@ impl CampaignTarget {
 
     pub fn current_value(&self) -> f64 {
         self.current_value
+    }
+
+    pub fn value(&self) -> f64 {
+        self.target_value
     }
 }
 

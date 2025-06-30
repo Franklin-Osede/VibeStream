@@ -23,20 +23,8 @@ pub struct CampaignCreated {
 }
 
 impl DomainEvent for CampaignCreated {
-    fn event_type(&self) -> &str {
-        "CampaignCreated"
-    }
-
-    fn aggregate_id(&self) -> Uuid {
-        self.aggregate_id
-    }
-
     fn occurred_on(&self) -> DateTime<Utc> {
         self.occurred_on
-    }
-
-    fn event_data(&self) -> serde_json::Value {
-        serde_json::to_value(self).unwrap_or_default()
     }
 }
 
@@ -54,20 +42,8 @@ pub struct CampaignActivated {
 }
 
 impl DomainEvent for CampaignActivated {
-    fn event_type(&self) -> &str {
-        "CampaignActivated"
-    }
-
-    fn aggregate_id(&self) -> Uuid {
-        self.aggregate_id
-    }
-
     fn occurred_on(&self) -> DateTime<Utc> {
         self.occurred_on
-    }
-
-    fn event_data(&self) -> serde_json::Value {
-        serde_json::to_value(self).unwrap_or_default()
     }
 }
 
@@ -94,20 +70,8 @@ pub enum CampaignEndReason {
 }
 
 impl DomainEvent for CampaignEnded {
-    fn event_type(&self) -> &str {
-        "CampaignEnded"
-    }
-
-    fn aggregate_id(&self) -> Uuid {
-        self.aggregate_id
-    }
-
     fn occurred_on(&self) -> DateTime<Utc> {
         self.occurred_on
-    }
-
-    fn event_data(&self) -> serde_json::Value {
-        serde_json::to_value(self).unwrap_or_default()
     }
 }
 
@@ -130,20 +94,8 @@ pub struct NFTPurchased {
 }
 
 impl DomainEvent for NFTPurchased {
-    fn event_type(&self) -> &str {
-        "NFTPurchased"
-    }
-
-    fn aggregate_id(&self) -> Uuid {
-        self.aggregate_id
-    }
-
     fn occurred_on(&self) -> DateTime<Utc> {
         self.occurred_on
-    }
-
-    fn event_data(&self) -> serde_json::Value {
-        serde_json::to_value(self).unwrap_or_default()
     }
 }
 
@@ -162,20 +114,8 @@ pub struct CampaignTargetAchieved {
 }
 
 impl DomainEvent for CampaignTargetAchieved {
-    fn event_type(&self) -> &str {
-        "CampaignTargetAchieved"
-    }
-
-    fn aggregate_id(&self) -> Uuid {
-        self.aggregate_id
-    }
-
     fn occurred_on(&self) -> DateTime<Utc> {
         self.occurred_on
-    }
-
-    fn event_data(&self) -> serde_json::Value {
-        serde_json::to_value(self).unwrap_or_default()
     }
 }
 
@@ -193,20 +133,8 @@ pub struct CampaignRevenueMilestone {
 }
 
 impl DomainEvent for CampaignRevenueMilestone {
-    fn event_type(&self) -> &str {
-        "CampaignRevenueMilestone"
-    }
-
-    fn aggregate_id(&self) -> Uuid {
-        self.aggregate_id
-    }
-
     fn occurred_on(&self) -> DateTime<Utc> {
         self.occurred_on
-    }
-
-    fn event_data(&self) -> serde_json::Value {
-        serde_json::to_value(self).unwrap_or_default()
     }
 }
 
@@ -233,20 +161,8 @@ pub enum NFTTransferType {
 }
 
 impl DomainEvent for NFTTransferred {
-    fn event_type(&self) -> &str {
-        "NFTTransferred"
-    }
-
-    fn aggregate_id(&self) -> Uuid {
-        self.aggregate_id
-    }
-
     fn occurred_on(&self) -> DateTime<Utc> {
         self.occurred_on
-    }
-
-    fn event_data(&self) -> serde_json::Value {
-        serde_json::to_value(self).unwrap_or_default()
     }
 }
 
@@ -265,20 +181,8 @@ pub struct CampaignUpdated {
 }
 
 impl DomainEvent for CampaignUpdated {
-    fn event_type(&self) -> &str {
-        "CampaignUpdated"
-    }
-
-    fn aggregate_id(&self) -> Uuid {
-        self.aggregate_id
-    }
-
     fn occurred_on(&self) -> DateTime<Utc> {
         self.occurred_on
-    }
-
-    fn event_data(&self) -> serde_json::Value {
-        serde_json::to_value(self).unwrap_or_default()
     }
 }
 
@@ -300,20 +204,8 @@ pub struct CampaignAnalyticsUpdated {
 }
 
 impl DomainEvent for CampaignAnalyticsUpdated {
-    fn event_type(&self) -> &str {
-        "CampaignAnalyticsUpdated"
-    }
-
-    fn aggregate_id(&self) -> Uuid {
-        self.aggregate_id
-    }
-
     fn occurred_on(&self) -> DateTime<Utc> {
         self.occurred_on
-    }
-
-    fn event_data(&self) -> serde_json::Value {
-        serde_json::to_value(self).unwrap_or_default()
     }
 }
 

@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use api_gateway::handlers;
 use api_gateway::services::{AppState, MessageQueue, DatabasePool};
-use api_gateway::auth;
+
 // use api_gateway::blockchain; // optional
 
 use api_gateway::shared::application::bus::InMemoryCommandBus;
@@ -28,9 +28,7 @@ use api_gateway::bounded_contexts::listen_reward::presentation::controllers::{
     create_listen_session_routes, create_reward_routes
 };
 // Campaign Context routes
-use api_gateway::bounded_contexts::campaign::presentation::routes::{create_campaign_routes};
-// Campaign Context routes
-use api_gateway::bounded_contexts::campaign::presentation::routes::{create_campaign_routes};
+use api_gateway::bounded_contexts::campaign::presentation::routes::create_campaign_routes;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

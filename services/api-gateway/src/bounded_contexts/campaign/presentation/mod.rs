@@ -45,11 +45,17 @@ async fn create_campaign(State(state): State<AppState>, Json(req): Json<CreateCa
         .with_timezone(&Utc);
 
     let cmd = CreateCampaign {
+        song_id: Uuid::new_v4(), // Mock song ID
         artist_id,
+        name: "Campaign from API".to_string(),
+        description: Some("Created via API".to_string()),
         nft_contract: req.nft_contract,
         start: start_dt,
         end: end_dt,
         multiplier: req.multiplier,
+        nft_price: 10.0, // Default price
+        max_nfts: 1000, // Default max
+        target_revenue: Some(10000.0), // Default target
     };
 
     // Dispatch command via Command Bus

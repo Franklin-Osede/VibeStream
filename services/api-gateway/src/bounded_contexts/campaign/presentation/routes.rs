@@ -5,7 +5,7 @@ use axum::{
 
 use super::controllers::*;
 
-pub fn create_campaign_routes() -> Router {
+pub fn create_campaign_routes() -> Router<crate::services::AppState> {
     Router::new()
         .route("/campaigns", post(create_campaign))
         .route("/campaigns", get(get_active_campaigns))

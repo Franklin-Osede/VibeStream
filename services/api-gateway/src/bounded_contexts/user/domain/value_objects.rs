@@ -1,6 +1,8 @@
 use regex::Regex;
 use lazy_static::lazy_static;
 use crate::shared::domain::errors::AppError;
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Email(String);
@@ -36,5 +38,48 @@ impl Username {
 
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct UserId {
+    value: Uuid,
+}
+
+impl UserId {
+    pub fn new() -> Self {
+        Self {
+            value: Uuid::new_v4(),
+        }
+    }
+
+    pub fn from_uuid(uuid: Uuid) -> Self {
+        Self { value: uuid }
+    }
+
+    pub fn from_string(s: &str) -> Result<Self, String> {
+        let uuid = Uuid::parse_str(s)
+            .map_err(|e| format!("Invalid UUID format: {}", e))?;
+        Ok(Self::from_uuid(uuid))
+    }
+
+    pub fn value(&self) -> Uuid {
+        self.value
+    }
+
+    pub fn to_string(&self) -> String {
+        self.value.to_string()
+    }
+}
+
+impl Default for UserId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for UserId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
     }
 } 
