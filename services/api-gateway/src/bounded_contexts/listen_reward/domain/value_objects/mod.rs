@@ -252,9 +252,55 @@ impl ValidationPeriod {
     }
 }
 
+// Listen Reward - Value Objects
+//
+// Value objects for the Listen Reward bounded context:
+// - ListenSessionId: Unique identifier for listen sessions
+// - RewardAmount: Amount of reward earned (tokens/points)
+// - ListenDuration: Duration of listening session with validations
+// - ListenQuality: Quality metrics for listen sessions
+// - RewardRate: Rate of reward per listen metric
+// - ListenCount: Number of listens with fraud detection
+// - DeviceFingerprint: Device identification for fraud prevention
+
+pub mod listen_session_id;
+pub mod reward_amount;
+pub mod listen_duration;
+pub mod listen_quality;
+pub mod reward_rate;
+pub mod listen_count;
+pub mod device_fingerprint;
+
+pub use listen_session_id::ListenSessionId;
+pub use reward_amount::RewardAmount;
+pub use listen_duration::ListenDuration;
+pub use listen_quality::ListenQuality;
+pub use reward_rate::RewardRate;
+pub use listen_count::ListenCount;
+pub use device_fingerprint::DeviceFingerprint;
+
+// Re-export commonly used types from other bounded contexts
+pub use crate::bounded_contexts::fractional_ownership::domain::value_objects::{
+    OwnershipContractId, RevenueAmount,
+};
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_value_objects_exist() {
+        // Test that all value objects are accessible
+        use uuid::Uuid;
+        
+        let _session_id = ListenSessionId::new(Uuid::new_v4());
+        let _reward_amount = RewardAmount::new(100.0);
+        let _duration = ListenDuration::new(120); // 2 minutes
+        let _quality = ListenQuality::new(0.95, true, "high".to_string());
+        let _rate = RewardRate::new(1.5);
+        let _count = ListenCount::new(42);
+        let _fingerprint = DeviceFingerprint::generate("test_device", "test_user");
+    }
 
     #[test]
     fn test_reward_amount_validation() {

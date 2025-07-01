@@ -1,0 +1,483 @@
+// Listen Reward Application Service
+//
+// This service orchestrates all use cases and provides a unified interface
+// for the Listen Reward bounded context. It handles cross-cutting concerns
+// and coordinates between different use cases.
+
+use std::sync::Arc;
+use uuid::Uuid;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+
+use crate::bounded_contexts::listen_reward::domain::{
+    entities::{ListenSession, SessionStatus},
+    value_objects::{ListenSessionId, RewardTier, RewardAmount},
+    aggregates::RewardDistribution,
+};
+use crate::bounded_contexts::listen_reward::application::use_cases::{
+    StartListenSessionUseCase, StartListenSessionCommand, StartListenSessionResponse,
+    CompleteListenSessionUseCase, CompleteListenSessionCommand, CompleteListenSessionResponse,
+    ProcessRewardDistributionUseCase, ProcessRewardDistributionCommand, ProcessRewardDistributionResponse,
+};
+use crate::bounded_contexts::listen_reward::infrastructure::{
+    ListenSessionRepository, RewardDistributionRepository, EventPublisher,
+    RewardAnalyticsRepository, ZkProofVerificationService,
+};
+use crate::shared::domain::errors::AppError;
+
+// Application Service Commands
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StartListeningCommand {
+    pub user_id: Uuid,
+    pub song_id: Uuid,
+    pub artist_id: Uuid,
+    pub user_tier: String,
+    pub device_fingerprint: Option<String>,
+    pub geo_location: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompleteListeningCommand {
+    pub session_id: Uuid,
+    pub listen_duration_seconds: u32,
+    pub quality_score: f64,
+    pub zk_proof_hash: String,
+    pub song_duration_seconds: u32,
+    pub completion_percentage: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProcessRewardsCommand {
+    pub distribution_id: Uuid,
+    pub session_ids: Vec<Uuid>,
+    pub base_reward_rate: f64,
+    pub platform_fee_percentage: f64,
+}
+
+// Query Commands
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetUserListeningHistoryQuery {
+    pub user_id: Uuid,
+    pub start_date: Option<DateTime<Utc>>,
+    pub end_date: Option<DateTime<Utc>>,
+    pub page: Option<u32>,
+    pub limit: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetArtistAnalyticsQuery {
+    pub artist_id: Uuid,
+    pub start_date: DateTime<Utc>,
+    pub end_date: DateTime<Utc>,
+}
+
+// Response DTOs
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StartListeningResponse {
+    pub session_id: Uuid,
+    pub started_at: DateTime<Utc>,
+    pub estimated_reward: f64,
+    pub user_tier: String,
+    pub events_triggered: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompleteListeningResponse {
+    pub session_id: Uuid,
+    pub completed_at: DateTime<Utc>,
+    pub final_reward: Option<f64>,
+    pub status: String,
+    pub verification_status: String,
+    pub events_triggered: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProcessRewardsResponse {
+    pub distribution_id: Uuid,
+    pub processed_sessions: u32,
+    pub total_rewards_distributed: f64,
+    pub total_artist_royalties: f64,
+    pub events_triggered: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserListeningHistory {
+    pub sessions: Vec<ListeningSessionSummary>,
+    pub total_sessions: u32,
+    pub total_rewards_earned: f64,
+    pub favorite_genres: Vec<String>,
+    pub listening_streak: u32,
+    pub pagination: PaginationInfo,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListeningSessionSummary {
+    pub session_id: Uuid,
+    pub song_title: String,
+    pub artist_name: String,
+    pub duration_seconds: u32,
+    pub reward_earned: f64,
+    pub quality_score: Option<f64>,
+    pub listened_at: DateTime<Utc>,
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArtistAnalytics {
+    pub artist_id: Uuid,
+    pub total_listens: u64,
+    pub unique_listeners: u64,
+    pub total_revenue: f64,
+    pub average_session_duration: f64,
+    pub top_songs: Vec<TopSongAnalytics>,
+    pub listener_demographics: ListenerDemographics,
+    pub growth_metrics: GrowthMetrics,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TopSongAnalytics {
+    pub song_id: Uuid,
+    pub title: String,
+    pub listen_count: u64,
+    pub revenue: f64,
+    pub average_completion_rate: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListenerDemographics {
+    pub age_groups: Vec<AgeGroup>,
+    pub countries: Vec<CountryMetric>,
+    pub listening_times: Vec<TimeMetric>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GrowthMetrics {
+    pub daily_growth_rate: f64,
+    pub monthly_growth_rate: f64,
+    pub retention_rate: f64,
+    pub churn_rate: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgeGroup {
+    pub range: String,
+    pub percentage: f64,
+    pub listen_count: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CountryMetric {
+    pub country_code: String,
+    pub country_name: String,
+    pub percentage: f64,
+    pub listen_count: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TimeMetric {
+    pub hour: u8,
+    pub listen_count: u64,
+    pub percentage: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PaginationInfo {
+    pub current_page: u32,
+    pub total_pages: u32,
+    pub per_page: u32,
+    pub total_items: u64,
+}
+
+/// Main Application Service for Listen Reward Bounded Context
+pub struct ListenRewardApplicationService {
+    start_session_use_case: Arc<StartListenSessionUseCase>,
+    complete_session_use_case: Arc<CompleteListenSessionUseCase>,
+    process_distribution_use_case: Arc<ProcessRewardDistributionUseCase>,
+    session_repository: Arc<dyn ListenSessionRepository>,
+    distribution_repository: Arc<dyn RewardDistributionRepository>,
+    analytics_repository: Arc<dyn RewardAnalyticsRepository>,
+    event_publisher: Arc<dyn EventPublisher>,
+    zk_verification_service: Arc<dyn ZkProofVerificationService>,
+}
+
+impl ListenRewardApplicationService {
+    pub fn new(
+        start_session_use_case: Arc<StartListenSessionUseCase>,
+        complete_session_use_case: Arc<CompleteListenSessionUseCase>,
+        process_distribution_use_case: Arc<ProcessRewardDistributionUseCase>,
+        session_repository: Arc<dyn ListenSessionRepository>,
+        distribution_repository: Arc<dyn RewardDistributionRepository>,
+        analytics_repository: Arc<dyn RewardAnalyticsRepository>,
+        event_publisher: Arc<dyn EventPublisher>,
+        zk_verification_service: Arc<dyn ZkProofVerificationService>,
+    ) -> Self {
+        Self {
+            start_session_use_case,
+            complete_session_use_case,
+            process_distribution_use_case,
+            session_repository,
+            distribution_repository,
+            analytics_repository,
+            event_publisher,
+            zk_verification_service,
+        }
+    }
+
+    /// Start a new listening session
+    pub async fn start_listening_session(
+        &self,
+        command: StartListeningCommand,
+    ) -> Result<StartListeningResponse, AppError> {
+        // Validate rate limits
+        self.validate_user_rate_limits(command.user_id).await?;
+
+        // Parse reward tier
+        let reward_tier = RewardTier::from_string(&command.user_tier)
+            .map_err(|e| AppError::ValidationError(e))?;
+
+        // Create use case command
+        let use_case_command = StartListenSessionCommand {
+            user_id: command.user_id,
+            song_id: command.song_id,
+            artist_id: command.artist_id,
+            user_tier: reward_tier,
+            device_fingerprint: command.device_fingerprint,
+            geo_location: command.geo_location,
+        };
+
+        // Execute use case
+        let response = self.start_session_use_case
+            .execute(use_case_command)
+            .await
+            .map_err(|e| AppError::BusinessLogicError(e))?;
+
+        // Calculate estimated reward
+        let estimated_reward = self.calculate_estimated_reward(&response.user_tier).await?;
+
+        Ok(StartListeningResponse {
+            session_id: response.session_id,
+            started_at: response.started_at,
+            estimated_reward,
+            user_tier: format!("{:?}", response.user_tier),
+            events_triggered: response.events_triggered,
+        })
+    }
+
+    /// Complete a listening session with ZK proof
+    pub async fn complete_listening_session(
+        &self,
+        command: CompleteListeningCommand,
+    ) -> Result<CompleteListeningResponse, AppError> {
+        // Validate session exists and is active
+        let session_id = ListenSessionId::from_uuid(command.session_id);
+        let session = self.session_repository
+            .find_by_id(&session_id)
+            .await
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?
+            .ok_or_else(|| AppError::NotFoundError("Session not found".to_string()))?;
+
+        if *session.status() != SessionStatus::Active {
+            return Err(AppError::BusinessLogicError("Session is not active".to_string()));
+        }
+
+        // Verify ZK proof asynchronously
+        let zk_verification_task = self.zk_verification_service
+            .verify_proof(&command.zk_proof_hash, &session);
+
+        // Create use case command
+        let use_case_command = CompleteListenSessionCommand {
+            session_id: command.session_id,
+            listen_duration_seconds: command.listen_duration_seconds,
+            quality_score: command.quality_score,
+            zk_proof_hash: command.zk_proof_hash.clone(),
+            song_duration_seconds: command.song_duration_seconds,
+            completion_percentage: command.completion_percentage,
+        };
+
+        // Execute use case
+        let response = self.complete_session_use_case
+            .execute(use_case_command)
+            .await
+            .map_err(|e| AppError::BusinessLogicError(e))?;
+
+        // Wait for ZK verification
+        let is_zk_valid = zk_verification_task.await
+            .unwrap_or(false);
+
+        let verification_status = if is_zk_valid { "verified" } else { "failed" };
+
+        Ok(CompleteListeningResponse {
+            session_id: response.session_id,
+            completed_at: response.completed_at,
+            final_reward: response.final_reward,
+            status: response.status,
+            verification_status: verification_status.to_string(),
+            events_triggered: response.events_triggered,
+        })
+    }
+
+    /// Process reward distribution for completed sessions
+    pub async fn process_reward_distribution(
+        &self,
+        command: ProcessRewardsCommand,
+    ) -> Result<ProcessRewardsResponse, AppError> {
+        // Validate distribution exists
+        let distribution = self.distribution_repository
+            .find_by_id(command.distribution_id)
+            .await
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?
+            .ok_or_else(|| AppError::NotFoundError("Distribution not found".to_string()))?;
+
+        // Create use case command
+        let use_case_command = ProcessRewardDistributionCommand {
+            distribution_id: command.distribution_id,
+            session_ids: command.session_ids.clone(),
+            base_reward_rate: command.base_reward_rate,
+            platform_fee_percentage: command.platform_fee_percentage,
+        };
+
+        // Execute use case
+        let response = self.process_distribution_use_case
+            .execute(use_case_command)
+            .await
+            .map_err(|e| AppError::BusinessLogicError(e))?;
+
+        Ok(ProcessRewardsResponse {
+            distribution_id: response.distribution_id,
+            processed_sessions: response.processed_sessions,
+            total_rewards_distributed: response.total_rewards_distributed,
+            total_artist_royalties: response.total_artist_royalties,
+            events_triggered: response.events_triggered,
+        })
+    }
+
+    /// Get user listening history with analytics
+    pub async fn get_user_listening_history(
+        &self,
+        query: GetUserListeningHistoryQuery,
+    ) -> Result<UserListeningHistory, AppError> {
+        let pagination = crate::bounded_contexts::listen_reward::infrastructure::repositories::Pagination {
+            offset: ((query.page.unwrap_or(1) - 1) * query.limit.unwrap_or(20)) as i64,
+            limit: query.limit.unwrap_or(20) as i64,
+        };
+
+        let filter = crate::bounded_contexts::listen_reward::infrastructure::repositories::ListenSessionFilter {
+            user_id: Some(query.user_id),
+            start_date: query.start_date,
+            end_date: query.end_date,
+            ..Default::default()
+        };
+
+        // Get user reward history
+        let reward_history = self.analytics_repository
+            .get_user_reward_history(query.user_id, &pagination)
+            .await
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        // Convert to response format
+        let sessions: Vec<ListeningSessionSummary> = reward_history
+            .into_iter()
+            .map(|h| ListeningSessionSummary {
+                session_id: h.session_id,
+                song_title: "Unknown".to_string(), // Would be fetched from music context
+                artist_name: "Unknown".to_string(), // Would be fetched from music context
+                duration_seconds: h.listen_duration.unwrap_or(0),
+                reward_earned: h.reward_amount,
+                quality_score: h.quality_score,
+                listened_at: h.earned_at,
+                status: "Rewarded".to_string(),
+            })
+            .collect();
+
+        let total_rewards: f64 = sessions.iter().map(|s| s.reward_earned).sum();
+
+        Ok(UserListeningHistory {
+            sessions,
+            total_sessions: sessions.len() as u32,
+            total_rewards_earned: total_rewards,
+            favorite_genres: vec![], // Would be calculated from song data
+            listening_streak: 0, // Would be calculated from session patterns
+            pagination: PaginationInfo {
+                current_page: query.page.unwrap_or(1),
+                total_pages: 1,
+                per_page: query.limit.unwrap_or(20),
+                total_items: sessions.len() as u64,
+            },
+        })
+    }
+
+    /// Get artist analytics and revenue data
+    pub async fn get_artist_analytics(
+        &self,
+        query: GetArtistAnalyticsQuery,
+    ) -> Result<ArtistAnalytics, AppError> {
+        let artist_revenue = self.analytics_repository
+            .get_artist_revenue(query.artist_id, query.start_date, query.end_date)
+            .await
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        Ok(ArtistAnalytics {
+            artist_id: query.artist_id,
+            total_listens: artist_revenue.total_sessions as u64,
+            unique_listeners: artist_revenue.unique_listeners as u64,
+            total_revenue: artist_revenue.total_revenue,
+            average_session_duration: 180.0, // Would be calculated from session data
+            top_songs: artist_revenue.top_songs.into_iter().map(|song| TopSongAnalytics {
+                song_id: song.song_id,
+                title: song.title,
+                listen_count: song.listen_count as u64,
+                revenue: song.revenue,
+                average_completion_rate: 0.85, // Would be calculated
+            }).collect(),
+            listener_demographics: ListenerDemographics {
+                age_groups: vec![],
+                countries: vec![],
+                listening_times: vec![],
+            },
+            growth_metrics: GrowthMetrics {
+                daily_growth_rate: 0.05,
+                monthly_growth_rate: 0.15,
+                retention_rate: 0.75,
+                churn_rate: 0.25,
+            },
+        })
+    }
+
+    // Private helper methods
+    async fn validate_user_rate_limits(&self, user_id: Uuid) -> Result<(), AppError> {
+        let today_start = chrono::Utc::now().date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
+        let today_end = today_start + chrono::Duration::days(1);
+
+        let session_count = self.session_repository
+            .count_user_sessions_in_period(user_id, today_start, today_end)
+            .await
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        if session_count > 100 {
+            return Err(AppError::RateLimitError("Daily session limit exceeded".to_string()));
+        }
+
+        Ok(())
+    }
+
+    async fn calculate_estimated_reward(&self, tier: &RewardTier) -> Result<f64, AppError> {
+        // Base reward calculation: 3 minutes * 0.5 tokens/minute * tier multiplier
+        let base_reward = 3.0 * 0.5 * tier.multiplier();
+        Ok(base_reward)
+    }
+
+    pub fn get_session_repository(&self) -> Arc<dyn ListenSessionRepository> {
+        Arc::clone(&self.session_repository)
+    }
+
+    pub fn get_analytics_repository(&self) -> Arc<dyn RewardAnalyticsRepository> {
+        Arc::clone(&self.analytics_repository)
+    }
+}
+
+// Error types specific to Listen Reward
+impl From<String> for AppError {
+    fn from(error: String) -> Self {
+        AppError::BusinessLogicError(error)
+    }
+} 
