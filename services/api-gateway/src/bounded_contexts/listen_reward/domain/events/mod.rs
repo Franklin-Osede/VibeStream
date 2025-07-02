@@ -355,4 +355,46 @@ impl DomainEvent for RewardPoolDepleted {
     fn data(&self) -> serde_json::Value {
         serde_json::to_value(self).unwrap_or_default()
     }
+}
+
+// Reward distribution created
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RewardDistributionCreated {
+    pub distribution_id: Uuid,
+    pub pool_id: Uuid,
+    pub total_tokens: f64,
+    pub created_at: DateTime<Utc>,
+}
+
+impl RewardDistributionCreated {
+    pub fn new(
+        distribution_id: Uuid,
+        pool_id: Uuid,
+        total_tokens: f64,
+    ) -> Self {
+        Self {
+            distribution_id,
+            pool_id,
+            total_tokens,
+            created_at: Utc::now(),
+        }
+    }
+}
+
+impl DomainEvent for RewardDistributionCreated {
+    fn event_type(&self) -> &'static str {
+        "RewardDistributionCreated"
+    }
+
+    fn aggregate_id(&self) -> Uuid {
+        self.distribution_id
+    }
+
+    fn timestamp(&self) -> DateTime<Utc> {
+        self.created_at
+    }
+
+    fn data(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or_default()
+    }
 } 

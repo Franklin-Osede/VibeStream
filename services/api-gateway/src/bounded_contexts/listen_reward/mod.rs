@@ -25,7 +25,8 @@ pub use presentation::controllers::{
 pub use infrastructure::{
     ListenSessionRepository, RewardDistributionRepository, RewardAnalyticsRepository,
     EventPublisher, ZkProofVerificationService,
-    ListenRewardConfig, ListenRewardBoundedContext,
+    // ListenRewardConfig, ListenRewardBoundedContext,
+    ListenRewardInfrastructureConfig,
 };
 
 pub use domain::{

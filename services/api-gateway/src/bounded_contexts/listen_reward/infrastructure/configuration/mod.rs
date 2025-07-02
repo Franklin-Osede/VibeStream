@@ -1,7 +1,7 @@
-// Configuration for Listen Reward Bounded Context
+// Configuration module for Listen & Reward bounded context
 //
-// Provides configuration management and dependency injection
-// for the Listen Reward bounded context.
+// This module provides configuration and dependency injection
+// for the Listen & Reward bounded context infrastructure components.
 
 use std::sync::Arc;
 use sqlx::PgPool;
@@ -9,413 +9,250 @@ use serde::{Deserialize, Serialize};
 
 use crate::bounded_contexts::listen_reward::{
     application::{
-        ListenRewardApplicationService, StartListenSessionUseCase,
-        CompleteListenSessionUseCase, ProcessRewardDistributionUseCase,
+        ListenRewardApplicationService,
+        use_cases::{
+            StartListenSessionUseCase,
+            CompleteListenSessionUseCase,
+            ProcessRewardDistributionUseCase,
+        },
     },
     infrastructure::{
         repositories::{
-            ListenSessionRepository, RewardDistributionRepository,
-            RewardAnalyticsRepository,
+            PostgresListenSessionRepository,
+            PostgresRewardDistributionRepository,
+            PostgresRewardAnalyticsRepository,
         },
-        event_publishers::{EventPublisher, InMemoryEventPublisher, PostgresEventPublisher},
-        external_services::{
-            ZkProofVerificationService, MockZkProofVerificationService,
-            BlockchainPaymentService, MockBlockchainPaymentService,
-            AnalyticsService, MockAnalyticsService,
-        },
-        BoundedContextHealth,
+        event_publishers::EventPublisherFactory,
+        external_services::MockZkProofVerificationService,
+    },
+    presentation::controllers::{
+        ListenSessionController,
+        RewardController,
+        AnalyticsController,
+        ListenRewardController,
     },
 };
-use crate::shared::domain::errors::AppError;
 
-// Configuration for Listen Reward bounded context
+/// Configuración para el bounded context de Listen Reward
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListenRewardConfig {
-    pub database_url: String,
-    pub zk_verification_endpoint: String,
-    pub blockchain_rpc_url: String,
-    pub base_reward_rate: f64,
-    pub platform_fee_percentage: f64,
-    pub max_daily_sessions_per_user: u32,
-    pub event_batch_size: usize,
-    pub use_mock_services: bool,
-    pub analytics_enabled: bool,
+    /// Configuración de la base de datos
+    pub database: DatabaseConfig,
+    
+    /// Configuración del servicio ZK Proof
+    pub zk_proof: ZkProofConfig,
+    
+    /// Configuración de los publicadores de eventos
+    pub event_publishers: EventPublishersConfig,
+    
+    /// Configuración de recompensas
+    pub rewards: RewardsConfig,
 }
 
-impl Default for ListenRewardConfig {
-    fn default() -> Self {
-        Self {
-            database_url: "postgresql://localhost:5432/vibestream".to_string(),
-            zk_verification_endpoint: "http://localhost:8080".to_string(),
-            blockchain_rpc_url: "http://localhost:8545".to_string(),
-            base_reward_rate: 0.5, // tokens per minute
-            platform_fee_percentage: 5.0,
-            max_daily_sessions_per_user: 100,
-            event_batch_size: 50,
-            use_mock_services: true,
-            analytics_enabled: true,
-        }
+/// Configuración de la base de datos
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DatabaseConfig {
+    /// Cadena de conexión a PostgreSQL
+    pub connection_string: String,
+    
+    /// Número máximo de conexiones en el pool
+    pub max_connections: u32,
+}
+
+/// Configuración del servicio ZK Proof
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ZkProofConfig {
+    /// URL del servicio ZK Proof
+    pub service_url: String,
+    
+    /// Timeout en segundos para las solicitudes al servicio
+    pub timeout_seconds: u64,
+    
+    /// Número máximo de reintentos
+    pub max_retries: u32,
+}
+
+/// Configuración de los publicadores de eventos
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EventPublishersConfig {
+    /// Tipo de publicador principal ("postgres", "redis_stream", etc.)
+    pub primary_publisher: String,
+    
+    /// Configuración para el publicador de PostgreSQL
+    pub postgres: Option<PostgresPublisherConfig>,
+    
+    /// Configuración para el publicador de Redis Stream
+    pub redis_stream: Option<RedisStreamPublisherConfig>,
+}
+
+/// Configuración para el publicador de PostgreSQL
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PostgresPublisherConfig {
+    /// Cadena de conexión a PostgreSQL (puede ser la misma que la de la base de datos principal)
+    pub connection_string: String,
+}
+
+/// Configuración para el publicador de Redis Stream
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RedisStreamPublisherConfig {
+    /// URL de conexión a Redis
+    pub redis_url: String,
+    
+    /// Clave del stream para los eventos
+    pub stream_key: String,
+}
+
+/// Configuración de recompensas
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RewardsConfig {
+    /// Duración mínima de escucha en segundos para recibir recompensa
+    pub min_listen_duration_seconds: u32,
+    
+    /// Multiplicador de recompensa base
+    pub base_reward_multiplier: f64,
+    
+    /// Multiplicadores por tier de usuario
+    pub tier_multipliers: TierMultipliers,
+    
+    /// Límite diario de recompensas por usuario
+    pub daily_reward_limit_per_user: f64,
+}
+
+/// Multiplicadores por tier de usuario
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TierMultipliers {
+    pub basic: f64,
+    pub premium: f64,
+    pub vip: f64,
+    pub artist: f64,
+}
+
+/// Proveedor de configuración
+pub struct ConfigProvider {
+    config: ListenRewardConfig,
+}
+
+impl ConfigProvider {
+    /// Crea un nuevo proveedor de configuración
+    pub fn new(config: ListenRewardConfig) -> Self {
+        Self { config }
+    }
+    
+    /// Obtiene la configuración completa
+    pub fn get_config(&self) -> &ListenRewardConfig {
+        &self.config
+    }
+    
+    /// Crea un pool de conexiones a la base de datos
+    pub async fn create_db_pool(&self) -> Result<PgPool, sqlx::Error> {
+        // Crear el pool de conexiones de manera simple
+        let pool = PgPool::connect(&self.config.database.connection_string).await?;
+        Ok(pool)
+    }
+    
+    /// Obtiene la configuración del publicador de eventos principal
+    pub fn get_event_publisher_config(&self) -> Result<(String, serde_json::Value), String> {
+        let publisher_type = &self.config.event_publishers.primary_publisher;
+        
+        let config = match publisher_type.as_str() {
+            "postgres" => {
+                let pg_config = self.config.event_publishers.postgres
+                    .as_ref()
+                    .ok_or("Postgres publisher configuration not found")?;
+                
+                serde_json::to_value(pg_config)
+                    .map_err(|e| format!("Failed to serialize Postgres config: {}", e))?
+            },
+            "redis_stream" => {
+                let redis_config = self.config.event_publishers.redis_stream
+                    .as_ref()
+                    .ok_or("Redis Stream publisher configuration not found")?;
+                
+                serde_json::to_value(redis_config)
+                    .map_err(|e| format!("Failed to serialize Redis Stream config: {}", e))?
+            },
+            _ => return Err(format!("Unsupported event publisher type: {}", publisher_type)),
+        };
+        
+        Ok((publisher_type.clone(), config))
     }
 }
 
-// Main bounded context container
-pub struct ListenRewardBoundedContext {
+/// Configuración completa de infraestructura para Listen Reward
+pub struct ListenRewardInfrastructureConfig {
+    pub db_pool: PgPool,
+    pub listen_session_repository: Arc<PostgresListenSessionRepository>,
+    pub reward_distribution_repository: Arc<PostgresRewardDistributionRepository>,
+    pub analytics_repository: Arc<PostgresRewardAnalyticsRepository>,
+    pub zk_proof_service: Arc<MockZkProofVerificationService>,
+    pub event_publisher: Arc<dyn crate::bounded_contexts::listen_reward::infrastructure::event_publishers::EventPublisher>,
     pub application_service: Arc<ListenRewardApplicationService>,
-    pub config: ListenRewardConfig,
-    pub database_pool: PgPool,
-    event_publisher: Arc<dyn EventPublisher>,
+    pub listen_session_controller: Arc<ListenSessionController>,
+    pub reward_controller: Arc<RewardController>,
+    pub analytics_controller: Arc<AnalyticsController>,
+    pub listen_reward_controller: Arc<ListenRewardController>,
 }
 
-impl ListenRewardBoundedContext {
-    /// Initialize the bounded context with given configuration
-    pub async fn initialize(
-        database_pool: PgPool,
-        config: Option<ListenRewardConfig>,
-    ) -> Result<Self, AppError> {
-        let config = config.unwrap_or_default();
+impl ListenRewardInfrastructureConfig {
+    pub async fn new(database_url: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        // Crear pool de base de datos
+        let db_pool = PgPool::connect(database_url).await?;
 
-        // Create repositories (mocked for now)
-        let session_repository = Arc::new(MockListenSessionRepository::new());
-        let distribution_repository = Arc::new(MockRewardDistributionRepository::new());
-        let analytics_repository = Arc::new(MockRewardAnalyticsRepository::new());
+        // Crear repositorios
+        let listen_session_repository = Arc::new(PostgresListenSessionRepository::new(db_pool.clone()));
+        let reward_distribution_repository = Arc::new(PostgresRewardDistributionRepository::new(db_pool.clone()));
+        let analytics_repository = Arc::new(PostgresRewardAnalyticsRepository::new(db_pool.clone()));
 
-        // Create external services
-        let zk_verification_service: Arc<dyn ZkProofVerificationService> = if config.use_mock_services {
-            Arc::new(MockZkProofVerificationService::new_always_valid())
-        } else {
-            Arc::new(MockZkProofVerificationService::new_always_valid()) // Would be real service
-        };
+        // Crear servicios externos
+        let zk_proof_service = Arc::new(MockZkProofVerificationService::new_always_valid());
 
-        let blockchain_service: Arc<dyn BlockchainPaymentService> = 
-            Arc::new(MockBlockchainPaymentService);
+        // Crear event publisher
+        let event_publisher_factory = EventPublisherFactory::new(db_pool.clone()).await?;
+        let event_publisher1 = event_publisher_factory.create_postgres_publisher().await?;
+        let event_publisher2 = event_publisher_factory.create_postgres_publisher().await?;
 
-        let analytics_service: Arc<dyn AnalyticsService> = 
-            Arc::new(MockAnalyticsService);
+        // Crear use cases
+        let start_session_use_case = Arc::new(StartListenSessionUseCase::new());
+        let complete_session_use_case = Arc::new(CompleteListenSessionUseCase::new());
+        let process_distribution_use_case = Arc::new(ProcessRewardDistributionUseCase::new());
 
-        // Create event publisher
-        let event_publisher: Arc<dyn EventPublisher> = if config.use_mock_services {
-            Arc::new(InMemoryEventPublisher::new())
-        } else {
-            Arc::new(PostgresEventPublisher::new(database_pool.clone()))
-        };
-
-        // Create use cases
-        let start_session_use_case = Arc::new(StartListenSessionUseCase::new(
-            Arc::clone(&session_repository),
-            Arc::clone(&event_publisher),
-        ));
-
-        let complete_session_use_case = Arc::new(CompleteListenSessionUseCase::new(
-            Arc::clone(&session_repository),
-            Arc::clone(&zk_verification_service),
-            Arc::clone(&event_publisher),
-        ));
-
-        let process_distribution_use_case = Arc::new(ProcessRewardDistributionUseCase::new(
-            Arc::clone(&distribution_repository),
-            Arc::clone(&blockchain_service),
-            Arc::clone(&event_publisher),
-        ));
-
-        // Create application service
+        // Crear application service
         let application_service = Arc::new(ListenRewardApplicationService::new(
             start_session_use_case,
             complete_session_use_case,
             process_distribution_use_case,
-            session_repository,
-            distribution_repository,
-            analytics_repository,
-            Arc::clone(&event_publisher),
-            zk_verification_service,
+            listen_session_repository.clone() as Arc<dyn crate::bounded_contexts::listen_reward::infrastructure::repositories::ListenSessionRepository>,
+            reward_distribution_repository.clone() as Arc<dyn crate::bounded_contexts::listen_reward::infrastructure::repositories::RewardDistributionRepository>,
+            analytics_repository.clone() as Arc<dyn crate::bounded_contexts::listen_reward::infrastructure::repositories::RewardAnalyticsRepository>,
+            Arc::from(event_publisher1),
+            zk_proof_service.clone() as Arc<dyn crate::bounded_contexts::listen_reward::infrastructure::external_services::ZkProofVerificationService>,
+        ));
+
+        // Crear controllers
+        let listen_session_controller = Arc::new(ListenSessionController::new());
+        
+        let reward_controller = Arc::new(RewardController::new());
+        
+        let analytics_controller = Arc::new(AnalyticsController::new(
+            application_service.clone(),
+        ));
+        
+        let listen_reward_controller = Arc::new(ListenRewardController::new(
+            application_service.clone(),
         ));
 
         Ok(Self {
-            application_service,
-            config,
-            database_pool,
-            event_publisher,
-        })
-    }
-
-    /// Create bounded context for testing
-    pub fn create_for_testing() -> Self {
-        let config = ListenRewardConfig::default();
-        
-        // Mock dependencies
-        let session_repository = Arc::new(MockListenSessionRepository::new());
-        let distribution_repository = Arc::new(MockRewardDistributionRepository::new());
-        let analytics_repository = Arc::new(MockRewardAnalyticsRepository::new());
-        let zk_verification_service = Arc::new(MockZkProofVerificationService::new_always_valid());
-        let blockchain_service = Arc::new(MockBlockchainPaymentService);
-        let analytics_service = Arc::new(MockAnalyticsService);
-        let event_publisher = Arc::new(InMemoryEventPublisher::new());
-
-        // Mock use cases
-        let start_session_use_case = Arc::new(StartListenSessionUseCase::new(
-            Arc::clone(&session_repository),
-            Arc::clone(&event_publisher),
-        ));
-
-        let complete_session_use_case = Arc::new(CompleteListenSessionUseCase::new(
-            Arc::clone(&session_repository),
-            Arc::clone(&zk_verification_service),
-            Arc::clone(&event_publisher),
-        ));
-
-        let process_distribution_use_case = Arc::new(ProcessRewardDistributionUseCase::new(
-            Arc::clone(&distribution_repository),
-            Arc::clone(&blockchain_service),
-            Arc::clone(&event_publisher),
-        ));
-
-        let application_service = Arc::new(ListenRewardApplicationService::new(
-            start_session_use_case,
-            complete_session_use_case,
-            process_distribution_use_case,
-            session_repository,
-            distribution_repository,
+            db_pool,
+            listen_session_repository,
+            reward_distribution_repository,
             analytics_repository,
-            Arc::clone(&event_publisher),
-            zk_verification_service,
-        ));
-
-        // Create a dummy database pool (won't be used in testing)
-        let database_pool = PgPool::connect("postgresql://dummy").unwrap();
-
-        Self {
+            zk_proof_service,
+            event_publisher: Arc::from(event_publisher2),
             application_service,
-            config,
-            database_pool,
-            event_publisher,
-        }
-    }
-
-    /// Health check for the bounded context
-    pub async fn health_check(&self) -> Result<BoundedContextHealth, AppError> {
-        let repository_status = true; // Would check actual repository
-        let event_publisher_status = self.event_publisher.is_healthy().await;
-
-        if repository_status && event_publisher_status {
-            Ok(BoundedContextHealth::healthy("ListenReward".to_string()))
-        } else {
-            Ok(BoundedContextHealth::unhealthy(
-                "ListenReward".to_string(),
-                "Some components are unhealthy".to_string(),
-            ))
-        }
-    }
-
-    pub fn get_application_service(&self) -> Arc<ListenRewardApplicationService> {
-        Arc::clone(&self.application_service)
-    }
-}
-
-// Builder pattern for custom configuration
-pub struct ListenRewardBoundedContextBuilder {
-    config: ListenRewardConfig,
-    database_pool: Option<PgPool>,
-}
-
-impl ListenRewardBoundedContextBuilder {
-    pub fn new() -> Self {
-        Self {
-            config: ListenRewardConfig::default(),
-            database_pool: None,
-        }
-    }
-
-    pub fn with_config(mut self, config: ListenRewardConfig) -> Self {
-        self.config = config;
-        self
-    }
-
-    pub fn with_database_pool(mut self, pool: PgPool) -> Self {
-        self.database_pool = Some(pool);
-        self
-    }
-
-    pub fn with_base_reward_rate(mut self, rate: f64) -> Self {
-        self.config.base_reward_rate = rate;
-        self
-    }
-
-    pub fn enable_analytics(mut self) -> Self {
-        self.config.analytics_enabled = true;
-        self
-    }
-
-    pub fn use_mock_services(mut self) -> Self {
-        self.config.use_mock_services = true;
-        self
-    }
-
-    pub async fn build(self) -> Result<ListenRewardBoundedContext, AppError> {
-        let database_pool = self.database_pool
-            .ok_or_else(|| AppError::ConfigurationError("Database pool is required".to_string()))?;
-
-        ListenRewardBoundedContext::initialize(database_pool, Some(self.config)).await
-    }
-}
-
-impl Default for ListenRewardBoundedContextBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-// Mock implementations for compilation
-use async_trait::async_trait;
-
-struct MockListenSessionRepository;
-
-impl MockListenSessionRepository {
-    fn new() -> Self { Self }
-}
-
-#[async_trait]
-impl ListenSessionRepository for MockListenSessionRepository {
-    async fn save(&self, _session: &crate::bounded_contexts::listen_reward::domain::entities::ListenSession) -> Result<(), crate::bounded_contexts::listen_reward::infrastructure::repositories::RepositoryError> {
-        Ok(())
-    }
-
-    async fn update(&self, _session: &crate::bounded_contexts::listen_reward::domain::entities::ListenSession, _expected_version: i32) -> Result<(), crate::bounded_contexts::listen_reward::infrastructure::repositories::RepositoryError> {
-        Ok(())
-    }
-
-    async fn find_by_id(&self, _id: &crate::bounded_contexts::listen_reward::domain::value_objects::ListenSessionId) -> Result<Option<crate::bounded_contexts::listen_reward::domain::entities::ListenSession>, crate::bounded_contexts::listen_reward::infrastructure::repositories::RepositoryError> {
-        Ok(None)
-    }
-
-    async fn delete(&self, _id: &crate::bounded_contexts::listen_reward::domain::value_objects::ListenSessionId) -> Result<(), crate::bounded_contexts::listen_reward::infrastructure::repositories::RepositoryError> {
-        Ok(())
-    }
-
-    async fn exists(&self, _id: &crate::bounded_contexts::listen_reward::domain::value_objects::ListenSessionId) -> Result<bool, crate::bounded_contexts::listen_reward::infrastructure::repositories::RepositoryError> {
-        Ok(false)
-    }
-
-    async fn find_active_sessions_for_user(&self, _user_id: uuid::Uuid) -> Result<Vec<crate::bounded_contexts::listen_reward::domain::entities::ListenSession>, crate::bounded_contexts::listen_reward::infrastructure::repositories::RepositoryError> {
-        Ok(vec![])
-    }
-
-    async fn count_user_sessions_in_period(&self, _user_id: uuid::Uuid, _start: chrono::DateTime<chrono::Utc>, _end: chrono::DateTime<chrono::Utc>) -> Result<i64, crate::bounded_contexts::listen_reward::infrastructure::repositories::RepositoryError> {
-        Ok(0)
-    }
-}
-
-struct MockRewardDistributionRepository;
-
-impl MockRewardDistributionRepository {
-    fn new() -> Self { Self }
-}
-
-#[async_trait]
-impl RewardDistributionRepository for MockRewardDistributionRepository {
-    async fn save(&self, _distribution: &crate::bounded_contexts::listen_reward::domain::aggregates::RewardDistribution) -> Result<(), crate::bounded_contexts::listen_reward::infrastructure::repositories::RepositoryError> {
-        Ok(())
-    }
-
-    async fn update(&self, _distribution: &crate::bounded_contexts::listen_reward::domain::aggregates::RewardDistribution, _expected_version: i32) -> Result<(), crate::bounded_contexts::listen_reward::infrastructure::repositories::RepositoryError> {
-        Ok(())
-    }
-
-    async fn find_by_id(&self, _id: uuid::Uuid) -> Result<Option<crate::bounded_contexts::listen_reward::domain::aggregates::RewardDistribution>, crate::bounded_contexts::listen_reward::infrastructure::repositories::RepositoryError> {
-        Ok(None)
-    }
-
-    async fn find_by_pool_id(&self, _pool_id: &crate::bounded_contexts::listen_reward::domain::value_objects::RewardPoolId) -> Result<Option<crate::bounded_contexts::listen_reward::domain::aggregates::RewardDistribution>, crate::bounded_contexts::listen_reward::infrastructure::repositories::RepositoryError> {
-        Ok(None)
-    }
-
-    async fn find_active_distributions(&self) -> Result<Vec<crate::bounded_contexts::listen_reward::domain::aggregates::RewardDistribution>, crate::bounded_contexts::listen_reward::infrastructure::repositories::RepositoryError> {
-        Ok(vec![])
-    }
-
-    async fn find_distributions_with_pending_rewards(&self) -> Result<Vec<crate::bounded_contexts::listen_reward::domain::aggregates::RewardDistribution>, crate::bounded_contexts::listen_reward::infrastructure::repositories::RepositoryError> {
-        Ok(vec![])
-    }
-
-    async fn mark_processed(&self, _id: uuid::Uuid) -> Result<(), crate::bounded_contexts::listen_reward::infrastructure::repositories::RepositoryError> {
-        Ok(())
-    }
-}
-
-struct MockRewardAnalyticsRepository;
-
-impl MockRewardAnalyticsRepository {
-    fn new() -> Self { Self }
-}
-
-#[async_trait]
-impl RewardAnalyticsRepository for MockRewardAnalyticsRepository {
-    async fn get_analytics(&self, _start: chrono::DateTime<chrono::Utc>, _end: chrono::DateTime<chrono::Utc>) -> Result<crate::bounded_contexts::listen_reward::infrastructure::repositories::RewardAnalytics, crate::bounded_contexts::listen_reward::infrastructure::repositories::RepositoryError> {
-        Ok(crate::bounded_contexts::listen_reward::infrastructure::repositories::RewardAnalytics {
-            total_sessions: 0,
-            total_rewards_distributed: 0.0,
-            unique_users: 0,
-            unique_songs: 0,
-            average_session_duration: 0.0,
-            average_reward_per_session: 0.0,
-            total_zk_proofs_verified: 0,
-            failed_verifications: 0,
-            period_start: _start,
-            period_end: _end,
-        })
-    }
-
-    async fn get_user_reward_history(&self, _user_id: uuid::Uuid, _pagination: &crate::bounded_contexts::listen_reward::infrastructure::repositories::Pagination) -> Result<Vec<crate::bounded_contexts::listen_reward::infrastructure::repositories::UserRewardHistory>, crate::bounded_contexts::listen_reward::infrastructure::repositories::RepositoryError> {
-        Ok(vec![])
-    }
-
-    async fn get_artist_revenue(&self, _artist_id: uuid::Uuid, _start: chrono::DateTime<chrono::Utc>, _end: chrono::DateTime<chrono::Utc>) -> Result<crate::bounded_contexts::listen_reward::infrastructure::repositories::ArtistRevenueAnalytics, crate::bounded_contexts::listen_reward::infrastructure::repositories::RepositoryError> {
-        Ok(crate::bounded_contexts::listen_reward::infrastructure::repositories::ArtistRevenueAnalytics {
-            artist_id: _artist_id,
-            total_revenue: 0.0,
-            total_sessions: 0,
-            unique_listeners: 0,
-            top_songs: vec![],
-            revenue_trend: vec![],
-            period_start: _start,
-            period_end: _end,
-        })
-    }
-
-    async fn get_song_metrics(&self, _song_id: uuid::Uuid, _start: chrono::DateTime<chrono::Utc>, _end: chrono::DateTime<chrono::Utc>) -> Result<crate::bounded_contexts::listen_reward::infrastructure::repositories::SongMetrics, crate::bounded_contexts::listen_reward::infrastructure::repositories::RepositoryError> {
-        Ok(crate::bounded_contexts::listen_reward::infrastructure::repositories::SongMetrics {
-            song_id: _song_id,
-            total_listens: 0,
-            unique_listeners: 0,
-            total_rewards_paid: 0.0,
-            average_listen_duration: 0.0,
-            average_quality_score: None,
-            completion_rate: 0.0,
-            listener_geography: vec![],
-        })
-    }
-
-    async fn get_platform_statistics(&self, _start: chrono::DateTime<chrono::Utc>, _end: chrono::DateTime<chrono::Utc>) -> Result<crate::bounded_contexts::listen_reward::infrastructure::repositories::PlatformStatistics, crate::bounded_contexts::listen_reward::infrastructure::repositories::RepositoryError> {
-        Ok(crate::bounded_contexts::listen_reward::infrastructure::repositories::PlatformStatistics {
-            total_sessions: 0,
-            total_rewards_distributed: 0.0,
-            unique_users: 0,
-            unique_artists: 0,
-            unique_songs: 0,
-            average_session_duration: 0.0,
-            zk_proof_success_rate: 0.0,
-            daily_active_users: 0,
-            top_performing_artists: vec![],
-            reward_pool_utilization: 0.0,
-        })
-    }
-
-    async fn get_fraud_metrics(&self, _start: chrono::DateTime<chrono::Utc>, _end: chrono::DateTime<chrono::Utc>) -> Result<crate::bounded_contexts::listen_reward::infrastructure::repositories::FraudMetrics, crate::bounded_contexts::listen_reward::infrastructure::repositories::RepositoryError> {
-        Ok(crate::bounded_contexts::listen_reward::infrastructure::repositories::FraudMetrics {
-            total_fraud_attempts: 0,
-            failed_zk_verifications: 0,
-            suspicious_patterns: 0,
-            blocked_sessions: 0,
-            fraud_rate_percentage: 0.0,
-            top_fraud_indicators: vec![],
+            listen_session_controller,
+            reward_controller,
+            analytics_controller,
+            listen_reward_controller,
         })
     }
 } 

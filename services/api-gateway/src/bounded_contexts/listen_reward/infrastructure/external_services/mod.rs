@@ -14,6 +14,7 @@ pub mod fraud_detection_service;
 pub use zk_proof_verification_service::{
     ZkProofVerificationService, MockZkProofVerificationService, 
     ZkProofVerificationResult, ProofVerificationError,
+    ProductionZkProofVerificationService,
 };
 pub use blockchain_payment_service::{
     BlockchainPaymentService, MockBlockchainPaymentService,
@@ -27,6 +28,9 @@ pub use fraud_detection_service::{
     FraudDetectionService, MockFraudDetectionService,
     FraudAssessment, FraudRisk, SuspiciousActivity,
 };
+
+// Re-export health status struct so other modules can reference it
+pub use crate::bounded_contexts::listen_reward::infrastructure::external_services::ExternalServiceHealth as ServiceHealth;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};

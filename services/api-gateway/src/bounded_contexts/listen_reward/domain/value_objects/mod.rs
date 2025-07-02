@@ -144,65 +144,65 @@ impl ZkProofHash {
     pub fn hash(&self) -> &str {
         &self.hash
     }
+
+    pub fn value(&self) -> String {
+        self.hash.clone()
+    }
 }
 
 // Reward Pool ID
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct RewardPoolId {
-    value: Uuid,
-}
+pub struct RewardPoolId(Uuid);
 
 impl RewardPoolId {
     pub fn new() -> Self {
-        Self {
-            value: Uuid::new_v4(),
-        }
+        Self(Uuid::new_v4())
     }
 
     pub fn from_uuid(uuid: Uuid) -> Self {
-        Self { value: uuid }
+        Self(uuid)
     }
 
     pub fn value(&self) -> Uuid {
-        self.value
+        self.0
     }
 }
 
 // Reward Tier for different user levels
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum RewardTier {
-    Basic,      // 1x multiplier
-    Premium,    // 1.5x multiplier
-    VIP,        // 2x multiplier
-    Artist,     // 3x multiplier (for verified artists)
+    Bronze,
+    Silver,
+    Gold,
+    Platinum,
 }
 
 impl RewardTier {
-    pub fn multiplier(&self) -> f64 {
-        match self {
-            RewardTier::Basic => 1.0,
-            RewardTier::Premium => 1.5,
-            RewardTier::VIP => 2.0,
-            RewardTier::Artist => 3.0,
-        }
-    }
-
-    pub fn from_string(tier: &str) -> Result<Self, String> {
-        match tier.to_lowercase().as_str() {
-            "basic" => Ok(RewardTier::Basic),
-            "premium" => Ok(RewardTier::Premium),
-            "vip" => Ok(RewardTier::VIP),
-            "artist" => Ok(RewardTier::Artist),
-            _ => Err(format!("Invalid reward tier: {}", tier)),
+    pub fn from_string(s: &str) -> Result<Self, String> {
+        match s.to_lowercase().as_str() {
+            "bronze" => Ok(RewardTier::Bronze),
+            "silver" => Ok(RewardTier::Silver),
+            "gold" => Ok(RewardTier::Gold),
+            "platinum" => Ok(RewardTier::Platinum),
+            _ => Err(format!("Invalid reward tier: {}", s)),
         }
     }
 
     pub fn to_string(&self) -> String {
         match self {
-            RewardTier::Basic => "basic".to_string(),
-            RewardTier::Premium => "premium".to_string(),
-            RewardTier::VIP => "vip".to_string(),
-            RewardTier::Artist => "artist".to_string(),
+            RewardTier::Bronze => "bronze".to_string(),
+            RewardTier::Silver => "silver".to_string(),
+            RewardTier::Gold => "gold".to_string(),
+            RewardTier::Platinum => "platinum".to_string(),
+        }
+    }
+
+    pub fn multiplier(&self) -> f64 {
+        match self {
+            RewardTier::Bronze => 1.0,
+            RewardTier::Silver => 1.5,
+            RewardTier::Gold => 2.0,
+            RewardTier::Platinum => 3.0,
         }
     }
 }
@@ -223,15 +223,27 @@ impl ValidationPeriod {
     }
 
     pub fn daily() -> Self {
-        let start = Utc::now();
-        let end = start + chrono::Duration::hours(24);
-        Self { start_time: start, end_time: end }
+        let now = Utc::now();
+        Self {
+            start_time: now,
+            end_time: now + chrono::Duration::days(1),
+        }
     }
 
     pub fn weekly() -> Self {
-        let start = Utc::now();
-        let end = start + chrono::Duration::weeks(1);
-        Self { start_time: start, end_time: end }
+        let now = Utc::now();
+        Self {
+            start_time: now,
+            end_time: now + chrono::Duration::weeks(1),
+        }
+    }
+
+    pub fn days(days: i64) -> Result<Self, String> {
+        let now = Utc::now();
+        Ok(Self {
+            start_time: now,
+            end_time: now + chrono::Duration::days(days),
+        })
     }
 
     pub fn start_time(&self) -> DateTime<Utc> {
@@ -263,26 +275,66 @@ impl ValidationPeriod {
 // - ListenCount: Number of listens with fraud detection
 // - DeviceFingerprint: Device identification for fraud prevention
 
-pub mod listen_session_id;
-pub mod reward_amount;
-pub mod listen_duration;
-pub mod listen_quality;
-pub mod reward_rate;
-pub mod listen_count;
-pub mod device_fingerprint;
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SessionStatus {
+    Active,
+    Completed,
+    Failed,
+    Verified,
+    Rewarded,
+}
 
-pub use listen_session_id::ListenSessionId;
-pub use reward_amount::RewardAmount;
-pub use listen_duration::ListenDuration;
-pub use listen_quality::ListenQuality;
-pub use reward_rate::RewardRate;
-pub use listen_count::ListenCount;
-pub use device_fingerprint::DeviceFingerprint;
+impl SessionStatus {
+    pub fn from_string(s: &str) -> Result<Self, String> {
+        match s.to_lowercase().as_str() {
+            "active" => Ok(SessionStatus::Active),
+            "completed" => Ok(SessionStatus::Completed),
+            "failed" => Ok(SessionStatus::Failed),
+            "verified" => Ok(SessionStatus::Verified),
+            "rewarded" => Ok(SessionStatus::Rewarded),
+            _ => Err(format!("Invalid session status: {}", s)),
+        }
+    }
 
-// Re-export commonly used types from other bounded contexts
-pub use crate::bounded_contexts::fractional_ownership::domain::value_objects::{
-    OwnershipContractId, RevenueAmount,
-};
+    pub fn to_string(&self) -> String {
+        match self {
+            SessionStatus::Active => "active".to_string(),
+            SessionStatus::Completed => "completed".to_string(),
+            SessionStatus::Failed => "failed".to_string(),
+            SessionStatus::Verified => "verified".to_string(),
+            SessionStatus::Rewarded => "rewarded".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RewardPool {
+    id: RewardPoolId,
+    total_tokens: RewardAmount,
+    available_tokens: RewardAmount,
+}
+
+impl RewardPool {
+    pub fn new(id: RewardPoolId, total_tokens: RewardAmount) -> Self {
+        Self {
+            id,
+            total_tokens: total_tokens.clone(),
+            available_tokens: total_tokens,
+        }
+    }
+
+    pub fn id(&self) -> &RewardPoolId {
+        &self.id
+    }
+
+    pub fn total_tokens(&self) -> &RewardAmount {
+        &self.total_tokens
+    }
+
+    pub fn available_tokens(&self) -> &RewardAmount {
+        &self.available_tokens
+    }
+}
 
 #[cfg(test)]
 mod tests {

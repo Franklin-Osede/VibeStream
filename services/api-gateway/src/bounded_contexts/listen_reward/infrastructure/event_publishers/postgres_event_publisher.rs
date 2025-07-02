@@ -25,21 +25,21 @@ impl EventPublisher for PostgresEventPublisher {
 
         let event_data = event.data();
 
-        let result = sqlx::query!(
+        let result = sqlx::query(
             r#"
             INSERT INTO event_outbox (
                 id, event_type, aggregate_id, aggregate_type, 
                 event_data, occurred_at, processed
             ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-            "#,
-            metadata.event_id,
-            metadata.event_type,
-            metadata.aggregate_id,
-            metadata.aggregate_type,
-            event_data,
-            metadata.occurred_at,
-            false
+            "#
         )
+        .bind(metadata.event_id)
+        .bind(metadata.event_type)
+        .bind(metadata.aggregate_id)
+        .bind(metadata.aggregate_type)
+        .bind(event_data)
+        .bind(metadata.timestamp)
+        .bind(false)
         .execute(&self.pool)
         .await;
 

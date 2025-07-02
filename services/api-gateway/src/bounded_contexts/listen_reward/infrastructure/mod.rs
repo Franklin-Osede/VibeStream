@@ -22,18 +22,19 @@ pub use repositories::{
 pub use external_services::{
     ZkProofVerificationService, ProductionZkProofVerificationService, MockZkProofVerificationService,
     BlockchainPaymentService, AnalyticsService, FraudDetectionService,
-    ZkProofRequest, ZkProofResponse, VerificationResult, ServiceHealth,
+    ZkProofVerificationResult, ProofVerificationError, PaymentResult, PaymentError, TransactionHash,
+    AnalyticsEvent, MetricsCollection, FraudAssessment, FraudRisk, SuspiciousActivity, ServiceHealth,
 };
 
 // Re-export event publishing
 pub use event_publishers::{
-    EventPublisher, PostgresEventPublisher, InMemoryEventPublisher,
-    EventProcessor, ListenRewardEventProcessor, EventMetadata,
+    EventPublisher, PostgresEventPublisher, EventMetadata,
 };
 
 // Re-export configuration
 pub use configuration::{
-    ListenRewardConfig, ListenRewardBoundedContext, ListenRewardBoundedContextBuilder,
+    // ListenRewardConfig, ListenRewardBoundedContext, ListenRewardBoundedContextBuilder,
+    ListenRewardInfrastructureConfig,
 };
 
 // Health check utilities

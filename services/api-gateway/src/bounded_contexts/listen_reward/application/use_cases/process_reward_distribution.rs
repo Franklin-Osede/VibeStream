@@ -2,8 +2,9 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::bounded_contexts::listen_reward::domain::{
-    ListenSession, RewardDistribution, RewardAmount, ValidationPeriod, RewardPool, DomainEvent
+    ListenSession, RewardDistribution, RewardAmount, ValidationPeriod, DomainEvent
 };
+use crate::bounded_contexts::listen_reward::domain::value_objects::RewardPool;
 use crate::bounded_contexts::music::domain::value_objects::RoyaltyPercentage;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -133,14 +134,16 @@ impl ProcessRewardDistributionUseCase {
         let reward_amount = RewardAmount::new(total_tokens)
             .map_err(|e| format!("Invalid reward amount: {}", e))?;
 
-        let validation_period = if validation_period_hours <= 24 {
-            ValidationPeriod::daily()
-        } else {
-            ValidationPeriod::weekly()
-        };
-
-        let reward_pool = RewardPool::new(reward_amount, validation_period);
-        let distribution = RewardDistribution::new(reward_pool);
+        let pool_id = crate::bounded_contexts::listen_reward::domain::value_objects::RewardPoolId::from_uuid(uuid::Uuid::new_v4());
+        
+        // Crear RewardPool para el agregado
+        let aggregate_pool = crate::bounded_contexts::listen_reward::domain::aggregates::reward_distribution::RewardPool::new(
+            reward_amount,
+            ValidationPeriod::daily(), // Simplificado por ahora
+        );
+        
+        // Crear la distribución con el RewardPool del agregado
+        let distribution = RewardDistribution::new(aggregate_pool);
 
         Ok(distribution)
     }

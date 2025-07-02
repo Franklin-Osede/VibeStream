@@ -11,8 +11,13 @@ use uuid::Uuid;
 use std::collections::HashMap;
 
 use crate::bounded_contexts::listen_reward::application::{
-    StartListenSessionUseCase, StartListenSessionCommand, StartListenSessionResponse,
-    CompleteListenSessionUseCase, CompleteListenSessionCommand, CompleteListenSessionResponse,
+    StartListenSessionUseCase, StartListenSessionCommand,
+    CompleteListenSessionUseCase, CompleteListenSessionCommand,
+};
+
+// Exponer públicamente los tipos de respuesta
+pub use crate::bounded_contexts::listen_reward::application::{
+    StartListenSessionResponse, CompleteListenSessionResponse,
 };
 
 // DTOs for API requests/responses

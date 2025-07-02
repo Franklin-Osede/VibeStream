@@ -29,19 +29,54 @@ pub enum AppError {
 
     #[error("Internal server error: {0}")]
     InternalError(String),
+
+    // Additional variants needed by the codebase
+    #[error("Business logic error: {0}")]
+    BusinessLogicError(String),
+
+    #[error("Resource not found: {0}")]
+    NotFoundError(String),
+
+    #[error("Rate limit exceeded: {0}")]
+    RateLimitError(String),
+
+    #[error("Unauthorized: {0}")]
+    Unauthorized(String),
+
+    #[error("Forbidden: {0}")]
+    Forbidden(String),
+
+    #[error("Concurrency conflict: {0}")]
+    ConcurrencyConflict(String),
+
+    #[error("Serialization error: {0}")]
+    SerializationError(String),
+
+    #[error("Network error: {0}")]
+    NetworkError(String),
+
+    #[error("Configuration error: {0}")]
+    ConfigurationError(String),
 }
 
 impl AppError {
     pub fn status_code(&self) -> StatusCode {
         match self {
-            AppError::NotFound(_) => StatusCode::NOT_FOUND,
-            AppError::InvalidState(_) | AppError::DomainRuleViolation(_) => StatusCode::BAD_REQUEST,
+            AppError::NotFound(_) | AppError::NotFoundError(_) => StatusCode::NOT_FOUND,
+            AppError::InvalidState(_) | AppError::DomainRuleViolation(_) | AppError::BusinessLogicError(_) => StatusCode::BAD_REQUEST,
             AppError::Infrastructure(_) => StatusCode::SERVICE_UNAVAILABLE,
             AppError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::ValidationError(_) => StatusCode::BAD_REQUEST,
             AppError::InvalidInput(_) => StatusCode::BAD_REQUEST,
             AppError::DatabaseError(_) => StatusCode::SERVICE_UNAVAILABLE,
             AppError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            AppError::RateLimitError(_) => StatusCode::TOO_MANY_REQUESTS,
+            AppError::Unauthorized(_) => StatusCode::UNAUTHORIZED,
+            AppError::Forbidden(_) => StatusCode::FORBIDDEN,
+            AppError::ConcurrencyConflict(_) => StatusCode::CONFLICT,
+            AppError::SerializationError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            AppError::NetworkError(_) => StatusCode::BAD_GATEWAY,
+            AppError::ConfigurationError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }

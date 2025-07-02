@@ -10,7 +10,7 @@ use crate::bounded_contexts::listen_reward::domain::entities::{
     ListenSession
 };
 use crate::bounded_contexts::listen_reward::domain::events::{
-    DomainEvent, RewardDistributed, ArtistRoyaltyPaid, RewardPoolDepleted
+    DomainEvent, RewardDistributed, ArtistRoyaltyPaid, RewardPoolDepleted, RewardDistributionCreated
 };
 use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId, RoyaltyPercentage};
 
@@ -83,6 +83,40 @@ impl RewardPool {
             true
         }
     }
+
+    pub fn total_tokens(&self) -> &RewardAmount {
+        &self.total_tokens
+    }
+
+    pub fn distributed_tokens(&self) -> &RewardAmount {
+        &self.distributed_tokens
+    }
+
+    pub fn reserved_tokens(&self) -> &RewardAmount {
+        &self.reserved_tokens
+    }
+
+    pub fn validation_period(&self) -> &ValidationPeriod {
+        &self.validation_period
+    }
+
+    pub fn from_parts(
+        id: RewardPoolId,
+        total_tokens: RewardAmount,
+        distributed_tokens: RewardAmount,
+        reserved_tokens: RewardAmount,
+        validation_period: ValidationPeriod,
+        created_at: DateTime<Utc>,
+    ) -> Self {
+        Self {
+            id,
+            total_tokens,
+            distributed_tokens,
+            reserved_tokens,
+            validation_period,
+            created_at,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -150,7 +184,7 @@ impl Default for DistributionLimits {
 
 impl RewardDistribution {
     pub fn new(reward_pool: RewardPool) -> Self {
-        Self {
+        let mut aggregate = Self {
             id: Uuid::new_v4(),
             reward_pool,
             pending_distributions: HashMap::new(),
@@ -159,7 +193,16 @@ impl RewardDistribution {
             distribution_limits: DistributionLimits::default(),
             created_at: Utc::now(),
             uncommitted_events: Vec::new(),
-        }
+        };
+
+        aggregate.apply_event(RewardDistributionCreated {
+            distribution_id: aggregate.id,
+            pool_id: aggregate.reward_pool.id().value(),
+            total_tokens: aggregate.reward_pool.total_tokens().tokens(),
+            created_at: aggregate.created_at,
+        });
+
+        aggregate
     }
 
     pub fn id(&self) -> Uuid {
@@ -170,8 +213,58 @@ impl RewardDistribution {
         &self.reward_pool
     }
 
+    pub fn pool_id(&self) -> Uuid {
+        self.reward_pool.id().value()
+    }
+
+    pub fn total_amount(&self) -> f64 {
+        self.reward_pool.total_tokens().tokens()
+    }
+
+    pub fn distributed_amount(&self) -> f64 {
+        self.reward_pool.distributed_tokens().tokens()
+    }
+
+    pub fn reserved_amount(&self) -> f64 {
+        self.reward_pool.reserved_tokens().tokens()
+    }
+
+    pub fn period_start(&self) -> DateTime<Utc> {
+        self.reward_pool.validation_period().start_time()
+    }
+
+    pub fn period_end(&self) -> DateTime<Utc> {
+        self.reward_pool.validation_period().end_time()
+    }
+
+    pub fn status(&self) -> String {
+        if self.reward_pool.is_depleted() {
+            "depleted".to_string()
+        } else if self.reward_pool.validation_period().is_active() {
+            "active".to_string()
+        } else {
+            "expired".to_string()
+        }
+    }
+
     pub fn take_uncommitted_events(&mut self) -> Vec<Box<dyn DomainEvent>> {
         std::mem::take(&mut self.uncommitted_events)
+    }
+
+    pub fn created_at(&self) -> DateTime<Utc> {
+        self.created_at
+    }
+
+    pub fn pending_distributions_count(&self) -> usize {
+        self.pending_distributions.len()
+    }
+
+    pub fn completed_distributions_count(&self) -> usize {
+        self.completed_distributions.len()
+    }
+
+    pub fn get_events(&self) -> &Vec<Box<dyn DomainEvent>> {
+        &self.uncommitted_events
     }
 
     pub fn queue_reward_distribution(
@@ -371,6 +464,33 @@ impl RewardDistribution {
 
         royalty_info.total_earned = royalty_info.total_earned.add(royalty_amount).unwrap_or(royalty_info.total_earned.clone());
         royalty_info.pending_amount = royalty_info.pending_amount.add(royalty_amount).unwrap_or(royalty_info.pending_amount.clone());
+    }
+
+    pub fn version(&self) -> i32 {
+        0 // Versión por defecto
+    }
+
+    pub fn from_persisted_state(
+        id: Uuid,
+        reward_pool: RewardPool,
+        created_at: DateTime<Utc>,
+        uncommitted_events: Vec<Box<dyn DomainEvent>>,
+        version: i32,
+    ) -> Self {
+        Self {
+            id,
+            reward_pool,
+            pending_distributions: HashMap::new(),
+            completed_distributions: Vec::new(),
+            artist_royalties: HashMap::new(),
+            distribution_limits: DistributionLimits::default(),
+            created_at,
+            uncommitted_events,
+        }
+    }
+
+    fn apply_event(&mut self, event: impl DomainEvent + 'static) {
+        self.uncommitted_events.push(Box::new(event));
     }
 }
 

@@ -6,14 +6,30 @@
 
 pub mod listen_reward_controller;
 pub mod analytics_controller;
+pub mod listen_session_controller;
+pub mod reward_controller;
 
 pub use listen_reward_controller::{
-    ListenRewardController, StartSessionRequest, StartSessionResponse,
-    CompleteSessionRequest, CompleteSessionResponse, SessionDetailsResponse,
+    ListenRewardController, listen_reward_routes,
 };
 pub use analytics_controller::{
     AnalyticsController, UserHistoryRequest, UserHistoryResponse,
     ArtistAnalyticsRequest, ArtistAnalyticsResponse, PlatformStatsResponse,
+    analytics_routes,
+};
+pub use listen_session_controller::{
+    ListenSessionController, StartListenSessionRequest as StartSessionRequest,
+    StartListenSessionResponse as StartSessionResponse,
+    CompleteListenSessionRequest as CompleteSessionRequest,
+    CompleteListenSessionResponse as CompleteSessionResponse,
+    SessionStatusResponse as SessionDetailsResponse,
+    create_listen_session_routes,
+};
+pub use reward_controller::{
+    RewardController, CreateRewardPoolRequest, CreateRewardPoolResponse,
+    RewardPoolStatusResponse, UserRewardSummaryResponse, ArtistRoyaltySummaryResponse,
+    DistributionAnalyticsResponse, ApiResponse as RewardApiResponse,
+    create_reward_routes,
 };
 
 // Common HTTP utilities

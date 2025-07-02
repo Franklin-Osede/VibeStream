@@ -5,43 +5,22 @@
 
 pub mod postgres_listen_session_repository;
 pub mod postgres_reward_distribution_repository;
+pub mod postgres_analytics_repository;
 pub mod repository_traits;
 
 pub use postgres_listen_session_repository::PostgresListenSessionRepository;
 pub use postgres_reward_distribution_repository::PostgresRewardDistributionRepository;
-pub use repository_traits::{
-    ListenSessionRepository, RewardDistributionRepository,
-    ListenSessionQueryRepository, RewardAnalyticsRepository,
-};
+pub use postgres_analytics_repository::PostgresRewardAnalyticsRepository;
+pub use repository_traits::*;
 
 // Common repository utilities
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use sqlx::FromRow;
 
-// Repository error types
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum RepositoryError {
-    NotFound(String),
-    Conflict(String),
-    Database(String),
-    Validation(String),
-    Serialization(String),
-}
-
-impl std::fmt::Display for RepositoryError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            RepositoryError::NotFound(msg) => write!(f, "Not found: {}", msg),
-            RepositoryError::Conflict(msg) => write!(f, "Conflict: {}", msg),
-            RepositoryError::Database(msg) => write!(f, "Database error: {}", msg),
-            RepositoryError::Validation(msg) => write!(f, "Validation error: {}", msg),
-            RepositoryError::Serialization(msg) => write!(f, "Serialization error: {}", msg),
-        }
-    }
-}
-
-impl std::error::Error for RepositoryError {}
+// Repository result type
+pub type RepositoryResult<T> = Result<T, String>;
 
 // Pagination support
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -100,42 +79,26 @@ pub struct RewardAnalytics {
 }
 
 // Database row mappings
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(FromRow, Debug)]
 pub struct ListenSessionRow {
     pub id: Uuid,
     pub user_id: Uuid,
     pub song_id: Uuid,
     pub artist_id: Uuid,
-    pub user_tier: String,
+    pub zk_proof_hash: String,
+    pub base_reward: i64, // Decimal as integer for precision
     pub status: String,
-    pub listen_duration_seconds: Option<i32>,
-    pub quality_score: Option<f64>,
-    pub zk_proof_hash: Option<String>,
-    pub base_reward_tokens: Option<f64>,
-    pub final_reward_tokens: Option<f64>,
-    pub started_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
     pub completed_at: Option<DateTime<Utc>>,
     pub verified_at: Option<DateTime<Utc>>,
     pub version: i32,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(FromRow, Debug, Clone, Serialize, Deserialize)]
 pub struct RewardDistributionRow {
     pub id: Uuid,
-    pub pool_id: Uuid,
-    pub total_tokens: f64,
-    pub distributed_tokens: f64,
-    pub reserved_tokens: f64,
-    pub validation_period_start: DateTime<Utc>,
-    pub validation_period_end: DateTime<Utc>,
-    pub pending_distributions_count: i32,
-    pub completed_distributions_count: i32,
+    pub reward_pool_data: serde_json::Value,
+    pub events: serde_json::Value,
     pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
     pub version: i32,
-}
-
-// Repository result type
-pub type RepositoryResult<T> = Result<T, RepositoryError>; 
+} 

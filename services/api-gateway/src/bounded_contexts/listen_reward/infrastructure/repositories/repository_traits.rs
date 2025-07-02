@@ -13,7 +13,7 @@ use crate::bounded_contexts::listen_reward::domain::value_objects::{
     ListenSessionId, RewardPoolId,
 };
 use super::{
-    RepositoryResult, RepositoryError, Pagination, ListenSessionFilter, RewardAnalytics,
+    RepositoryResult, Pagination, ListenSessionFilter, RewardAnalytics,
 };
 
 /// Repository for persisting and retrieving ListenSession entities
@@ -97,19 +97,19 @@ pub trait RewardDistributionRepository: Send + Sync {
     ) -> RepositoryResult<()>;
 
     /// Find a reward distribution by ID
-    async fn find_by_id(&self, id: Uuid) -> RepositoryResult<Option<RewardDistribution>>;
+    async fn find_by_id(&self, id: &Uuid) -> RepositoryResult<Option<RewardDistribution>>;
 
     /// Find reward distribution by pool ID
-    async fn find_by_pool_id(&self, pool_id: &RewardPoolId) -> RepositoryResult<Option<RewardDistribution>>;
+    async fn find_by_pool_id(&self, pool_id: &RewardPoolId) -> RepositoryResult<Vec<RewardDistribution>>;
 
     /// Find active reward distributions
-    async fn find_active_distributions(&self) -> RepositoryResult<Vec<RewardDistribution>>;
+    async fn find_active_distributions(&self, pagination: &Pagination) -> RepositoryResult<Vec<RewardDistribution>>;
 
     /// Find distributions with pending rewards
     async fn find_distributions_with_pending_rewards(&self) -> RepositoryResult<Vec<RewardDistribution>>;
 
     /// Mark distribution as processed
-    async fn mark_processed(&self, id: Uuid) -> RepositoryResult<()>;
+    async fn mark_processed(&self, id: &Uuid) -> RepositoryResult<()>;
 }
 
 /// Repository for reward analytics and reporting

@@ -117,6 +117,31 @@ impl ListenSession {
         self.started_at
     }
 
+    pub fn zk_proof(&self) -> Option<&ZkProofHash> {
+        self.zk_proof.as_ref()
+    }
+
+    pub fn base_reward(&self) -> Option<&RewardAmount> {
+        self.base_reward.as_ref()
+    }
+
+    pub fn completed_at(&self) -> Option<DateTime<Utc>> {
+        self.completed_at
+    }
+
+    pub fn verified_at(&self) -> Option<DateTime<Utc>> {
+        self.verified_at
+    }
+
+    // Métodos auxiliares para acceso a datos
+    pub fn created_at(&self) -> DateTime<Utc> {
+        self.started_at
+    }
+
+    pub fn version(&self) -> i32 {
+        0 // Versión por defecto
+    }
+
     // Business logic methods
     pub fn complete_session(
         &mut self,
@@ -248,6 +273,40 @@ impl ListenSession {
             status: self.status.clone(),
         }
     }
+
+    pub fn from_parts(
+        id: ListenSessionId,
+        user_id: Uuid,
+        song_id: SongId,
+        artist_id: ArtistId,
+        user_tier: RewardTier,
+        status: SessionStatus,
+        listen_duration: Option<ListenDuration>,
+        quality_score: Option<QualityScore>,
+        zk_proof: Option<ZkProofHash>,
+        base_reward: Option<RewardAmount>,
+        final_reward: Option<RewardAmount>,
+        started_at: DateTime<Utc>,
+        completed_at: Option<DateTime<Utc>>,
+        verified_at: Option<DateTime<Utc>>,
+    ) -> Self {
+        Self {
+            id,
+            user_id,
+            song_id,
+            artist_id,
+            user_tier,
+            status,
+            listen_duration,
+            quality_score,
+            zk_proof,
+            base_reward,
+            final_reward,
+            started_at,
+            completed_at,
+            verified_at,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -263,6 +322,29 @@ pub struct SessionAnalytics {
     pub tier_multiplier: f64,
     pub session_duration_seconds: Option<u32>,
     pub status: SessionStatus,
+}
+
+impl SessionStatus {
+    pub fn to_string(&self) -> String {
+        match self {
+            SessionStatus::Active => "active".to_string(),
+            SessionStatus::Completed => "completed".to_string(),
+            SessionStatus::Verified => "verified".to_string(),
+            SessionStatus::Rewarded => "rewarded".to_string(),
+            SessionStatus::Failed => "failed".to_string(),
+        }
+    }
+
+    pub fn from_string(s: &str) -> Result<Self, String> {
+        match s {
+            "active" => Ok(SessionStatus::Active),
+            "completed" => Ok(SessionStatus::Completed),
+            "verified" => Ok(SessionStatus::Verified),
+            "rewarded" => Ok(SessionStatus::Rewarded),
+            "failed" => Ok(SessionStatus::Failed),
+            _ => Err(format!("Invalid session status: {}", s)),
+        }
+    }
 }
 
 #[cfg(test)]
