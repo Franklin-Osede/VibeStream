@@ -10,6 +10,7 @@ pub mod repositories;
 pub mod external_services;
 pub mod event_publishers;
 pub mod configuration;
+pub mod integration;
 
 // Re-export repository traits
 pub use repositories::{
@@ -35,6 +36,13 @@ pub use event_publishers::{
 pub use configuration::{
     // ListenRewardConfig, ListenRewardBoundedContext, ListenRewardBoundedContextBuilder,
     ListenRewardInfrastructureConfig,
+};
+
+// Re-export integration components
+pub use integration::{
+    FractionalOwnershipIntegrationHandler, RevenueDistributionTriggered,
+    RevenueSplit, RevenueMetadata, ListenRewardIntegrationFactory,
+    IntegrationConfig
 };
 
 // Health check utilities

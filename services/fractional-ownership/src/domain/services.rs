@@ -1,12 +1,12 @@
 // TODO: Implement ShareTradingService, RevenueDistributionService 
 
-use crate::domain::entities::{FractionalSong, ShareOwnership};
-use crate::domain::value_objects::{OwnershipPercentage, SharePrice, RevenueAmount};
+use crate::domain::value_objects::{SharePrice, RevenueAmount};
 use crate::domain::aggregates::FractionalOwnershipAggregate;
 use crate::domain::errors::FractionalOwnershipError;
+use crate::domain::entities::FractionalSong; // Agregado para tests
 use uuid::Uuid;
+use chrono::Utc;
 use std::collections::HashMap;
-use chrono::{DateTime, Utc, Duration};
 
 /// Servicio de dominio para cálculos financieros complejos de participaciones fraccionadas
 pub struct FractionalOwnershipPricingService;

@@ -4,7 +4,6 @@ use crate::domain::errors::FractionalOwnershipError;
 use crate::domain::value_objects::RevenueAmount;
 use async_trait::async_trait;
 use uuid::Uuid;
-use std::collections::HashMap;
 
 /// Repository trait para agregados de fractional ownership
 /// Esta es una interface/contrato que define qué operaciones necesita el dominio

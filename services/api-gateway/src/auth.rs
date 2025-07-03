@@ -7,7 +7,7 @@ use axum::{
 };
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
-use chrono::{Duration, Utc};
+use chrono::{Duration, Utc, DateTime};
 use uuid::Uuid;
 
 const JWT_SECRET: &[u8] = b"your-secret-key-change-in-production";
@@ -128,4 +128,64 @@ pub fn hash_password(password: &str) -> Result<String, bcrypt::BcryptError> {
 
 pub fn verify_password(password: &str, hash: &str) -> Result<bool, bcrypt::BcryptError> {
     bcrypt::verify(password, hash)
+} 
+
+// Modelo de usuario
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct User {
+    pub id: Uuid,
+    pub username: String,
+    pub email: String,
+    pub role: UserRole,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum UserRole {
+    Fan,
+    Artist,
+    Admin,
+}
+
+// Servicio de autenticación
+pub struct AuthService {
+    // En una implementación real, esto sería una conexión a DB
+    users: Vec<User>,
+}
+
+impl AuthService {
+    pub fn new() -> Self {
+        // Usuarios demo
+        let users = vec![
+            User {
+                id: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
+                username: "demo".to_string(),
+                email: "demo@example.com".to_string(),
+                role: UserRole::Fan,
+                created_at: Utc::now(),
+            },
+            User {
+                id: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440001").unwrap(),
+                username: "artist".to_string(),
+                email: "artist@example.com".to_string(),
+                role: UserRole::Artist,
+                created_at: Utc::now(),
+            },
+        ];
+        
+        Self { users }
+    }
+    
+    pub fn authenticate(&self, username: &str, password: &str) -> Option<&User> {
+        // En una implementación real, verificaríamos el hash de la contraseña
+        if password != "password" {
+            return None;
+        }
+        
+        self.users.iter().find(|u| u.username == username)
+    }
+    
+    pub fn get_user_by_id(&self, id: &Uuid) -> Option<&User> {
+        self.users.iter().find(|u| u.id == *id)
+    }
 } 

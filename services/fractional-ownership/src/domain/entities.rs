@@ -1,12 +1,10 @@
 // TODO: Implement FractionalShare, OwnershipContract entities 
 
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 
 use crate::domain::value_objects::{OwnershipPercentage, SharePrice, RevenueAmount};
 use crate::domain::errors::FractionalOwnershipError;
 use uuid::Uuid;
-use std::collections::HashMap;
 
 /// Entidad principal: Canción que puede ser comprada fraccionalmente
 #[derive(Debug, Clone)]

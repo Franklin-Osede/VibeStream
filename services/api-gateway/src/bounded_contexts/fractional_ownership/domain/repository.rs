@@ -184,21 +184,22 @@ pub struct StoredEvent {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
     use std::collections::HashMap;
     use std::sync::Arc;
     use tokio::sync::Mutex;
 
     // Mock implementation for testing
+    #[derive(Debug, Clone)]
     pub struct MockOwnershipContractRepository {
-        contracts: Arc<Mutex<HashMap<OwnershipContractId, OwnershipContractAggregate>>>,
+        contracts: std::collections::HashMap<OwnershipContractId, OwnershipContractAggregate>,
     }
 
     impl MockOwnershipContractRepository {
         pub fn new() -> Self {
             Self {
-                contracts: Arc::new(Mutex::new(HashMap::new())),
+                contracts: HashMap::new(),
             }
         }
     }

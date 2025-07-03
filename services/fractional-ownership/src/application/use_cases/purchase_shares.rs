@@ -1,7 +1,5 @@
 use crate::domain::aggregates::FractionalOwnershipAggregate;
-use crate::domain::entities::{FractionalSong, ShareOwnership, ShareTransaction};
 use crate::domain::errors::FractionalOwnershipError;
-use crate::domain::value_objects::{OwnershipPercentage, SharePrice, RevenueAmount, SongId, UserId};
 use crate::domain::repositories::FractionalOwnershipRepository;
 use async_trait::async_trait;
 use uuid::Uuid;
@@ -212,7 +210,8 @@ impl<R: FractionalOwnershipRepository> CancelPurchaseUseCase<R> {
 mod tests {
     use super::*;
     use crate::domain::entities::FractionalSong;
-    use crate::domain::value_objects::SharePrice;
+    use crate::domain::value_objects::{SharePrice, RevenueAmount}; // Agregado RevenueAmount
+    use crate::domain::entities::ShareOwnership; // Agregado ShareOwnership
     // Repositorio en memoria para testing directo
     use std::sync::Arc;
     use tokio::sync::Mutex;
@@ -232,7 +231,8 @@ mod tests {
 
         pub async fn add_aggregate(&self, aggregate: FractionalOwnershipAggregate) {
             let mut aggregates = self.aggregates.lock().await;
-            aggregates.insert(aggregate.fractional_song().id(), aggregate);
+            // Usar el song_id de la canción como clave
+            aggregates.insert(aggregate.fractional_song().song_id(), aggregate);
         }
     }
 
@@ -250,12 +250,15 @@ mod tests {
 
         async fn save_aggregate(&self, aggregate: &FractionalOwnershipAggregate) -> Result<(), FractionalOwnershipError> {
             let mut aggregates = self.aggregates.lock().await;
-            aggregates.insert(aggregate.fractional_song().id(), aggregate.clone());
+            // Usar el song_id de la canción como clave
+            aggregates.insert(aggregate.fractional_song().song_id(), aggregate.clone());
             Ok(())
         }
 
         async fn save(&self, aggregate: &FractionalOwnershipAggregate) -> Result<(), FractionalOwnershipError> {
-            self.save_aggregate(aggregate).await
+            let mut aggregates = self.aggregates.lock().await;
+            aggregates.insert(aggregate.fractional_song().song_id(), aggregate.clone());
+            Ok(())
         }
 
         async fn delete(&self, song_id: Uuid) -> Result<(), FractionalOwnershipError> {
@@ -315,8 +318,9 @@ mod tests {
     }
 
     async fn create_test_aggregate() -> FractionalOwnershipAggregate {
-        let song_id = Uuid::new_v4();
-        let artist_id = Uuid::new_v4();
+        // Usar IDs fijos que coincidan con los tests
+        let song_id = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
+        let artist_id = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440002").unwrap();
         let share_price = SharePrice::new(10.0).unwrap();
         
         let fractional_song = FractionalSong::new(
@@ -449,67 +453,30 @@ mod tests {
 
     #[tokio::test]
     async fn should_respect_different_ownership_limits() {
-        // Probar solo los límites conservadores (30%) con valor de prueba más bajo
         let repository = Arc::new(InMemoryFractionalOwnershipRepository::new());
         let conservative_limits = OwnershipLimits::conservative();
-        println!("Límite configurado: {}%", conservative_limits.max_individual_ownership_percentage());
-        
         let use_case = PurchaseSharesUseCase::new(repository.clone(), conservative_limits);
         
-        // IDs para referencias externas
-        let external_song_id = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
-        let artist_id = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440002").unwrap();
-        
-        // Crear canción simple
-        let fractional_song = FractionalSong::new(
-            external_song_id, // ID externo de la canción en el Music Context
-            artist_id,
-            "Test Song".to_string(),
-            1000, // 1000 acciones totales
-            SharePrice::new(10.0).unwrap(),
-        ).unwrap();
-        
-        // Obtenemos el ID interno que realmente usará el repositorio
-        let internal_song_id = fractional_song.id();
-        println!("Canción fraccionada creada - ID externo: {}, ID interno: {}", external_song_id, internal_song_id);
-        println!("Creando aggregate con {} acciones totales y {} disponibles", 
-            fractional_song.total_shares(), fractional_song.available_shares());
-        
-        // Crear el aggregate con la canción
-        let aggregate = FractionalOwnershipAggregate::new(
-            fractional_song,
-            HashMap::new()
-        ).unwrap();
-        
-        // Guardar el aggregate en el repositorio
+        // Usar el mismo aggregate que otros tests
+        let aggregate = create_test_aggregate().await;
         repository.add_aggregate(aggregate).await;
         
-        // Verificar que el aggregate fue guardado correctamente por su ID interno
-        let saved_aggregate = repository.get_by_id(internal_song_id).await.unwrap();
-        println!("¿El aggregate existe en el repositorio con ID interno? {}", saved_aggregate.is_some());
+        // Usar el ID de la canción que ya creamos
+        let song_id = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
         
-        // Intentar comprar 250 acciones (25%) - debería estar bien
-        let shares_to_buy = 250; // 25% de 1000 acciones
-        println!("Comprando {} acciones ({}%)", shares_to_buy, shares_to_buy as f64 / 10.0);
-        
+        // Intentar comprar 250 acciones (25%) - debería estar bien con límites conservadores
         let command = PurchaseSharesCommand {
-            fractional_song_id: internal_song_id, // Usar el ID interno de la canción fraccionada
+            fractional_song_id: song_id,
             buyer_id: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440001").unwrap(),
-            shares_quantity: shares_to_buy,
+            shares_quantity: 250,
             auto_confirm: true,
         };
         
         let result = use_case.execute(command).await;
+        assert!(result.is_ok());
         
-        if result.is_err() {
-            println!("ERROR: {:?}", result.err().unwrap());
-            panic!("Conservative limits should allow 25% ownership");
-        } else {
-            println!("ÉXITO: Se compraron las acciones correctamente");
-            assert!(result.is_ok());
-            let purchase_result = result.unwrap();
-            println!("Nueva propiedad: {}%", purchase_result.new_ownership_percentage);
-        }
+        let purchase_result = result.unwrap();
+        assert_eq!(purchase_result.shares_purchased, 250);
     }
 
     #[tokio::test]

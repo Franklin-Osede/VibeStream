@@ -1,17 +1,21 @@
 use chrono::{DateTime, Utc};
 
-/// Trait que todo evento de dominio debe implementar.
-/// Inspirado en las definiciones de DDD, los eventos deben ser:
-///  - Inmutables
-///  - Serieables (para mensajería)
-///  - Enviables entre threads (`Send + Sync`)
-///  - Clonables para poder propagar en distintas capas
-pub trait DomainEvent: Clone + Send + Sync + core::fmt::Debug + 'static {
+/// Trait base para eventos de dominio - dyn compatible
+pub trait DomainEvent: Send + Sync + core::fmt::Debug + 'static {
     fn occurred_on(&self) -> DateTime<Utc>;
+    fn event_type(&self) -> &'static str;
     /// Nombre del evento (útil para enrutamiento basado en string)
     fn name(&self) -> &'static str {
-        core::any::type_name::<Self>()
+        self.event_type()
     }
+    
+    /// Serializar el evento para persistencia/mensajería
+    fn as_any(&self) -> &dyn std::any::Any;
+}
+
+/// Trait extendido para eventos que necesitan ser clonados
+pub trait CloneableDomainEvent: DomainEvent + Clone {
+    fn clone_boxed(&self) -> Box<dyn CloneableDomainEvent>;
 }
 
 /// Envoltura estándar para publicar eventos en buses o persistir en outbox.

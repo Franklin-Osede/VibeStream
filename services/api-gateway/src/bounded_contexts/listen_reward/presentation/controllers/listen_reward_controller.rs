@@ -347,7 +347,7 @@ pub fn listen_reward_routes(controller: Arc<ListenRewardController>) -> Router {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum_test::TestServer;
+    // use axum_test::TestServer; // Commented out - dependency not available
 
     // Mock application service for testing
     struct MockListenRewardApplicationService;

@@ -17,6 +17,7 @@ use super::commands::{
 
 use super::queries::{
     GetOwnershipContract, GetOwnershipContractHandler, GetOwnershipContractResult,
+    GetOwnershipContractBySongId, GetOwnershipContractBySongIdHandler, GetOwnershipContractBySongIdResult,
     GetUserPortfolio, GetUserPortfolioHandler, GetUserPortfolioResult,
     GetContractAnalytics, GetContractAnalyticsHandler, GetContractAnalyticsResult,
     GetMarketStatistics, GetMarketStatisticsResult,
@@ -199,6 +200,18 @@ impl<R: OwnershipContractRepository> FractionalOwnershipApplicationService<R> {
         query: GetOwnershipContract,
     ) -> Result<GetOwnershipContractResult, AppError> {
         let handler = GetOwnershipContractHandler {
+            repository: Arc::clone(&self.repository),
+        };
+
+        handler.handle(query).await
+    }
+
+    /// Get ownership contract by song ID
+    pub async fn get_ownership_contract_by_song_id(
+        &self,
+        query: GetOwnershipContractBySongId,
+    ) -> Result<GetOwnershipContractBySongIdResult, AppError> {
+        let handler = GetOwnershipContractBySongIdHandler {
             repository: Arc::clone(&self.repository),
         };
 

@@ -1,379 +1,403 @@
 use axum::{
     routing::{get, post, delete},
     Router,
+    extract::{State, Path, Query, Extension},
+    http::StatusCode,
+    Json,
 };
 use std::sync::Arc;
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::bounded_contexts::fractional_ownership::{
-    domain::repository::OwnershipContractRepository,
-    presentation::controllers::FractionalOwnershipController,
+    application::FractionalOwnershipApplicationService,
+    infrastructure::InMemoryOwnershipContractRepository,
+    presentation::controllers::{
+        AppState, ConcreteApplicationService, AuthUser,
+        CreateContractRequest, CreateContractResponse,
+        ActivateContractResponse, PurchaseSharesRequest, PurchaseSharesResponse,
+        TradeSharesRequest, TradeSharesResponse, DistributeRevenueRequest,
+        DistributeRevenueResponse, TerminateContractRequest, TerminateContractResponse,
+        ContractDetailsResponse, UserPortfolioResponse, ContractAnalyticsResponse,
+        SearchContractsResponse, SearchContractsQuery, ArtistContractsResponse,
+        MarketStatisticsResponse
+    },
 };
+use crate::shared::domain::errors::AppError;
 
-/// Sets up all HTTP routes for Fractional Ownership bounded context
-/// 
-/// This function creates the complete router with all endpoints,
-/// following RESTful conventions and proper HTTP methods.
-pub fn create_routes<R: OwnershipContractRepository + Send + Sync + 'static>(
-    controller: Arc<FractionalOwnershipController<R>>,
+// WRAPPER FUNCTIONS CONCRETAS PARA AXUM
+// Estas funciones son wrappers no genéricos que Axum puede usar como handlers
+
+async fn create_contract_handler(
+    State(state): State<AppState>,
+    Extension(auth_user): Extension<AuthUser>,
+    Json(request): Json<CreateContractRequest>,
+) -> Result<Json<CreateContractResponse>, StatusCode> {
+    match crate::bounded_contexts::fractional_ownership::presentation::controllers::create_contract(
+        State(state), Extension(auth_user), Json(request)
+    ).await {
+        Ok(response) => Ok(response),
+        Err(err) => Err(StatusCode::from(err)),
+    }
+}
+
+async fn activate_contract_handler(
+    State(state): State<AppState>,
+    Extension(auth_user): Extension<AuthUser>,
+    Path(contract_id): Path<Uuid>,
+) -> Result<Json<ActivateContractResponse>, StatusCode> {
+    match crate::bounded_contexts::fractional_ownership::presentation::controllers::activate_contract(
+        State(state), Extension(auth_user), Path(contract_id)
+    ).await {
+        Ok(response) => Ok(response),
+        Err(err) => Err(StatusCode::from(err)),
+    }
+}
+
+async fn purchase_shares_handler(
+    State(state): State<AppState>,
+    Extension(auth_user): Extension<AuthUser>,
+    Path(contract_id): Path<Uuid>,
+    Json(request): Json<PurchaseSharesRequest>,
+) -> Result<Json<PurchaseSharesResponse>, StatusCode> {
+    match crate::bounded_contexts::fractional_ownership::presentation::controllers::purchase_shares(
+        State(state), Extension(auth_user), Path(contract_id), Json(request)
+    ).await {
+        Ok(response) => Ok(response),
+        Err(err) => Err(StatusCode::from(err)),
+    }
+}
+
+async fn trade_shares_handler(
+    State(state): State<AppState>,
+    Extension(auth_user): Extension<AuthUser>,
+    Path(share_id): Path<Uuid>,
+    Json(request): Json<TradeSharesRequest>,
+) -> Result<Json<TradeSharesResponse>, StatusCode> {
+    match crate::bounded_contexts::fractional_ownership::presentation::controllers::trade_shares(
+        State(state), Extension(auth_user), Path(share_id), Json(request)
+    ).await {
+        Ok(response) => Ok(response),
+        Err(err) => Err(StatusCode::from(err)),
+    }
+}
+
+async fn distribute_revenue_handler(
+    State(state): State<AppState>,
+    Extension(auth_user): Extension<AuthUser>,
+    Path(contract_id): Path<Uuid>,
+    Json(request): Json<DistributeRevenueRequest>,
+) -> Result<Json<DistributeRevenueResponse>, StatusCode> {
+    match crate::bounded_contexts::fractional_ownership::presentation::controllers::distribute_revenue(
+        State(state), Extension(auth_user), Path(contract_id), Json(request)
+    ).await {
+        Ok(response) => Ok(response),
+        Err(err) => Err(StatusCode::from(err)),
+    }
+}
+
+async fn terminate_contract_handler(
+    State(state): State<AppState>,
+    Extension(auth_user): Extension<AuthUser>,
+    Path(contract_id): Path<Uuid>,
+    Json(request): Json<TerminateContractRequest>,
+) -> Result<Json<TerminateContractResponse>, StatusCode> {
+    match crate::bounded_contexts::fractional_ownership::presentation::controllers::terminate_contract(
+        State(state), Extension(auth_user), Path(contract_id), Json(request)
+    ).await {
+        Ok(response) => Ok(response),
+        Err(err) => Err(StatusCode::from(err)),
+    }
+}
+
+async fn get_contract_handler(
+    State(state): State<AppState>,
+    Path(contract_id): Path<Uuid>,
+) -> Result<Json<ContractDetailsResponse>, StatusCode> {
+    match crate::bounded_contexts::fractional_ownership::presentation::controllers::get_contract(
+        State(state), Path(contract_id)
+    ).await {
+        Ok(response) => Ok(response),
+        Err(err) => Err(StatusCode::from(err)),
+    }
+}
+
+async fn get_user_portfolio_handler(
+    State(state): State<AppState>,
+    Extension(auth_user): Extension<AuthUser>,
+    Path(user_id): Path<Uuid>,
+) -> Result<Json<UserPortfolioResponse>, StatusCode> {
+    match crate::bounded_contexts::fractional_ownership::presentation::controllers::get_user_portfolio(
+        State(state), Extension(auth_user), Path(user_id)
+    ).await {
+        Ok(response) => Ok(response),
+        Err(err) => Err(StatusCode::from(err)),
+    }
+}
+
+async fn get_contract_analytics_handler(
+    State(state): State<AppState>,
+    Path(contract_id): Path<Uuid>,
+) -> Result<Json<ContractAnalyticsResponse>, StatusCode> {
+    match crate::bounded_contexts::fractional_ownership::presentation::controllers::get_contract_analytics(
+        State(state), Path(contract_id)
+    ).await {
+        Ok(response) => Ok(response),
+        Err(err) => Err(StatusCode::from(err)),
+    }
+}
+
+async fn search_contracts_handler(
+    State(state): State<AppState>,
+    Query(params): Query<SearchContractsQuery>,
+) -> Result<Json<SearchContractsResponse>, StatusCode> {
+    match crate::bounded_contexts::fractional_ownership::presentation::controllers::search_contracts(
+        State(state), Query(params)
+    ).await {
+        Ok(response) => Ok(response),
+        Err(err) => Err(StatusCode::from(err)),
+    }
+}
+
+async fn get_contracts_by_artist_handler(
+    State(state): State<AppState>,
+    Path(artist_id): Path<Uuid>,
+) -> Result<Json<ArtistContractsResponse>, StatusCode> {
+    match crate::bounded_contexts::fractional_ownership::presentation::controllers::get_contracts_by_artist(
+        State(state), Path(artist_id)
+    ).await {
+        Ok(response) => Ok(response),
+        Err(err) => Err(StatusCode::from(err)),
+    }
+}
+
+async fn get_market_statistics_handler(
+    State(state): State<AppState>,
+) -> Result<Json<MarketStatisticsResponse>, StatusCode> {
+    match crate::bounded_contexts::fractional_ownership::presentation::controllers::get_market_statistics(
+        State(state)
+    ).await {
+        Ok(response) => Ok(response),
+        Err(err) => Err(StatusCode::from(err)),
+    }
+}
+
+/// Create all fractional ownership routes using concrete handlers
+pub fn create_routes(
+    service: Arc<ConcreteApplicationService>,
 ) -> Router {
+    let state = AppState::new(service);
+    
     Router::new()
         // Contract management routes
         .route(
             "/api/v1/fractional-ownership/contracts",
-            post(FractionalOwnershipController::create_contract),
+            post(create_contract_handler),
         )
         .route(
             "/api/v1/fractional-ownership/contracts/:contract_id",
-            get(FractionalOwnershipController::get_contract),
+            get(get_contract_handler),
         )
         .route(
             "/api/v1/fractional-ownership/contracts/:contract_id/activate",
-            post(FractionalOwnershipController::activate_contract),
+            post(activate_contract_handler),
         )
         .route(
-            "/api/v1/fractional-ownership/contracts/:contract_id",
-            delete(FractionalOwnershipController::terminate_contract),
+            "/api/v1/fractional-ownership/contracts/:contract_id/terminate",
+            delete(terminate_contract_handler),
         )
         
         // Share trading routes
         .route(
             "/api/v1/fractional-ownership/contracts/:contract_id/purchase",
-            post(FractionalOwnershipController::purchase_shares),
+            post(purchase_shares_handler),
         )
         .route(
             "/api/v1/fractional-ownership/shares/:share_id/trade",
-            post(FractionalOwnershipController::trade_shares),
+            post(trade_shares_handler),
         )
         
         // Revenue distribution routes
         .route(
             "/api/v1/fractional-ownership/contracts/:contract_id/distribute-revenue",
-            post(FractionalOwnershipController::distribute_revenue),
+            post(distribute_revenue_handler),
         )
         
-        // Analytics and reporting routes
+        // Analytics routes
         .route(
             "/api/v1/fractional-ownership/contracts/:contract_id/analytics",
-            get(FractionalOwnershipController::get_contract_analytics),
+            get(get_contract_analytics_handler),
         )
         .route(
             "/api/v1/fractional-ownership/contracts/search",
-            get(FractionalOwnershipController::search_contracts),
+            get(search_contracts_handler),
         )
+        
+        // Artist routes
         .route(
             "/api/v1/fractional-ownership/artists/:artist_id/contracts",
-            get(FractionalOwnershipController::get_contracts_by_artist),
+            get(get_contracts_by_artist_handler),
         )
+        
+        // Market routes
         .route(
             "/api/v1/fractional-ownership/market/statistics",
-            get(FractionalOwnershipController::get_market_statistics),
+            get(get_market_statistics_handler),
         )
         
         // User portfolio routes
         .route(
             "/api/v1/fractional-ownership/users/:user_id/portfolio",
-            get(FractionalOwnershipController::get_user_portfolio),
+            get(get_user_portfolio_handler),
         )
-        
-        // Add the controller as application state
-        .with_state(controller)
+        .with_state(state)
 }
 
-/// Alternative route grouping for modular composition
-/// 
-/// This allows different route groups to be composed together
-/// for more complex API structures.
+/// Admin routes for internal operations
+pub fn admin_routes(
+    service: Arc<ConcreteApplicationService>,
+) -> Router {
+    let state = AppState::new(service);
+    
+    Router::new()
+        // Admin contract management
+        .route("/admin/contracts", post(create_contract_handler))
+        .route("/admin/contracts/:contract_id", get(get_contract_handler))
+        .route("/admin/contracts/:contract_id/activate", post(activate_contract_handler))
+        .route("/admin/contracts/:contract_id/terminate", delete(terminate_contract_handler))
+        .route("/admin/contracts/:contract_id/purchase", post(purchase_shares_handler))
+        .route("/admin/contracts/:contract_id/distribute-revenue", post(distribute_revenue_handler))
+        .route("/admin/contracts/:contract_id/analytics", get(get_contract_analytics_handler))
+        .route("/admin/contracts/search", get(search_contracts_handler))
+        .with_state(state)
+}
+
+/// Route groups organized by functionality
 pub struct FractionalOwnershipRoutes;
 
 impl FractionalOwnershipRoutes {
-    /// Contract management routes group
-    pub fn contracts<R: OwnershipContractRepository + Send + Sync + 'static>(
-        controller: Arc<FractionalOwnershipController<R>>,
-    ) -> Router {
+    /// Contract-related routes
+    pub fn contracts(state: AppState) -> Router {
         Router::new()
-            .route("/", post(FractionalOwnershipController::create_contract))
-            .route("/:contract_id", get(FractionalOwnershipController::get_contract))
-            .route("/:contract_id/activate", post(FractionalOwnershipController::activate_contract))
-            .route("/:contract_id", delete(FractionalOwnershipController::terminate_contract))
-            .route("/:contract_id/purchase", post(FractionalOwnershipController::purchase_shares))
-            .route("/:contract_id/distribute-revenue", post(FractionalOwnershipController::distribute_revenue))
-            .route("/:contract_id/analytics", get(FractionalOwnershipController::get_contract_analytics))
-            .route("/search", get(FractionalOwnershipController::search_contracts))
-            .with_state(controller)
+            .route("/", post(create_contract_handler))
+            .route("/:contract_id", get(get_contract_handler))
+            .route("/:contract_id/activate", post(activate_contract_handler))
+            .route("/:contract_id/terminate", delete(terminate_contract_handler))
+            .route("/:contract_id/purchase", post(purchase_shares_handler))
+            .route("/:contract_id/distribute-revenue", post(distribute_revenue_handler))
+            .route("/:contract_id/analytics", get(get_contract_analytics_handler))
+            .route("/search", get(search_contracts_handler))
+            .with_state(state)
     }
 
-    /// Share trading routes group
-    pub fn shares<R: OwnershipContractRepository + Send + Sync + 'static>(
-        controller: Arc<FractionalOwnershipController<R>>,
-    ) -> Router {
+    /// Share trading routes
+    pub fn shares(state: AppState) -> Router {
         Router::new()
-            .route("/:share_id/trade", post(FractionalOwnershipController::trade_shares))
-            .with_state(controller)
+            .route("/:share_id/trade", post(trade_shares_handler))
+            .with_state(state)
     }
 
-    /// Artist-specific routes group
-    pub fn artists<R: OwnershipContractRepository + Send + Sync + 'static>(
-        controller: Arc<FractionalOwnershipController<R>>,
-    ) -> Router {
+    /// Artist-specific routes
+    pub fn artists(state: AppState) -> Router {
         Router::new()
-            .route("/:artist_id/contracts", get(FractionalOwnershipController::get_contracts_by_artist))
-            .with_state(controller)
+            .route("/:artist_id/contracts", get(get_contracts_by_artist_handler))
+            .with_state(state)
     }
 
-    /// User portfolio routes group
-    pub fn users<R: OwnershipContractRepository + Send + Sync + 'static>(
-        controller: Arc<FractionalOwnershipController<R>>,
-    ) -> Router {
+    /// User portfolio routes
+    pub fn users(state: AppState) -> Router {
         Router::new()
-            .route("/:user_id/portfolio", get(FractionalOwnershipController::get_user_portfolio))
-            .with_state(controller)
+            .route("/:user_id/portfolio", get(get_user_portfolio_handler))
+            .with_state(state)
     }
 
-    /// Market data routes group
-    pub fn market<R: OwnershipContractRepository + Send + Sync + 'static>(
-        controller: Arc<FractionalOwnershipController<R>>,
-    ) -> Router {
+    /// Market statistics routes
+    pub fn market(state: AppState) -> Router {
         Router::new()
-            .route("/statistics", get(FractionalOwnershipController::get_market_statistics))
-            .with_state(controller)
+            .route("/statistics", get(get_market_statistics_handler))
+            .with_state(state)
     }
 
     /// Compose all route groups into a single router
-    pub fn compose_all<R: OwnershipContractRepository + Send + Sync + 'static>(
-        controller: Arc<FractionalOwnershipController<R>>,
-    ) -> Router {
+    pub fn compose_all(service: Arc<ConcreteApplicationService>) -> Router {
+        let state = AppState::new(service);
+        
         Router::new()
-            .nest("/contracts", Self::contracts(Arc::clone(&controller)))
-            .nest("/shares", Self::shares(Arc::clone(&controller)))
-            .nest("/artists", Self::artists(Arc::clone(&controller)))
-            .nest("/users", Self::users(Arc::clone(&controller)))
-            .nest("/market", Self::market(controller))
+            .nest("/contracts", Self::contracts(state.clone()))
+            .nest("/shares", Self::shares(state.clone()))
+            .nest("/artists", Self::artists(state.clone()))
+            .nest("/users", Self::users(state.clone()))
+            .nest("/market", Self::market(state))
     }
 }
 
-/// Health check and admin routes for Fractional Ownership
-pub fn admin_routes<R: OwnershipContractRepository + Send + Sync + 'static>() -> Router {
-    Router::new()
-        .route("/api/v1/fractional-ownership/health", get(health_check))
-        .route("/api/v1/fractional-ownership/metrics", get(get_metrics))
-}
-
-/// Health check endpoint
-async fn health_check() -> &'static str {
-    "Fractional Ownership service is healthy"
-}
-
-/// Metrics endpoint (mock implementation)
-async fn get_metrics() -> axum::Json<serde_json::Value> {
-    axum::Json(serde_json::json!({
-        "service": "fractional_ownership",
-        "status": "healthy",
-        "version": "1.0.0",
-        "uptime": "24h",
-        "active_contracts": 42,
-        "total_market_cap": 1_250_000.0
-    }))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use axum::http::{Method, Request, StatusCode};
-    use axum::body::Body;
-    use tower::ServiceExt;
-    
-    use crate::bounded_contexts::fractional_ownership::{
-        application::FractionalOwnershipApplicationService,
-        domain::repository::tests::MockOwnershipContractRepository,
-        presentation::controllers::FractionalOwnershipController,
-    };
-
-    fn setup_test_router() -> Router {
-        let repo = Arc::new(MockOwnershipContractRepository::new());
-        let service = Arc::new(FractionalOwnershipApplicationService::new(repo));
-        let controller = Arc::new(FractionalOwnershipController::new(service));
-        
-        create_routes(controller)
-    }
-
-    #[tokio::test]
-    async fn test_health_check_route() {
-        let app = admin_routes::<MockOwnershipContractRepository>();
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method(Method::GET)
-                    .uri("/api/v1/fractional-ownership/health")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(response.status(), StatusCode::OK);
-    }
-
-    #[tokio::test]
-    async fn test_metrics_route() {
-        let app = admin_routes::<MockOwnershipContractRepository>();
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method(Method::GET)
-                    .uri("/api/v1/fractional-ownership/metrics")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(response.status(), StatusCode::OK);
-    }
-
-    #[tokio::test]
-    async fn test_route_structure() {
-        let router = setup_test_router();
-        
-        // Test that the router is properly constructed
-        // In a real test, we would make actual HTTP requests
-        // For now, we just verify the router structure exists
-        assert!(true); // Router constructed successfully
-    }
-
-    #[tokio::test]
-    async fn test_grouped_routes() {
-        let repo = Arc::new(MockOwnershipContractRepository::new());
-        let service = Arc::new(FractionalOwnershipApplicationService::new(repo));
-        let controller = Arc::new(FractionalOwnershipController::new(service));
-        
-        // Test individual route groups
-        let contracts_router = FractionalOwnershipRoutes::contracts(Arc::clone(&controller));
-        let shares_router = FractionalOwnershipRoutes::shares(Arc::clone(&controller));
-        let artists_router = FractionalOwnershipRoutes::artists(Arc::clone(&controller));
-        let users_router = FractionalOwnershipRoutes::users(Arc::clone(&controller));
-        let market_router = FractionalOwnershipRoutes::market(controller);
-        
-        // Verify all routers are created successfully
-        assert!(true);
-    }
-
-    #[tokio::test]
-    async fn test_composed_routes() {
-        let repo = Arc::new(MockOwnershipContractRepository::new());
-        let service = Arc::new(FractionalOwnershipApplicationService::new(repo));
-        let controller = Arc::new(FractionalOwnershipController::new(service));
-        
-        let composed_router = FractionalOwnershipRoutes::compose_all(controller);
-        
-        // Verify composed router is created successfully
-        assert!(true);
-    }
-}
-
-/// Route documentation for API consumers
-/// 
-/// This provides a structured overview of all available endpoints
-/// for integration and documentation purposes.
+/// API documentation helpers
 pub struct ApiDocumentation;
 
 impl ApiDocumentation {
-    pub fn get_endpoint_summary() -> Vec<EndpointInfo> {
+    pub fn get_endpoint_info() -> Vec<EndpointInfo> {
         vec![
             EndpointInfo {
                 method: "POST".to_string(),
                 path: "/api/v1/fractional-ownership/contracts".to_string(),
-                description: "Create a new ownership contract for a song".to_string(),
+                description: "Create a new fractional ownership contract".to_string(),
                 auth_required: true,
-                rate_limited: true,
             },
             EndpointInfo {
                 method: "GET".to_string(),
                 path: "/api/v1/fractional-ownership/contracts/{contract_id}".to_string(),
-                description: "Get ownership contract details".to_string(),
+                description: "Get contract details".to_string(),
                 auth_required: false,
-                rate_limited: false,
-            },
-            EndpointInfo {
-                method: "POST".to_string(),
-                path: "/api/v1/fractional-ownership/contracts/{contract_id}/activate".to_string(),
-                description: "Activate an ownership contract for public investment".to_string(),
-                auth_required: true,
-                rate_limited: true,
             },
             EndpointInfo {
                 method: "POST".to_string(),
                 path: "/api/v1/fractional-ownership/contracts/{contract_id}/purchase".to_string(),
-                description: "Purchase shares in an ownership contract".to_string(),
+                description: "Purchase shares in a contract".to_string(),
                 auth_required: true,
-                rate_limited: true,
-            },
-            EndpointInfo {
-                method: "POST".to_string(),
-                path: "/api/v1/fractional-ownership/shares/{share_id}/trade".to_string(),
-                description: "Trade shares between users".to_string(),
-                auth_required: true,
-                rate_limited: true,
-            },
-            EndpointInfo {
-                method: "POST".to_string(),
-                path: "/api/v1/fractional-ownership/contracts/{contract_id}/distribute-revenue".to_string(),
-                description: "Distribute revenue to shareholders".to_string(),
-                auth_required: true,
-                rate_limited: true,
-            },
-            EndpointInfo {
-                method: "GET".to_string(),
-                path: "/api/v1/fractional-ownership/contracts/{contract_id}/analytics".to_string(),
-                description: "Get contract analytics".to_string(),
-                auth_required: false,
-                rate_limited: false,
-            },
-            EndpointInfo {
-                method: "GET".to_string(),
-                path: "/api/v1/fractional-ownership/contracts/search".to_string(),
-                description: "Search ownership contracts".to_string(),
-                auth_required: false,
-                rate_limited: false,
-            },
-            EndpointInfo {
-                method: "GET".to_string(),
-                path: "/api/v1/fractional-ownership/artists/{artist_id}/contracts".to_string(),
-                description: "Get contracts by artist".to_string(),
-                auth_required: false,
-                rate_limited: false,
             },
             EndpointInfo {
                 method: "GET".to_string(),
                 path: "/api/v1/fractional-ownership/users/{user_id}/portfolio".to_string(),
                 description: "Get user's investment portfolio".to_string(),
                 auth_required: true,
-                rate_limited: false,
             },
             EndpointInfo {
                 method: "GET".to_string(),
                 path: "/api/v1/fractional-ownership/market/statistics".to_string(),
                 description: "Get market statistics".to_string(),
                 auth_required: false,
-                rate_limited: false,
-            },
-            EndpointInfo {
-                method: "DELETE".to_string(),
-                path: "/api/v1/fractional-ownership/contracts/{contract_id}".to_string(),
-                description: "Terminate an ownership contract".to_string(),
-                auth_required: true,
-                rate_limited: true,
             },
         ]
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Serialize)]
 pub struct EndpointInfo {
     pub method: String,
     pub path: String,
     pub description: String,
     pub auth_required: bool,
-    pub rate_limited: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_route_creation() {
+        let repository = Arc::new(crate::bounded_contexts::fractional_ownership::infrastructure::InMemoryOwnershipContractRepository::new());
+        let service = Arc::new(FractionalOwnershipApplicationService::new(repository));
+        let router = create_routes(service);
+        
+        // Test that router is created successfully
+        assert!(!router.clone().into_make_service().to_string().is_empty());
+    }
+
+    #[test]
+    fn test_api_documentation() {
+        let docs = ApiDocumentation::get_endpoint_info();
+        assert!(!docs.is_empty());
+        assert!(docs.iter().any(|e| e.method == "POST"));
+        assert!(docs.iter().any(|e| e.method == "GET"));
+    }
 } 

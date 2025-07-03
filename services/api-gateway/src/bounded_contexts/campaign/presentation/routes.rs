@@ -21,7 +21,7 @@ pub fn create_campaign_routes() -> Router<crate::services::AppState> {
 mod tests {
     use super::*;
     use axum::http::{Request, StatusCode};
-    use tower::ServiceExt;
+    use axum::ServiceExt;
 
     #[tokio::test]
     async fn test_campaign_routes_health() {

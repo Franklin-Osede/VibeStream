@@ -1,7 +1,4 @@
-use crate::domain::aggregates::FractionalOwnershipAggregate;
-use crate::domain::entities::ShareOwnership;
 use crate::domain::value_objects::RevenueAmount;
-use crate::domain::events::RevenueDistributed;
 use crate::domain::repositories::FractionalOwnershipRepository;
 use crate::domain::errors::FractionalOwnershipError;
 use uuid::Uuid;

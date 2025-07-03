@@ -17,7 +17,8 @@ pub mod integration_service;
 
 // Re-export the main integration components
 pub use integration_service::{
-    FractionalOwnershipBoundedContext, FractionalOwnershipBoundedContextBuilder,
+    FractionalOwnershipBoundedContext, PostgresFractionalOwnershipBoundedContext, 
+    InMemoryFractionalOwnershipBoundedContext, FractionalOwnershipBoundedContextBuilder,
     FractionalOwnershipConfig, IntegrationEndpoints, BoundedContextHealth,
     BoundedContextRegistry,
 };
@@ -43,9 +44,9 @@ pub use infrastructure::{
 
 // Re-export presentation components
 pub use presentation::{
-    FractionalOwnershipController, create_routes, admin_routes,
+    AppState, create_routes, admin_routes,
     CreateContractRequest, CreateContractResponse, PurchaseSharesRequest,
-    PurchaseSharesResponse, ContractDetailsResponse,
+    PurchaseSharesResponse, ContractDetailsResponse, AuthUser,
 };
 
 // Re-export core domain concepts for external usage
@@ -53,7 +54,9 @@ pub use domain::{
     // Value Objects
     value_objects::{OwnershipContractId, OwnershipPercentage, SharePrice, RevenueAmount},
     // Entities
-    entities::{FractionalShare, ContractStatus},
+    entities::FractionalShare,
+    // Aggregates
+    aggregates::ContractStatus,
     // Events
     events::{OwnershipContractCreated, SharesPurchased, RevenueDistributed},
     // Repository traits
@@ -64,8 +67,8 @@ pub use domain::{
 /// 
 /// This is a convenience function that sets up the entire bounded context
 /// with sensible defaults, suitable for most use cases.
-pub async fn quick_start(database_pool: sqlx::PgPool) -> Result<FractionalOwnershipBoundedContext, crate::shared::domain::errors::AppError> {
-    FractionalOwnershipBoundedContext::initialize(database_pool).await
+pub async fn quick_start(database_pool: sqlx::PgPool) -> Result<PostgresFractionalOwnershipBoundedContext, crate::shared::domain::errors::AppError> {
+    PostgresFractionalOwnershipBoundedContext::initialize(database_pool).await
 }
 
 /// Builder function for custom configuration
@@ -146,7 +149,7 @@ mod tests {
     async fn test_quick_start_with_mock() {
         // We can't test with real database in unit tests,
         // but we can test the structure
-        let context = FractionalOwnershipBoundedContext::create_for_testing();
+        let context = InMemoryFractionalOwnershipBoundedContext::create_for_testing();
         
         // Verify main components exist
         assert!(std::sync::Arc::strong_count(&context.application_service) >= 1);

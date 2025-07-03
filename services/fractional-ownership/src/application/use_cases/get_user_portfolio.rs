@@ -1,8 +1,6 @@
-use uuid::Uuid;
 use crate::domain::repositories::FractionalOwnershipRepository;
 use crate::domain::errors::FractionalOwnershipError;
 use crate::application::dtos::{GetUserPortfolioQuery, UserPortfolioResponse, PortfolioSongInfo, PerformanceMetrics};
-use crate::domain::value_objects::RevenueAmount;
 
 pub struct GetUserPortfolioUseCase<R: FractionalOwnershipRepository> {
     repository: R,

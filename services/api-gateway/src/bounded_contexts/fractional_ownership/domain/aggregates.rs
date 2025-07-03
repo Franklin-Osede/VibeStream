@@ -235,13 +235,16 @@ impl OwnershipContractAggregate {
         new_owner: UserId,
         trade_price: SharePrice,
     ) -> Result<Vec<String>, AppError> {
-        let share = self.shares.get_mut(&share_id)
-            .ok_or_else(|| AppError::NotFound("Share not found".to_string()))?;
-
-        // Check maximum ownership for new owner
+        // First, check ownership limits before mutable borrowing
         if let Some(max_ownership) = &self.contract.maximum_ownership_per_user {
             let current_ownership = self.get_user_total_ownership(&new_owner);
-            let new_total = current_ownership.add(share.ownership_percentage())?;
+            
+            // Get the share ownership percentage separately to avoid borrowing conflicts
+            let share_ownership = self.shares.get(&share_id)
+                .ok_or_else(|| AppError::NotFound("Share not found".to_string()))?
+                .ownership_percentage();
+                
+            let new_total = current_ownership.add(share_ownership)?;
             if new_total.value() > max_ownership.value() {
                 return Err(AppError::DomainRuleViolation(
                     "Trade would exceed maximum ownership for buyer".to_string(),
@@ -249,7 +252,11 @@ impl OwnershipContractAggregate {
             }
         }
 
-        let trade_event = share.transfer_to(new_owner.clone(), trade_price)?;
+        // Now safely get mutable reference
+        let share = self.shares.get_mut(&share_id)
+            .ok_or_else(|| AppError::NotFound("Share not found".to_string()))?;
+
+        let _trade_event = share.transfer_to(new_owner.clone(), trade_price)?;
         
         let events = vec![
             "SharesTraded".to_string(),

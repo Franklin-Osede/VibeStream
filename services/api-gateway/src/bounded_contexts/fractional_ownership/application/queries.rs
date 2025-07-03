@@ -21,9 +21,7 @@ pub struct GetOwnershipContract {
     pub contract_id: Uuid,
 }
 
-impl Query for GetOwnershipContract {
-    type Result = GetOwnershipContractResult;
-}
+impl Query for GetOwnershipContract {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GetOwnershipContractResult {
@@ -52,9 +50,7 @@ pub struct GetUserPortfolio {
     pub user_id: Uuid,
 }
 
-impl Query for GetUserPortfolio {
-    type Result = GetUserPortfolioResult;
-}
+impl Query for GetUserPortfolio {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GetUserPortfolioResult {
@@ -98,9 +94,7 @@ pub struct GetContractAnalytics {
     pub contract_id: Uuid,
 }
 
-impl Query for GetContractAnalytics {
-    type Result = GetContractAnalyticsResult;
-}
+impl Query for GetContractAnalytics {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GetContractAnalyticsResult {
@@ -147,9 +141,7 @@ pub struct GetMarketStatistics {
     // Empty - gets overall market stats
 }
 
-impl Query for GetMarketStatistics {
-    type Result = GetMarketStatisticsResult;
-}
+impl Query for GetMarketStatistics {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GetMarketStatisticsResult {
@@ -197,9 +189,7 @@ pub struct SearchOwnershipContracts {
     pub page_size: u32,
 }
 
-impl Query for SearchOwnershipContracts {
-    type Result = SearchOwnershipContractsResult;
-}
+impl Query for SearchOwnershipContracts {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContractSearchFilters {
@@ -243,9 +233,7 @@ pub struct GetContractsByArtist {
     pub artist_id: Uuid,
 }
 
-impl Query for GetContractsByArtist {
-    type Result = GetContractsByArtistResult;
-}
+impl Query for GetContractsByArtist {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GetContractsByArtistResult {
@@ -267,6 +255,32 @@ pub struct ContractSummary {
     pub created_at: DateTime<Utc>,
 }
 
+/// Query: Get ownership contract by song ID
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetOwnershipContractBySongId {
+    pub song_id: Uuid,
+}
+
+impl Query for GetOwnershipContractBySongId {}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetOwnershipContractBySongIdResult {
+    pub contract_id: Uuid,
+    pub song_id: Uuid,
+    pub artist_id: Uuid,
+    pub total_shares: u32,
+    pub price_per_share: f64,
+    pub artist_retained_percentage: f64,
+    pub shares_available_for_sale: u32,
+    pub shares_sold: u32,
+    pub completion_percentage: f64,
+    pub total_investment_value: f64,
+    pub contract_status: String,
+    pub can_accept_investment: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
 // Query Handlers Implementation
 
 pub struct GetOwnershipContractHandler<R: OwnershipContractRepository> {
@@ -275,7 +289,9 @@ pub struct GetOwnershipContractHandler<R: OwnershipContractRepository> {
 
 #[async_trait]
 impl<R: OwnershipContractRepository> QueryHandler<GetOwnershipContract> for GetOwnershipContractHandler<R> {
-    async fn handle(&self, query: GetOwnershipContract) -> Result<GetOwnershipContractResult, AppError> {
+    type Output = GetOwnershipContractResult;
+    
+    async fn handle(&self, query: GetOwnershipContract) -> Result<Self::Output, AppError> {
         let contract_id = OwnershipContractId::from_uuid(query.contract_id);
         
         let aggregate = self.repository.find_by_id(&contract_id).await?
@@ -306,13 +322,58 @@ impl<R: OwnershipContractRepository> QueryHandler<GetOwnershipContract> for GetO
     }
 }
 
+pub struct GetOwnershipContractBySongIdHandler<R: OwnershipContractRepository> {
+    pub repository: R,
+}
+
+#[async_trait]
+impl<R: OwnershipContractRepository> QueryHandler<GetOwnershipContractBySongId> for GetOwnershipContractBySongIdHandler<R> {
+    type Output = GetOwnershipContractBySongIdResult;
+    
+    async fn handle(&self, query: GetOwnershipContractBySongId) -> Result<Self::Output, AppError> {
+        let song_id = SongId::from_uuid(query.song_id);
+        
+        let contracts = self.repository.find_by_song_id(&song_id).await?;
+        
+        if contracts.is_empty() {
+            return Err(AppError::NotFound("No ownership contract found for this song".to_string()));
+        }
+
+        // Get the first active contract for this song
+        let aggregate = contracts.into_iter()
+            .find(|contract| contract.can_accept_investment())
+            .ok_or_else(|| AppError::NotFound("No active ownership contract found for this song".to_string()))?;
+
+        let contract = aggregate.contract();
+
+        Ok(GetOwnershipContractBySongIdResult {
+            contract_id: contract.id.value(),
+            song_id: contract.song_id.value(),
+            artist_id: contract.artist_id.value(),
+            total_shares: contract.total_shares,
+            price_per_share: contract.price_per_share.value(),
+            artist_retained_percentage: contract.artist_retained_percentage.value(),
+            shares_available_for_sale: contract.shares_available_for_sale,
+            shares_sold: contract.shares_sold,
+            completion_percentage: aggregate.completion_percentage(),
+            total_investment_value: aggregate.total_investment_value(),
+            contract_status: format!("{:?}", contract.contract_status),
+            can_accept_investment: aggregate.can_accept_investment(),
+            created_at: contract.created_at,
+            updated_at: contract.updated_at,
+        })
+    }
+}
+
 pub struct GetUserPortfolioHandler<R: OwnershipContractRepository> {
     pub repository: R,
 }
 
 #[async_trait]
 impl<R: OwnershipContractRepository> QueryHandler<GetUserPortfolio> for GetUserPortfolioHandler<R> {
-    async fn handle(&self, query: GetUserPortfolio) -> Result<GetUserPortfolioResult, AppError> {
+    type Output = GetUserPortfolioResult;
+    
+    async fn handle(&self, query: GetUserPortfolio) -> Result<Self::Output, AppError> {
         let user_id = UserId::from_uuid(query.user_id);
         
         let contracts = self.repository.find_contracts_with_user_shares(&user_id).await?;
@@ -392,7 +453,9 @@ pub struct GetContractAnalyticsHandler<R: OwnershipContractRepository> {
 
 #[async_trait]
 impl<R: OwnershipContractRepository> QueryHandler<GetContractAnalytics> for GetContractAnalyticsHandler<R> {
-    async fn handle(&self, query: GetContractAnalytics) -> Result<GetContractAnalyticsResult, AppError> {
+    type Output = GetContractAnalyticsResult;
+    
+    async fn handle(&self, query: GetContractAnalytics) -> Result<Self::Output, AppError> {
         let contract_id = OwnershipContractId::from_uuid(query.contract_id);
         
         let aggregate = self.repository.find_by_id(&contract_id).await?

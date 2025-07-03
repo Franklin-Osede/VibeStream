@@ -1,10 +1,8 @@
 use crate::domain::entities::{FractionalSong, ShareOwnership, ShareTransaction};
 use crate::domain::value_objects::{OwnershipPercentage, SharePrice, RevenueAmount};
-use crate::domain::events::{SharePurchased, RevenueDistributed, ShareTransferred};
 use crate::domain::errors::FractionalOwnershipError;
 use uuid::Uuid;
 use std::collections::HashMap;
-use chrono::{DateTime, Utc};
 
 /// Aggregate Root que encapsula toda la lógica de participaciones fraccionadas
 /// Mantiene consistencia transaccional entre FractionalSong, ShareOwnership y ShareTransaction

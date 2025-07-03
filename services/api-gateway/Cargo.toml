@@ -61,6 +61,15 @@ lazy_static = "1.4"
 bigdecimal = "0.4"
 num-traits = "0.2"
 
+# Kafka for event streaming (usando features más simples)
+rdkafka = { version = "0.36", features = ["ssl", "sasl"] }
+
+# Async runtime
+tokio-stream = "0.1"
+
+# Metrics
+prometheus = "0.13"
+
 [dev-dependencies]
 # Testing
 tokio-test = "0.4" 

@@ -27,9 +27,7 @@ pub struct CreateOwnershipContract {
     pub maximum_ownership_per_user: Option<f64>,
 }
 
-impl Command for CreateOwnershipContract {
-    type Result = CreateOwnershipContractResult;
-}
+impl Command for CreateOwnershipContract {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateOwnershipContractResult {
@@ -44,9 +42,7 @@ pub struct ActivateOwnershipContract {
     pub contract_id: Uuid,
 }
 
-impl Command for ActivateOwnershipContract {
-    type Result = ActivateOwnershipContractResult;
-}
+impl Command for ActivateOwnershipContract {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActivateOwnershipContractResult {
@@ -64,9 +60,7 @@ pub struct PurchaseShares {
     pub vesting_end_date: Option<DateTime<Utc>>,
 }
 
-impl Command for PurchaseShares {
-    type Result = PurchaseSharesResult;
-}
+impl Command for PurchaseShares {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PurchaseSharesResult {
@@ -87,9 +81,7 @@ pub struct TradeShares {
     pub trade_price: f64,
 }
 
-impl Command for TradeShares {
-    type Result = TradeSharesResult;
-}
+impl Command for TradeShares {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TradeSharesResult {
@@ -111,9 +103,7 @@ pub struct DistributeRevenue {
     pub platform_fee_percentage: f64,
 }
 
-impl Command for DistributeRevenue {
-    type Result = DistributeRevenueResult;
-}
+impl Command for DistributeRevenue {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DistributeRevenueResult {
@@ -134,9 +124,7 @@ pub struct TerminateOwnershipContract {
     pub termination_reason: String,
 }
 
-impl Command for TerminateOwnershipContract {
-    type Result = TerminateOwnershipContractResult;
-}
+impl Command for TerminateOwnershipContract {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TerminateOwnershipContractResult {
@@ -153,7 +141,9 @@ pub struct CreateOwnershipContractHandler<R: OwnershipContractRepository> {
 
 #[async_trait]
 impl<R: OwnershipContractRepository> CommandHandler<CreateOwnershipContract> for CreateOwnershipContractHandler<R> {
-    async fn handle(&self, command: CreateOwnershipContract) -> Result<CreateOwnershipContractResult, AppError> {
+    type Output = CreateOwnershipContractResult;
+    
+    async fn handle(&self, command: CreateOwnershipContract) -> Result<Self::Output, AppError> {
         // Validate inputs
         let song_id = SongId::from_uuid(command.song_id);
         let artist_id = ArtistId::from_uuid(command.artist_id);

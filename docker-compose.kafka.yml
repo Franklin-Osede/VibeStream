@@ -1,0 +1,309 @@
+version: '3.8'
+
+services:
+  # Zookeeper for Kafka coordination
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    hostname: zookeeper
+    container_name: vibestream-zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - vibestream-network
+
+  # Kafka Broker
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    hostname: kafka
+    container_name: vibestream-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "9101:9101"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_JMX_PORT: 9101
+      KAFKA_JMX_HOSTNAME: localhost
+      # Performance tuning for high throughput
+      KAFKA_NUM_NETWORK_THREADS: 8
+      KAFKA_NUM_IO_THREADS: 16
+      KAFKA_SOCKET_SEND_BUFFER_BYTES: 102400
+      KAFKA_SOCKET_RECEIVE_BUFFER_BYTES: 102400
+      KAFKA_SOCKET_REQUEST_MAX_BYTES: 104857600
+      KAFKA_NUM_PARTITIONS: 12
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+      KAFKA_LOG_CLEANUP_POLICY: delete
+      # Compression for better throughput
+      KAFKA_COMPRESSION_TYPE: snappy
+      # Producer configs for high throughput
+      KAFKA_PRODUCER_BATCH_SIZE: 1048576
+      KAFKA_PRODUCER_LINGER_MS: 50
+      KAFKA_PRODUCER_BUFFER_MEMORY: 33554432
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - vibestream-network
+
+  # Kafka Connect for external integrations
+  kafka-connect:
+    image: confluentinc/cp-kafka-connect:7.4.0
+    hostname: connect
+    container_name: vibestream-kafka-connect
+    depends_on:
+      - kafka
+    ports:
+      - "8083:8083"
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: 'kafka:29092'
+      CONNECT_REST_ADVERTISED_HOST_NAME: connect
+      CONNECT_GROUP_ID: vibestream-connect-cluster
+      CONNECT_CONFIG_STORAGE_TOPIC: vibestream-connect-configs
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_FLUSH_INTERVAL_MS: 10000
+      CONNECT_OFFSET_STORAGE_TOPIC: vibestream-connect-offsets
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_STATUS_STORAGE_TOPIC: vibestream-connect-status
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter
+      CONNECT_VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components"
+      CONNECT_LOG4J_LOGGERS: org.apache.zookeeper=ERROR,org.I0Itec.zkclient=ERROR,org.reflections=ERROR
+    networks:
+      - vibestream-network
+
+  # Schema Registry for Avro schemas
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.4.0
+    hostname: schema-registry
+    container_name: vibestream-schema-registry
+    depends_on:
+      - kafka
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'kafka:29092'
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    networks:
+      - vibestream-network
+
+  # KSQL for stream processing
+  ksqldb-server:
+    image: confluentinc/ksqldb-server:0.29.0
+    hostname: ksqldb-server
+    container_name: vibestream-ksqldb-server
+    depends_on:
+      - kafka
+      - kafka-connect
+    ports:
+      - "8088:8088"
+    environment:
+      KSQL_CONFIG_DIR: "/etc/ksql"
+      KSQL_BOOTSTRAP_SERVERS: "kafka:29092"
+      KSQL_HOST_NAME: ksqldb-server
+      KSQL_LISTENERS: "http://0.0.0.0:8088"
+      KSQL_CACHE_MAX_BYTES_BUFFERING: 0
+      KSQL_KSQL_SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
+      KSQL_PRODUCER_INTERCEPTOR_CLASSES: "io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor"
+      KSQL_CONSUMER_INTERCEPTOR_CLASSES: "io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor"
+      KSQL_KSQL_CONNECT_URL: "http://kafka-connect:8083"
+      KSQL_KSQL_LOGGING_PROCESSING_TOPIC_AUTO_CREATE: 'true'
+      KSQL_KSQL_LOGGING_PROCESSING_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - vibestream-network
+
+  # KSQL CLI
+  ksqldb-cli:
+    image: confluentinc/ksqldb-cli:0.29.0
+    container_name: vibestream-ksqldb-cli
+    depends_on:
+      - ksqldb-server
+    entrypoint: /bin/sh
+    tty: true
+    networks:
+      - vibestream-network
+
+  # Kafka UI for monitoring
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: vibestream-kafka-ui
+    depends_on:
+      - kafka
+      - schema-registry
+      - kafka-connect
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: vibestream-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: main
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://kafka-connect:8083
+      KAFKA_CLUSTERS_0_KSQLDBSERVER: http://ksqldb-server:8088
+    networks:
+      - vibestream-network
+
+  # Redis for caching (complementary to Kafka)
+  redis:
+    image: redis:7-alpine
+    container_name: vibestream-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 1gb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    networks:
+      - vibestream-network
+
+  # PostgreSQL for persistent storage
+  postgres:
+    image: postgres:15-alpine
+    container_name: vibestream-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: vibestream
+      POSTGRES_USER: vibestream
+      POSTGRES_PASSWORD: vibestream123
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    networks:
+      - vibestream-network
+
+  # VibeStream API Gateway
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+    container_name: vibestream-api-gateway
+    depends_on:
+      - kafka
+      - postgres
+      - redis
+    ports:
+      - "3000:3000"
+    environment:
+      # Kafka configuration
+      KAFKA_BROKERS: kafka:29092
+      KAFKA_CLIENT_ID: vibestream-api-gateway
+      KAFKA_ENABLE_SSL: "false"
+      KAFKA_ENABLE_SASL: "false"
+      
+      # Database configuration
+      DATABASE_URL: postgresql://vibestream:vibestream123@postgres:5432/vibestream
+      
+      # Redis configuration
+      REDIS_URL: redis://redis:6379
+      
+      # Application configuration
+      RUST_LOG: info
+      APP_ENV: development
+      
+      # Event bus configuration
+      EVENT_BUS_TYPE: kafka
+      ENABLE_REAL_TIME_ANALYTICS: "true"
+      FRAUD_DETECTION_THRESHOLD: "0.8"
+      MARKET_VOLATILITY_THRESHOLD: "0.3"
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - vibestream-network
+
+  # Stream Analytics Service
+  stream-analytics:
+    build:
+      context: ./services/stream-analytics
+      dockerfile: Dockerfile
+    container_name: vibestream-stream-analytics
+    depends_on:
+      - kafka
+      - postgres
+      - redis
+    environment:
+      KAFKA_BROKERS: kafka:29092
+      KAFKA_CLIENT_ID: vibestream-stream-analytics
+      DATABASE_URL: postgresql://vibestream:vibestream123@postgres:5432/vibestream
+      REDIS_URL: redis://redis:6379
+      RUST_LOG: info
+    networks:
+      - vibestream-network
+
+  # Fractional Ownership Service
+  fractional-ownership:
+    build:
+      context: ./services/fractional-ownership
+      dockerfile: Dockerfile
+    container_name: vibestream-fractional-ownership
+    depends_on:
+      - kafka
+      - postgres
+    ports:
+      - "3001:3001"
+    environment:
+      KAFKA_BROKERS: kafka:29092
+      KAFKA_CLIENT_ID: vibestream-fractional-ownership
+      DATABASE_URL: postgresql://vibestream:vibestream123@postgres:5432/vibestream
+      RUST_LOG: info
+    networks:
+      - vibestream-network
+
+  # Monitoring with Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: vibestream-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - vibestream-network
+
+  # Grafana for dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: vibestream-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - vibestream-network
+
+volumes:
+  kafka-data:
+  postgres-data:
+  redis-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  vibestream-network:
+    driver: bridge 

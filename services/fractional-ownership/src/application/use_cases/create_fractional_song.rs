@@ -32,7 +32,7 @@ impl CreateFractionalSongUseCase {
         }
 
         // Crear nuevo agregado
-        let mut aggregate = FractionalOwnershipAggregate::create_new(
+        let aggregate = FractionalOwnershipAggregate::create_new(
             command.song_id,
             command.artist_id,
             command.song_title,
