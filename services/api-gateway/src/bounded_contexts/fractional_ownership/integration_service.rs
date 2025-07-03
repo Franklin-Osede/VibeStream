@@ -43,9 +43,9 @@ impl PostgresFractionalOwnershipBoundedContext {
     /// Initialize the complete bounded context with all dependencies
     pub async fn initialize(database_pool: PgPool) -> Result<Self, AppError> {
         // 1. Initialize repository with database connection
-        // TODO: Switch back to PostgreSQL when tables are created
-        // let repository = Arc::new(PostgresOwnershipContractRepository::new(database_pool.clone()));
-        let repository = Arc::new(crate::bounded_contexts::fractional_ownership::infrastructure::InMemoryOwnershipContractRepository::new());
+        // PostgreSQL tables are now created - switching from InMemory to PostgreSQL
+        let repository = Arc::new(PostgresOwnershipContractRepository::new(database_pool.clone()));
+        // let repository = Arc::new(crate::bounded_contexts::fractional_ownership::infrastructure::InMemoryOwnershipContractRepository::new());
 
         // 2. Initialize event publisher with outbox pattern
         let (event_publisher, event_receiver) = PostgresEventPublisher::new(database_pool.clone());

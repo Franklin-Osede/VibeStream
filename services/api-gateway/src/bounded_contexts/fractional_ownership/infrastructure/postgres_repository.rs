@@ -361,9 +361,29 @@ impl OwnershipContractRepository for PostgresOwnershipContractRepository {
     }
 
     async fn find_by_id(&self, id: &OwnershipContractId) -> Result<Option<OwnershipContractAggregate>, AppError> {
-        // TODO: Re-enable when ownership_contracts table is created
-        let _id = id;
-        Ok(None)
+        // Ownership contracts table is now created - activating PostgreSQL implementation
+        let row = sqlx::query!(
+            r#"
+            SELECT id, song_id, artist_id, total_shares, price_per_share, 
+                   artist_retained_percentage, shares_available_for_sale, shares_sold,
+                   minimum_investment, maximum_ownership_per_user, contract_status,
+                   created_at, updated_at, version
+            FROM ownership_contracts 
+            WHERE id = $1
+            "#,
+            id.value()
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        match row {
+            Some(row) => {
+                let aggregate = self.map_row_to_aggregate(&row).await?;
+                Ok(Some(aggregate))
+            }
+            None => Ok(None),
+        }
     }
 
     async fn delete(&self, id: &OwnershipContractId) -> Result<(), AppError> {
