@@ -1,9 +1,16 @@
 // Módulos habilitados
 pub mod auth;
 // pub mod blockchain;
-// pub mod bounded_contexts;
+// pub mod bounded_contexts;  // Comentando por errores de compilación
 // pub mod handlers;
-// pub mod shared;
+// pub mod shared;  // Comentando por errores
+pub mod services;  // Exponiendo services
+
+// Solo el music context sin dependencias problemáticas
+pub mod music_simple;
+
+// Re-export the services AppState
+pub use services::AppState;
 
 // Simple module that works
 pub mod simple {
@@ -16,29 +23,51 @@ pub mod simple {
     };
     use serde::{Deserialize, Serialize};
     use serde_json::json;
+    use crate::music_simple::create_music_routes;
+    use crate::services::{AppState, DatabasePool, MessageQueue};
     
-    #[derive(Clone)]
-    pub struct AppState {
-        pub version: String,
-    }
-    
-    pub fn create_router() -> Router {
+    pub async fn create_router() -> Result<Router, Box<dyn std::error::Error>> {
+        // Initialize real services
+        let database_pool = DatabasePool::new("postgres://vibestream:vibestream@localhost:5432/vibestream").await?;
+        let message_queue = MessageQueue::new("redis://localhost:6379").await?;
+        
         let app_state = AppState {
-            version: env!("CARGO_PKG_VERSION").to_string(),
+            database_pool,
+            message_queue,
         };
         
-        Router::new()
+        let router = Router::new()
             .route("/health", get(health_check))
             .route("/api/auth/login", post(login))
-            .with_state(app_state)
+            .nest("/api/music", create_music_routes())
+            .with_state(app_state);
+            
+        Ok(router)
     }
     
     async fn health_check(State(state): State<AppState>) -> ResponseJson<serde_json::Value> {
+        // Test database connection
+        let db_status = match state.database_pool.health_check().await {
+            Ok(_) => "connected",
+            Err(_) => "disconnected",
+        };
+        
+        // Test Redis connection  
+        let redis_status = match state.message_queue.ping().await {
+            Ok(_) => "connected",
+            Err(_) => "disconnected",
+        };
+        
         ResponseJson(json!({
             "status": "ok",
-            "version": state.version,
+            "version": env!("CARGO_PKG_VERSION"),
             "name": "VibeStream API Gateway",
-            "timestamp": chrono::Utc::now().to_rfc3339()
+            "timestamp": chrono::Utc::now().to_rfc3339(),
+            "services": {
+                "database": db_status,
+                "message_queue": redis_status,
+                "music_context": "enabled"
+            }
         }))
     }
     
