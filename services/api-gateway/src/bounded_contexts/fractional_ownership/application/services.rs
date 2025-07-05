@@ -32,6 +32,7 @@ use crate::bounded_contexts::fractional_ownership::domain::repository::Ownership
 /// This service coordinates the execution of commands and queries,
 /// handles cross-cutting concerns, and manages transaction boundaries.
 /// It follows the Application Service pattern from DDD.
+#[derive(Debug)]
 pub struct FractionalOwnershipApplicationService<R: OwnershipContractRepository> {
     repository: Arc<R>,
     // Event publisher would be injected here
@@ -56,7 +57,7 @@ impl<R: OwnershipContractRepository> FractionalOwnershipApplicationService<R> {
         command: CreateOwnershipContract,
     ) -> Result<CreateOwnershipContractResult, AppError> {
         let handler = CreateOwnershipContractHandler {
-            repository: Arc::clone(&self.repository),
+            repository: &*self.repository,
         };
 
         // Execute command with transaction boundary

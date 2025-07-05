@@ -23,8 +23,34 @@ pub struct CampaignCreated {
 }
 
 impl DomainEvent for CampaignCreated {
-    fn occurred_on(&self) -> DateTime<Utc> {
-        self.occurred_on
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+    
+    fn event_type(&self) -> &str {
+        "CampaignCreated"
+    }
+    
+    fn aggregate_id(&self) -> Uuid {
+        self.metadata.aggregate_id
+    }
+    
+    fn aggregate_type(&self) -> &str {
+        "Campaign"
+    }
+    
+    fn occurred_at(&self) -> DateTime<Utc> {
+        self.metadata.occurred_at
+    }
+    
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::json!({
+            "campaign_id": self.campaign_id,
+            "song_id": self.song_id,
+            "artist_id": self.artist_id,
+            "nft_supply": self.nft_supply,
+            "nft_price": self.nft_price
+        })
     }
 }
 
@@ -42,8 +68,31 @@ pub struct CampaignActivated {
 }
 
 impl DomainEvent for CampaignActivated {
-    fn occurred_on(&self) -> DateTime<Utc> {
-        self.occurred_on
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+    
+    fn event_type(&self) -> &str {
+        "CampaignActivated"
+    }
+    
+    fn aggregate_id(&self) -> Uuid {
+        self.metadata.aggregate_id
+    }
+    
+    fn aggregate_type(&self) -> &str {
+        "Campaign"
+    }
+    
+    fn occurred_at(&self) -> DateTime<Utc> {
+        self.metadata.occurred_at
+    }
+    
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::json!({
+            "campaign_id": self.campaign_id,
+            "activation_date": self.activation_date
+        })
     }
 }
 
@@ -70,8 +119,8 @@ pub enum CampaignEndReason {
 }
 
 impl DomainEvent for CampaignEnded {
-    fn occurred_on(&self) -> DateTime<Utc> {
-        self.occurred_on
+    fn occurred_at(&self) -> DateTime<Utc> {
+        self.ended_at
     }
 }
 
@@ -94,8 +143,34 @@ pub struct NFTPurchased {
 }
 
 impl DomainEvent for NFTPurchased {
-    fn occurred_on(&self) -> DateTime<Utc> {
-        self.occurred_on
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+    
+    fn event_type(&self) -> &str {
+        "NFTPurchased"
+    }
+    
+    fn aggregate_id(&self) -> Uuid {
+        self.metadata.aggregate_id
+    }
+    
+    fn aggregate_type(&self) -> &str {
+        "Campaign"
+    }
+    
+    fn occurred_at(&self) -> DateTime<Utc> {
+        self.metadata.occurred_at
+    }
+    
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::json!({
+            "campaign_id": self.campaign_id,
+            "user_id": self.user_id,
+            "nft_token_id": self.nft_token_id,
+            "purchase_price": self.purchase_price,
+            "purchase_date": self.purchase_date
+        })
     }
 }
 
@@ -114,8 +189,8 @@ pub struct CampaignTargetAchieved {
 }
 
 impl DomainEvent for CampaignTargetAchieved {
-    fn occurred_on(&self) -> DateTime<Utc> {
-        self.occurred_on
+    fn occurred_at(&self) -> DateTime<Utc> {
+        self.achieved_at
     }
 }
 
@@ -133,8 +208,8 @@ pub struct CampaignRevenueMilestone {
 }
 
 impl DomainEvent for CampaignRevenueMilestone {
-    fn occurred_on(&self) -> DateTime<Utc> {
-        self.occurred_on
+    fn occurred_at(&self) -> DateTime<Utc> {
+        self.achieved_at
     }
 }
 
@@ -161,8 +236,8 @@ pub enum NFTTransferType {
 }
 
 impl DomainEvent for NFTTransferred {
-    fn occurred_on(&self) -> DateTime<Utc> {
-        self.occurred_on
+    fn occurred_at(&self) -> DateTime<Utc> {
+        self.transferred_at
     }
 }
 
@@ -181,8 +256,8 @@ pub struct CampaignUpdated {
 }
 
 impl DomainEvent for CampaignUpdated {
-    fn occurred_on(&self) -> DateTime<Utc> {
-        self.occurred_on
+    fn occurred_at(&self) -> DateTime<Utc> {
+        self.updated_at
     }
 }
 
@@ -204,8 +279,8 @@ pub struct CampaignAnalyticsUpdated {
 }
 
 impl DomainEvent for CampaignAnalyticsUpdated {
-    fn occurred_on(&self) -> DateTime<Utc> {
-        self.occurred_on
+    fn occurred_at(&self) -> DateTime<Utc> {
+        self.updated_at
     }
 }
 

@@ -277,29 +277,29 @@ impl KafkaEventBus {
         headers = headers
             .insert(rdkafka::message::Header {
                 key: "event_id",
-                value: Some(event.metadata.event_id.to_string()),
+                value: Some(event.metadata.event_id.as_bytes()),
             })
             .insert(rdkafka::message::Header {
                 key: "event_type", 
-                value: Some(event.metadata.event_type.clone()),
+                value: Some(event.metadata.event_type.as_bytes()),
             })
             .insert(rdkafka::message::Header {
                 key: "aggregate_type",
-                value: Some(event.metadata.aggregate_type.clone()),
+                value: Some(event.metadata.aggregate_type.as_bytes()),
             })
             .insert(rdkafka::message::Header {
                 key: "producer",
-                value: Some(event.metadata.producer.clone()),
+                value: Some(event.metadata.producer.as_bytes()),
             })
             .insert(rdkafka::message::Header {
                 key: "version",
-                value: Some(event.metadata.version.to_string()),
+                value: Some(event.metadata.version.to_string().as_bytes()),
             });
 
-        if let Some(correlation_id) = event.metadata.correlation_id {
+        if let Some(correlation_id) = &event.metadata.correlation_id {
             headers = headers.insert(rdkafka::message::Header {
                 key: "correlation_id",
-                value: Some(correlation_id.to_string()),
+                value: Some(correlation_id.as_bytes()),
             });
         }
 

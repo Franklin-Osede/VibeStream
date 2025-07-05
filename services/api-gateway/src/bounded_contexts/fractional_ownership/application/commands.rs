@@ -140,7 +140,7 @@ pub struct CreateOwnershipContractHandler<R: OwnershipContractRepository> {
 }
 
 #[async_trait]
-impl<R: OwnershipContractRepository> CommandHandler<CreateOwnershipContract> for CreateOwnershipContractHandler<R> {
+impl<R: OwnershipContractRepository + Send + Sync> CommandHandler<CreateOwnershipContract> for CreateOwnershipContractHandler<R> {
     type Output = CreateOwnershipContractResult;
     
     async fn handle(&self, command: CreateOwnershipContract) -> Result<Self::Output, AppError> {
@@ -196,8 +196,10 @@ pub struct ActivateOwnershipContractHandler<R: OwnershipContractRepository> {
 }
 
 #[async_trait]
-impl<R: OwnershipContractRepository> CommandHandler<ActivateOwnershipContract> for ActivateOwnershipContractHandler<R> {
-    async fn handle(&self, command: ActivateOwnershipContract) -> Result<ActivateOwnershipContractResult, AppError> {
+impl<R: OwnershipContractRepository + Send + Sync> CommandHandler<ActivateOwnershipContract> for ActivateOwnershipContractHandler<R> {
+    type Output = ActivateOwnershipContractResult;
+
+    async fn handle(&self, command: ActivateOwnershipContract) -> Result<Self::Output, AppError> {
         let contract_id = OwnershipContractId::from_uuid(command.contract_id);
         
         let mut aggregate = self.repository.find_by_id(&contract_id).await?
@@ -220,8 +222,10 @@ pub struct PurchaseSharesHandler<R: OwnershipContractRepository> {
 }
 
 #[async_trait]
-impl<R: OwnershipContractRepository> CommandHandler<PurchaseShares> for PurchaseSharesHandler<R> {
-    async fn handle(&self, command: PurchaseShares) -> Result<PurchaseSharesResult, AppError> {
+impl<R: OwnershipContractRepository + Send + Sync> CommandHandler<PurchaseShares> for PurchaseSharesHandler<R> {
+    type Output = PurchaseSharesResult;
+
+    async fn handle(&self, command: PurchaseShares) -> Result<Self::Output, AppError> {
         let contract_id = OwnershipContractId::from_uuid(command.contract_id);
         let buyer_id = UserId::from_uuid(command.buyer_id);
         let ownership_percentage = OwnershipPercentage::new(command.ownership_percentage)?;
@@ -256,15 +260,17 @@ pub struct TradeSharesHandler<R: OwnershipContractRepository> {
 }
 
 #[async_trait]
-impl<R: OwnershipContractRepository> CommandHandler<TradeShares> for TradeSharesHandler<R> {
-    async fn handle(&self, command: TradeShares) -> Result<TradeSharesResult, AppError> {
+impl<R: OwnershipContractRepository + Send + Sync> CommandHandler<TradeShares> for TradeSharesHandler<R> {
+    type Output = TradeSharesResult;
+
+    async fn handle(&self, command: TradeShares) -> Result<Self::Output, AppError> {
         let share_id = ShareId::from_uuid(command.share_id);
         let to_user_id = UserId::from_uuid(command.to_user_id);
         let trade_price = SharePrice::new(command.trade_price)?;
 
         // Find contract containing the share (simplified - in real implementation might need a share-to-contract index)
         let contracts = self.repository.find_active_contracts().await?;
-        let mut target_aggregate = None;
+        let mut target_aggregate: Option<OwnershipContractAggregate> = None;
         
         for mut aggregate in contracts {
             if aggregate.shares().contains_key(&share_id) {
@@ -294,8 +300,10 @@ pub struct DistributeRevenueHandler<R: OwnershipContractRepository> {
 }
 
 #[async_trait]
-impl<R: OwnershipContractRepository> CommandHandler<DistributeRevenue> for DistributeRevenueHandler<R> {
-    async fn handle(&self, command: DistributeRevenue) -> Result<DistributeRevenueResult, AppError> {
+impl<R: OwnershipContractRepository + Send + Sync> CommandHandler<DistributeRevenue> for DistributeRevenueHandler<R> {
+    type Output = DistributeRevenueResult;
+
+    async fn handle(&self, command: DistributeRevenue) -> Result<Self::Output, AppError> {
         let contract_id = OwnershipContractId::from_uuid(command.contract_id);
         let total_revenue = RevenueAmount::new(command.total_revenue)?;
 
@@ -328,8 +336,10 @@ pub struct TerminateOwnershipContractHandler<R: OwnershipContractRepository> {
 }
 
 #[async_trait]
-impl<R: OwnershipContractRepository> CommandHandler<TerminateOwnershipContract> for TerminateOwnershipContractHandler<R> {
-    async fn handle(&self, command: TerminateOwnershipContract) -> Result<TerminateOwnershipContractResult, AppError> {
+impl<R: OwnershipContractRepository + Send + Sync> CommandHandler<TerminateOwnershipContract> for TerminateOwnershipContractHandler<R> {
+    type Output = TerminateOwnershipContractResult;
+
+    async fn handle(&self, command: TerminateOwnershipContract) -> Result<Self::Output, AppError> {
         let contract_id = OwnershipContractId::from_uuid(command.contract_id);
         let terminated_by = UserId::from_uuid(command.terminated_by);
 

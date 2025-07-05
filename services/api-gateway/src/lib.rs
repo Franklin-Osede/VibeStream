@@ -1,10 +1,11 @@
 // Módulos habilitados
 pub mod auth;
-// pub mod blockchain;
-// pub mod bounded_contexts;  // Comentando por errores de compilación
-// pub mod handlers;
-// pub mod shared;  // Comentando por errores
-pub mod services;  // Exponiendo services
+pub mod blockchain;
+pub mod bounded_contexts;
+pub mod handlers;
+pub mod services;
+pub mod shared;
+pub mod openapi;
 
 // Solo el music context sin dependencias problemáticas
 pub mod music_simple;

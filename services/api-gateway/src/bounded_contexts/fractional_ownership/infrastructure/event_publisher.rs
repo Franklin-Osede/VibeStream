@@ -157,7 +157,7 @@ impl EventPublisher for PostgresEventPublisher {
     }
     */
     
-    async fn publish(&self, _event: &dyn DomainEvent) -> Result<(), AppError> {
+    async fn publish(&self, event: &dyn DomainEvent) -> Result<(), AppError> {
         // Implementación temporal - solo log
         println!("📤 Event published (temp implementation)");
         Ok(())
@@ -218,8 +218,18 @@ impl EventPublisher for PostgresEventPublisher {
             let event_message = EventMessage::Domain {
                 aggregate_id: event.aggregate_id(),
                 event_type: event.event_type().to_string(),
-                event_data: serde_json::to_value(*event)
-                    .map_err(|e| AppError::SerializationError(e.to_string()))?,
+                event_data: match event.event_type() {
+                    "SharesPurchased" => serde_json::json!({
+                        "event_type": event.event_type(),
+                        "aggregate_id": event.aggregate_id(),
+                        "occurred_at": event.occurred_at()
+                    }),
+                    _ => serde_json::json!({
+                        "event_type": event.event_type(),
+                        "aggregate_id": event.aggregate_id(),
+                        "occurred_at": event.occurred_at()
+                    })
+                },
                 occurred_at: event.occurred_at(),
             };
 

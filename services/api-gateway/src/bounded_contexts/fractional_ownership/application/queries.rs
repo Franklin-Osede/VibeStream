@@ -302,22 +302,22 @@ impl<R: OwnershipContractRepository> QueryHandler<GetOwnershipContract> for GetO
 
         Ok(GetOwnershipContractResult {
             contract_id: query.contract_id,
-            song_id: contract.song_id.value(),
-            artist_id: contract.artist_id.value(),
-            total_shares: contract.total_shares,
-            price_per_share: contract.price_per_share.value(),
-            artist_retained_percentage: contract.artist_retained_percentage.value(),
-            shares_available_for_sale: contract.shares_available_for_sale,
-            shares_sold: contract.shares_sold,
+            song_id: contract.song_id().value(),
+            artist_id: contract.artist_id().value(),
+            total_shares: contract.total_shares(),
+            price_per_share: contract.price_per_share().value(),
+            artist_retained_percentage: contract.artist_retained_percentage().value(),
+            shares_available_for_sale: contract.shares_available_for_sale(),
+            shares_sold: contract.shares_sold(),
             completion_percentage: aggregate.completion_percentage(),
             total_investment_value: aggregate.total_investment_value(),
-            contract_status: format!("{:?}", contract.contract_status),
-            minimum_investment: contract.minimum_investment.as_ref().map(|mi| mi.value()),
-            maximum_ownership_per_user: contract.maximum_ownership_per_user.as_ref().map(|mo| mo.value()),
+            contract_status: format!("{:?}", contract.contract_status()),
+            minimum_investment: contract.minimum_investment().as_ref().map(|mi| mi.value()),
+            maximum_ownership_per_user: contract.maximum_ownership_per_user().as_ref().map(|mo| mo.value()),
             unique_shareholders,
             can_accept_investment: aggregate.can_accept_investment(),
-            created_at: contract.created_at,
-            updated_at: contract.updated_at,
+            created_at: contract.created_at(),
+            updated_at: contract.updated_at(),
         })
     }
 }
@@ -490,7 +490,7 @@ impl<R: OwnershipContractRepository> QueryHandler<GetContractAnalytics> for GetC
 
         Ok(GetContractAnalyticsResult {
             contract_id: query.contract_id,
-            song_id: analytics.song_id,
+            song_id: analytics.contract_id, // Usar contract_id en lugar de song_id
             analytics,
             recent_activity,
             shareholder_breakdown,

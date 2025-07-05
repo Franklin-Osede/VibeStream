@@ -23,6 +23,7 @@ use crate::shared::domain::errors::AppError;
 /// - Fraud detection alerts
 /// - Market sentiment analysis
 /// - Artist performance metrics
+#[derive(Debug)]
 pub struct StreamProcessor {
     config: StreamProcessorConfig,
     analytics_store: Arc<RwLock<AnalyticsStore>>,
@@ -377,6 +378,7 @@ impl Default for StreamProcessorConfig {
 }
 
 /// Fraud detection engine
+#[derive(Debug)]
 pub struct FraudDetector {
     user_behavior_cache: RwLock<HashMap<Uuid, UserBehaviorProfile>>,
 }
@@ -395,7 +397,7 @@ impl FraudDetector {
         duration_seconds: u32,
         zk_proof_hash: &str,
     ) -> Result<f64, AppError> {
-        let mut fraud_score = 0.0;
+        let mut fraud_score: f64 = 0.0;
         
         // Check for rapid successive listens (bot behavior)
         {
@@ -433,6 +435,7 @@ impl FraudDetector {
 }
 
 /// Revenue calculation engine
+#[derive(Debug)]
 pub struct RevenueCalculator;
 
 impl RevenueCalculator {
@@ -460,6 +463,7 @@ impl RevenueCalculator {
 }
 
 /// Market analysis engine
+#[derive(Debug)]
 pub struct MarketAnalyzer {
     price_history: RwLock<HashMap<Uuid, Vec<PricePoint>>>,
 }
@@ -522,6 +526,7 @@ impl MarketAnalyzer {
 }
 
 /// Analytics data store
+#[derive(Debug)]
 pub struct AnalyticsStore {
     // Real-time counters
     pub daily_listens: u64,

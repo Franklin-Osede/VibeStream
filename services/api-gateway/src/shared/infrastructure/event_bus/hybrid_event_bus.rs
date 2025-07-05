@@ -12,6 +12,7 @@ use async_trait::async_trait;
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 use tracing::{info, warn, error};
+use futures_util::StreamExt;
 
 use super::{
     KafkaEventBus, 
@@ -159,7 +160,7 @@ impl HybridEventBus {
         // Also store in Redis for caching if needed
         if routing.store_in_redis {
             let key = format!("vibestream:event:{}:{}", event.metadata.event_type, event.metadata.event_id);
-            let _: () = conn.setex(&key, routing.redis_ttl_seconds.unwrap_or(3600), &serialized).await
+            let _: () = conn.set_ex(&key, routing.redis_ttl_seconds.unwrap_or(3600), &serialized).await
                 .map_err(|e| AppError::InternalError(format!("Redis store failed: {}", e)))?;
         }
 
@@ -190,8 +191,9 @@ impl HybridEventBus {
             let mut stream = pubsub.on_message();
             
             while let Some(msg) = stream.next().await {
-                if let Ok(payload) = msg.get_payload::<String>() {
-                    match serde_json::from_str::<DomainEventWrapper>(&payload) {
+                if let Ok(payload) = msg.payload() {
+                    let event_data: String = String::from_utf8_lossy(&payload).to_string();
+                    match serde_json::from_str::<DomainEventWrapper>(&event_data) {
                         Ok(event) => {
                             if let Err(e) = handler(event.clone()) {
                                 error!("Redis event handler failed for {}: {}", event.metadata.event_id, e);
@@ -230,7 +232,7 @@ impl HybridEventBus {
             .map_err(|e| AppError::InternalError(format!("Redis connection failed: {}", e)))?;
 
         if let Some(ttl) = ttl_seconds {
-            let _: () = conn.setex(key, ttl, value).await
+            let _: () = conn.set_ex(key, ttl, value).await
                 .map_err(|e| AppError::InternalError(format!("Redis setex failed: {}", e)))?;
         } else {
             let _: () = conn.set(key, value).await

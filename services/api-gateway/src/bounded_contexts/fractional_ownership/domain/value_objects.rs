@@ -10,6 +10,14 @@ pub struct OwnershipContractId {
     value: Uuid,
 }
 
+impl Default for OwnershipContractId {
+    fn default() -> Self {
+        Self {
+            value: Uuid::new_v4(),
+        }
+    }
+}
+
 impl OwnershipContractId {
     pub fn new() -> Self {
         Self {

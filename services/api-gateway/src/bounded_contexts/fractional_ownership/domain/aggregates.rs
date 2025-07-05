@@ -49,13 +49,56 @@ pub struct OwnershipContract {
     updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ContractStatus {
     Draft,
     Active,
     Paused,
     SoldOut,
     Terminated,
+}
+
+impl std::fmt::Display for ContractStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ContractStatus::Draft => write!(f, "Draft"),
+            ContractStatus::Active => write!(f, "Active"),
+            ContractStatus::Paused => write!(f, "Paused"),
+            ContractStatus::SoldOut => write!(f, "SoldOut"),
+            ContractStatus::Terminated => write!(f, "Terminated"),
+        }
+    }
+}
+
+impl OwnershipContract {
+    // Getter methods for accessing private fields
+    pub fn id(&self) -> &OwnershipContractId { &self.id }
+    pub fn song_id(&self) -> &SongId { &self.song_id }
+    pub fn artist_id(&self) -> &ArtistId { &self.artist_id }
+    pub fn total_shares(&self) -> u32 { self.total_shares }
+    pub fn price_per_share(&self) -> &SharePrice { &self.price_per_share }
+    pub fn artist_retained_percentage(&self) -> &OwnershipPercentage { &self.artist_retained_percentage }
+    pub fn shares_available_for_sale(&self) -> u32 { self.shares_available_for_sale }
+    pub fn shares_sold(&self) -> u32 { self.shares_sold }
+    pub fn minimum_investment(&self) -> Option<&RevenueAmount> { self.minimum_investment.as_ref() }
+    pub fn maximum_ownership_per_user(&self) -> Option<&OwnershipPercentage> { self.maximum_ownership_per_user.as_ref() }
+    pub fn contract_status(&self) -> &ContractStatus { &self.contract_status }
+    pub fn created_at(&self) -> DateTime<Utc> { self.created_at }
+    pub fn updated_at(&self) -> DateTime<Utc> { self.updated_at }
+}
+
+impl OwnershipContractAggregate {
+    // Additional getter methods
+    pub fn contract(&self) -> &OwnershipContract { &self.contract }
+    pub fn song_id(&self) -> &SongId { &self.contract.song_id }
+    pub fn artist_id(&self) -> &ArtistId { &self.contract.artist_id }
+    pub fn is_active(&self) -> bool { 
+        matches!(self.contract.contract_status, ContractStatus::Active) 
+    }
+    pub fn status(&self) -> &ContractStatus { &self.contract.contract_status }
+    pub fn total_value(&self) -> f64 {
+        self.contract.price_per_share.value() * self.contract.total_shares as f64
+    }
 }
 
 impl OwnershipContractAggregate {
@@ -431,7 +474,6 @@ impl OwnershipContractAggregate {
     }
 
     // Getters
-    pub fn contract(&self) -> &OwnershipContract { &self.contract }
     pub fn shares(&self) -> &HashMap<ShareId, FractionalShare> { &self.shares }
     pub fn revenue_distributions(&self) -> &[RevenueDistribution] { &self.revenue_distributions }
     pub fn pending_events(&self) -> &[String] { &self.pending_events }
@@ -440,21 +482,26 @@ impl OwnershipContractAggregate {
     pub fn id(&self) -> &OwnershipContractId { &self.contract.id }
 }
 
-// Supporting DTOs for analytics
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Analytics data for ownership contracts
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct OwnershipAnalytics {
-    pub contract_id: Uuid,
-    pub song_id: Uuid,
-    pub total_shares: u32,
-    pub shares_sold: u32,
+    pub contract_id: OwnershipContractId,
+    pub total_investment_value: f64,
     pub completion_percentage: f64,
-    pub total_investment: f64,
-    pub unique_shareholders: u32,
-    pub average_investment_per_user: f64,
-    pub largest_ownership_percentage: f64,
-    pub total_revenue_distributed: f64,
-    pub artist_total_revenue: f64,
-    pub platform_total_fees: f64,
+    pub number_of_shareholders: u32,
+    pub average_share_size: f64,
+    pub revenue_distributed_to_date: f64,
+    pub projected_annual_return: f64,
+    pub liquidity_score: f64,
+    pub performance_metrics: PerformanceMetrics,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct PerformanceMetrics {
+    pub roi_percentage: f64,
+    pub volatility_score: f64,
+    pub trading_volume: f64,
+    pub market_sentiment: f64,
 }
 
 impl OwnershipContractAggregate {
@@ -489,18 +536,15 @@ impl OwnershipContractAggregate {
             .sum();
 
         OwnershipAnalytics {
-            contract_id: self.contract.id.value(),
-            song_id: self.contract.song_id.value(),
-            total_shares: self.contract.total_shares,
-            shares_sold: self.contract.shares_sold,
+            contract_id: self.contract.id.clone(),
+            total_investment_value: total_investment,
             completion_percentage: self.completion_percentage(),
-            total_investment,
-            unique_shareholders: unique_shareholders.len() as u32,
-            average_investment_per_user: average_investment,
-            largest_ownership_percentage: largest_ownership,
-            total_revenue_distributed,
-            artist_total_revenue,
-            platform_total_fees,
+            number_of_shareholders: unique_shareholders.len() as u32,
+            average_share_size: average_investment,
+            revenue_distributed_to_date: total_revenue_distributed,
+            projected_annual_return: 0.0, // Placeholder
+            liquidity_score: 0.0, // Placeholder
+            performance_metrics: PerformanceMetrics::default(), // Placeholder
         }
     }
 }

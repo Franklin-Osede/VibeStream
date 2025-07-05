@@ -23,11 +23,6 @@ use crate::bounded_contexts::fractional_ownership::{
     presentation::{AppState, ConcreteApplicationService, create_routes},
 };
 
-/// Complete Fractional Ownership Bounded Context Integration
-/// 
-/// This service assembles and configures all components of the bounded context,
-/// providing a single entry point for initialization and integration with
-/// the larger application.
 pub struct FractionalOwnershipBoundedContext<R: OwnershipContractRepository> {
     pub application_service: Arc<FractionalOwnershipApplicationService<R>>,
     pub app_state: AppState,

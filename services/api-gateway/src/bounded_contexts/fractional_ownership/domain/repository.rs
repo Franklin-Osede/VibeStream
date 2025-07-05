@@ -1,6 +1,7 @@
 // TODO: Implement fractional ownership repository 
 
 use async_trait::async_trait;
+use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 
 use crate::shared::domain::errors::AppError;
@@ -138,17 +139,34 @@ pub trait OwnershipContractQueryRepository: Send + Sync {
     async fn search(&self, query: &str, limit: u32) -> RepoResult<Vec<OwnershipContractAggregate>>;
 }
 
-/// Market statistics DTO
-#[derive(Debug, Clone)]
+/// Market statistics for fractional ownership marketplace
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MarketStatistics {
     pub total_contracts: u64,
+    pub total_market_value: f64,
     pub active_contracts: u64,
-    pub total_market_cap: f64,
-    pub total_shares_traded: u64,
+    pub total_shareholders: u64,
     pub average_completion_rate: f64,
-    pub total_revenue_distributed: f64,
-    pub unique_investors: u64,
-    pub average_investment_per_user: f64,
+    pub top_performing_contracts: Vec<ContractPerformance>,
+    pub market_trends: MarketTrends,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContractPerformance {
+    pub contract_id: String,
+    pub song_title: String,
+    pub artist_name: String,
+    pub completion_percentage: f64,
+    pub total_value: f64,
+    pub roi_percentage: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MarketTrends {
+    pub daily_volume: Vec<f64>,
+    pub weekly_growth: f64,
+    pub monthly_growth: f64,
+    pub trending_genres: Vec<String>,
 }
 
 // Event Store pattern for Domain Events
