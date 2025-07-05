@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::shared::domain::events::DomainEvent;
+use crate::shared::domain::events::{DomainEvent, EventMetadata};
 
 // Campaign Created Event
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -24,7 +24,7 @@ pub struct CampaignCreated {
 
 impl DomainEvent for CampaignCreated {
     fn metadata(&self) -> &EventMetadata {
-        &self.metadata
+        unimplemented!("EventMetadata not implemented for CampaignCreated")
     }
     
     fn event_type(&self) -> &str {
@@ -32,7 +32,7 @@ impl DomainEvent for CampaignCreated {
     }
     
     fn aggregate_id(&self) -> Uuid {
-        self.metadata.aggregate_id
+        self.aggregate_id
     }
     
     fn aggregate_type(&self) -> &str {
@@ -40,7 +40,7 @@ impl DomainEvent for CampaignCreated {
     }
     
     fn occurred_at(&self) -> DateTime<Utc> {
-        self.metadata.occurred_at
+        self.occurred_on
     }
     
     fn event_data(&self) -> serde_json::Value {
@@ -48,7 +48,7 @@ impl DomainEvent for CampaignCreated {
             "campaign_id": self.campaign_id,
             "song_id": self.song_id,
             "artist_id": self.artist_id,
-            "nft_supply": self.nft_supply,
+            "max_nfts": self.max_nfts,
             "nft_price": self.nft_price
         })
     }
@@ -69,7 +69,7 @@ pub struct CampaignActivated {
 
 impl DomainEvent for CampaignActivated {
     fn metadata(&self) -> &EventMetadata {
-        &self.metadata
+        unimplemented!("EventMetadata not implemented for CampaignActivated")
     }
     
     fn event_type(&self) -> &str {
@@ -77,7 +77,7 @@ impl DomainEvent for CampaignActivated {
     }
     
     fn aggregate_id(&self) -> Uuid {
-        self.metadata.aggregate_id
+        self.aggregate_id
     }
     
     fn aggregate_type(&self) -> &str {
@@ -85,13 +85,13 @@ impl DomainEvent for CampaignActivated {
     }
     
     fn occurred_at(&self) -> DateTime<Utc> {
-        self.metadata.occurred_at
+        self.occurred_on
     }
     
     fn event_data(&self) -> serde_json::Value {
         serde_json::json!({
             "campaign_id": self.campaign_id,
-            "activation_date": self.activation_date
+            "activated_at": self.activated_at
         })
     }
 }
@@ -119,8 +119,28 @@ pub enum CampaignEndReason {
 }
 
 impl DomainEvent for CampaignEnded {
+    fn metadata(&self) -> &EventMetadata {
+        unimplemented!("EventMetadata not implemented for CampaignEnded")
+    }
+    
+    fn event_type(&self) -> &str {
+        "CampaignEnded"
+    }
+    
+    fn aggregate_id(&self) -> Uuid {
+        self.aggregate_id
+    }
+    
+    fn aggregate_type(&self) -> &str {
+        "Campaign"
+    }
+    
     fn occurred_at(&self) -> DateTime<Utc> {
-        self.ended_at
+        self.occurred_on
+    }
+    
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or_default()
     }
 }
 
@@ -144,7 +164,7 @@ pub struct NFTPurchased {
 
 impl DomainEvent for NFTPurchased {
     fn metadata(&self) -> &EventMetadata {
-        &self.metadata
+        unimplemented!("EventMetadata not implemented for NFTPurchased")
     }
     
     fn event_type(&self) -> &str {
@@ -152,7 +172,7 @@ impl DomainEvent for NFTPurchased {
     }
     
     fn aggregate_id(&self) -> Uuid {
-        self.metadata.aggregate_id
+        self.aggregate_id
     }
     
     fn aggregate_type(&self) -> &str {
@@ -160,16 +180,16 @@ impl DomainEvent for NFTPurchased {
     }
     
     fn occurred_at(&self) -> DateTime<Utc> {
-        self.metadata.occurred_at
+        self.occurred_on
     }
     
     fn event_data(&self) -> serde_json::Value {
         serde_json::json!({
             "campaign_id": self.campaign_id,
-            "user_id": self.user_id,
-            "nft_token_id": self.nft_token_id,
-            "purchase_price": self.purchase_price,
-            "purchase_date": self.purchase_date
+            "buyer_id": self.buyer_id,
+            "nft_id": self.nft_id,
+            "total_amount": self.total_amount,
+            "purchased_at": self.purchased_at
         })
     }
 }
@@ -189,8 +209,28 @@ pub struct CampaignTargetAchieved {
 }
 
 impl DomainEvent for CampaignTargetAchieved {
+    fn metadata(&self) -> &EventMetadata {
+        unimplemented!("EventMetadata not implemented for CampaignTargetAchieved")
+    }
+    
+    fn event_type(&self) -> &str {
+        "CampaignTargetAchieved"
+    }
+    
+    fn aggregate_id(&self) -> Uuid {
+        self.aggregate_id
+    }
+    
+    fn aggregate_type(&self) -> &str {
+        "Campaign"
+    }
+    
     fn occurred_at(&self) -> DateTime<Utc> {
-        self.achieved_at
+        self.occurred_on
+    }
+    
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or_default()
     }
 }
 
@@ -208,8 +248,28 @@ pub struct CampaignRevenueMilestone {
 }
 
 impl DomainEvent for CampaignRevenueMilestone {
+    fn metadata(&self) -> &EventMetadata {
+        unimplemented!("EventMetadata not implemented for CampaignRevenueMilestone")
+    }
+    
+    fn event_type(&self) -> &str {
+        "CampaignRevenueMilestone"
+    }
+    
+    fn aggregate_id(&self) -> Uuid {
+        self.aggregate_id
+    }
+    
+    fn aggregate_type(&self) -> &str {
+        "Campaign"
+    }
+    
     fn occurred_at(&self) -> DateTime<Utc> {
-        self.achieved_at
+        self.occurred_on
+    }
+    
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or_default()
     }
 }
 
@@ -236,8 +296,28 @@ pub enum NFTTransferType {
 }
 
 impl DomainEvent for NFTTransferred {
+    fn metadata(&self) -> &EventMetadata {
+        unimplemented!("EventMetadata not implemented for NFTTransferred")
+    }
+    
+    fn event_type(&self) -> &str {
+        "NFTTransferred"
+    }
+    
+    fn aggregate_id(&self) -> Uuid {
+        self.aggregate_id
+    }
+    
+    fn aggregate_type(&self) -> &str {
+        "Campaign"
+    }
+    
     fn occurred_at(&self) -> DateTime<Utc> {
-        self.transferred_at
+        self.occurred_on
+    }
+    
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or_default()
     }
 }
 
@@ -256,8 +336,28 @@ pub struct CampaignUpdated {
 }
 
 impl DomainEvent for CampaignUpdated {
+    fn metadata(&self) -> &EventMetadata {
+        unimplemented!("EventMetadata not implemented for CampaignUpdated")
+    }
+    
+    fn event_type(&self) -> &str {
+        "CampaignUpdated"
+    }
+    
+    fn aggregate_id(&self) -> Uuid {
+        self.aggregate_id
+    }
+    
+    fn aggregate_type(&self) -> &str {
+        "Campaign"
+    }
+    
     fn occurred_at(&self) -> DateTime<Utc> {
-        self.updated_at
+        self.occurred_on
+    }
+    
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or_default()
     }
 }
 
@@ -279,8 +379,28 @@ pub struct CampaignAnalyticsUpdated {
 }
 
 impl DomainEvent for CampaignAnalyticsUpdated {
+    fn metadata(&self) -> &EventMetadata {
+        unimplemented!("EventMetadata not implemented for CampaignAnalyticsUpdated")
+    }
+    
+    fn event_type(&self) -> &str {
+        "CampaignAnalyticsUpdated"
+    }
+    
+    fn aggregate_id(&self) -> Uuid {
+        self.aggregate_id
+    }
+    
+    fn aggregate_type(&self) -> &str {
+        "Campaign"
+    }
+    
     fn occurred_at(&self) -> DateTime<Utc> {
-        self.updated_at
+        self.occurred_on
+    }
+    
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or_default()
     }
 }
 

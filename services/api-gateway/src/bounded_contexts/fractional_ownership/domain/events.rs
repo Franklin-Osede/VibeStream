@@ -226,68 +226,288 @@ pub enum PortfolioUpdateType {
 
 // Implement common event trait for type safety
 impl crate::shared::domain::events::DomainEvent for OwnershipContractCreated {
-    fn occurred_on(&self) -> DateTime<Utc> {
+    fn metadata(&self) -> &crate::shared::domain::events::EventMetadata {
+        unimplemented!("EventMetadata not implemented for OwnershipContractCreated")
+    }
+    
+    fn event_type(&self) -> &str {
+        "OwnershipContractCreated"
+    }
+    
+    fn aggregate_id(&self) -> Uuid {
+        self.aggregate_id
+    }
+    
+    fn aggregate_type(&self) -> &str {
+        "OwnershipContract"
+    }
+    
+    fn occurred_at(&self) -> DateTime<Utc> {
         self.occurred_on
+    }
+    
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or_default()
     }
 }
 
 impl crate::shared::domain::events::DomainEvent for SharesPurchased {
-    fn occurred_on(&self) -> DateTime<Utc> {
+    fn metadata(&self) -> &crate::shared::domain::events::EventMetadata {
+        unimplemented!("EventMetadata not implemented for SharesPurchased")
+    }
+    
+    fn event_type(&self) -> &str {
+        "SharesPurchased"
+    }
+    
+    fn aggregate_id(&self) -> Uuid {
+        self.aggregate_id
+    }
+    
+    fn aggregate_type(&self) -> &str {
+        "OwnershipContract"
+    }
+    
+    fn occurred_at(&self) -> DateTime<Utc> {
         self.occurred_on
+    }
+    
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or_default()
     }
 }
 
 impl crate::shared::domain::events::DomainEvent for SharesTraded {
-    fn occurred_on(&self) -> DateTime<Utc> {
+    fn metadata(&self) -> &crate::shared::domain::events::EventMetadata {
+        unimplemented!("EventMetadata not implemented for SharesTraded")
+    }
+    
+    fn event_type(&self) -> &str {
+        "SharesTraded"
+    }
+    
+    fn aggregate_id(&self) -> Uuid {
+        self.aggregate_id
+    }
+    
+    fn aggregate_type(&self) -> &str {
+        "OwnershipContract"
+    }
+    
+    fn occurred_at(&self) -> DateTime<Utc> {
         self.occurred_on
+    }
+    
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or_default()
     }
 }
 
 impl crate::shared::domain::events::DomainEvent for RevenueDistributed {
-    fn occurred_on(&self) -> DateTime<Utc> {
+    fn metadata(&self) -> &crate::shared::domain::events::EventMetadata {
+        unimplemented!("EventMetadata not implemented for RevenueDistributed")
+    }
+    
+    fn event_type(&self) -> &str {
+        "RevenueDistributed"
+    }
+    
+    fn aggregate_id(&self) -> Uuid {
+        self.aggregate_id
+    }
+    
+    fn aggregate_type(&self) -> &str {
+        "OwnershipContract"
+    }
+    
+    fn occurred_at(&self) -> DateTime<Utc> {
         self.occurred_on
+    }
+    
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or_default()
     }
 }
 
 impl crate::shared::domain::events::DomainEvent for OwnershipContractUpdated {
-    fn occurred_on(&self) -> DateTime<Utc> {
+    fn metadata(&self) -> &crate::shared::domain::events::EventMetadata {
+        unimplemented!("EventMetadata not implemented for OwnershipContractUpdated")
+    }
+    
+    fn event_type(&self) -> &str {
+        "OwnershipContractUpdated"
+    }
+    
+    fn aggregate_id(&self) -> Uuid {
+        self.aggregate_id
+    }
+    
+    fn aggregate_type(&self) -> &str {
+        "OwnershipContract"
+    }
+    
+    fn occurred_at(&self) -> DateTime<Utc> {
         self.occurred_on
+    }
+    
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or_default()
     }
 }
 
 impl crate::shared::domain::events::DomainEvent for SharesLocked {
-    fn occurred_on(&self) -> DateTime<Utc> {
+    fn metadata(&self) -> &crate::shared::domain::events::EventMetadata {
+        unimplemented!("EventMetadata not implemented for SharesLocked")
+    }
+    
+    fn event_type(&self) -> &str {
+        "SharesLocked"
+    }
+    
+    fn aggregate_id(&self) -> Uuid {
+        self.aggregate_id
+    }
+    
+    fn aggregate_type(&self) -> &str {
+        "OwnershipContract"
+    }
+    
+    fn occurred_at(&self) -> DateTime<Utc> {
         self.occurred_on
+    }
+    
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or_default()
     }
 }
 
 impl crate::shared::domain::events::DomainEvent for SharesUnlocked {
-    fn occurred_on(&self) -> DateTime<Utc> {
+    fn metadata(&self) -> &crate::shared::domain::events::EventMetadata {
+        unimplemented!("EventMetadata not implemented for SharesUnlocked")
+    }
+    
+    fn event_type(&self) -> &str {
+        "SharesUnlocked"
+    }
+    
+    fn aggregate_id(&self) -> Uuid {
+        self.aggregate_id
+    }
+    
+    fn aggregate_type(&self) -> &str {
+        "OwnershipContract"
+    }
+    
+    fn occurred_at(&self) -> DateTime<Utc> {
         self.occurred_on
+    }
+    
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or_default()
     }
 }
 
 impl crate::shared::domain::events::DomainEvent for InvestmentThresholdReached {
-    fn occurred_on(&self) -> DateTime<Utc> {
+    fn metadata(&self) -> &crate::shared::domain::events::EventMetadata {
+        unimplemented!("EventMetadata not implemented for InvestmentThresholdReached")
+    }
+    
+    fn event_type(&self) -> &str {
+        "InvestmentThresholdReached"
+    }
+    
+    fn aggregate_id(&self) -> Uuid {
+        self.aggregate_id
+    }
+    
+    fn aggregate_type(&self) -> &str {
+        "OwnershipContract"
+    }
+    
+    fn occurred_at(&self) -> DateTime<Utc> {
         self.occurred_on
+    }
+    
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or_default()
     }
 }
 
 impl crate::shared::domain::events::DomainEvent for OwnershipContractTerminated {
-    fn occurred_on(&self) -> DateTime<Utc> {
+    fn metadata(&self) -> &crate::shared::domain::events::EventMetadata {
+        unimplemented!("EventMetadata not implemented for OwnershipContractTerminated")
+    }
+    
+    fn event_type(&self) -> &str {
+        "OwnershipContractTerminated"
+    }
+    
+    fn aggregate_id(&self) -> Uuid {
+        self.aggregate_id
+    }
+    
+    fn aggregate_type(&self) -> &str {
+        "OwnershipContract"
+    }
+    
+    fn occurred_at(&self) -> DateTime<Utc> {
         self.occurred_on
+    }
+    
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or_default()
     }
 }
 
 impl crate::shared::domain::events::DomainEvent for PaymentRequested {
-    fn occurred_on(&self) -> DateTime<Utc> {
+    fn metadata(&self) -> &crate::shared::domain::events::EventMetadata {
+        unimplemented!("EventMetadata not implemented for PaymentRequested")
+    }
+    
+    fn event_type(&self) -> &str {
+        "PaymentRequested"
+    }
+    
+    fn aggregate_id(&self) -> Uuid {
+        self.aggregate_id
+    }
+    
+    fn aggregate_type(&self) -> &str {
+        "OwnershipContract"
+    }
+    
+    fn occurred_at(&self) -> DateTime<Utc> {
         self.occurred_on
+    }
+    
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or_default()
     }
 }
 
 impl crate::shared::domain::events::DomainEvent for UserPortfolioUpdated {
-    fn occurred_on(&self) -> DateTime<Utc> {
+    fn metadata(&self) -> &crate::shared::domain::events::EventMetadata {
+        unimplemented!("EventMetadata not implemented for UserPortfolioUpdated")
+    }
+    
+    fn event_type(&self) -> &str {
+        "UserPortfolioUpdated"
+    }
+    
+    fn aggregate_id(&self) -> Uuid {
+        self.aggregate_id
+    }
+    
+    fn aggregate_type(&self) -> &str {
+        "OwnershipContract"
+    }
+    
+    fn occurred_at(&self) -> DateTime<Utc> {
         self.occurred_on
+    }
+    
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or_default()
     }
 }
 

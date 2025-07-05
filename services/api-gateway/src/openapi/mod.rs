@@ -431,13 +431,6 @@ pub mod utils {
     pub fn generate_request_example<T: Serialize>(data: &T) -> String {
         serde_json::to_string_pretty(data).unwrap_or_else(|_| "{}".to_string())
     }
-    
-    /// Validate that a schema is correctly defined
-    pub fn validate_schema<T: ToSchema + for<'a> ToSchema<'a>>() -> bool {
-        // This is a compile-time check
-        // If this compiles, the schema is valid
-        true
-    }
 }
 
 #[cfg(test)]
