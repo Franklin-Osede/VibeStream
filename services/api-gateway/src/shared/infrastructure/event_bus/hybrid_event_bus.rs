@@ -407,7 +407,7 @@ pub struct HybridEventBusConfig {
 impl Default for HybridEventBusConfig {
     fn default() -> Self {
         Self {
-            enable_kafka: false, // Start with Redis only
+            enable_kafka: true, // ✅ ACTIVAR KAFKA - Era false antes
             kafka_brokers: "localhost:9092".to_string(),
             kafka_client_id: "vibestream-hybrid".to_string(),
             redis_url: "redis://localhost:6379".to_string(),
