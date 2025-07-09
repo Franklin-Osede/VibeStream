@@ -2,14 +2,15 @@ use async_trait::async_trait;
 use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::{DateTime, Utc, Duration};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use super::{
     aggregates::UserAggregate,
     value_objects::{UserId, Email, Username, PasswordHash, UserTier, UserRole},
     repository::UserRepository,
-    specifications::{EmailSpecification, UsernameSpecification, PasswordSpecification},
+    specifications::{EmailSpecification, UsernameSpecification, PasswordSpecification, Specification},
 };
-use crate::shared::domain::errors::VibeStreamError;
+use crate::shared::domain::errors::AppError;
 
 /// Authentication domain service
 #[async_trait]
@@ -19,22 +20,22 @@ pub trait AuthenticationDomainService: Send + Sync {
         &self,
         credential: String, // email or username
         password: String,
-    ) -> Result<UserAggregate, VibeStreamError>;
+    ) -> Result<UserAggregate, AppError>;
 
     /// Generate password hash
-    fn hash_password(&self, password: &str) -> Result<PasswordHash, VibeStreamError>;
+    fn hash_password(&self, password: &str) -> Result<PasswordHash, AppError>;
 
     /// Verify password against hash
-    fn verify_password(&self, password: &str, hash: &PasswordHash) -> Result<bool, VibeStreamError>;
+    fn verify_password(&self, password: &str, hash: &PasswordHash) -> Result<bool, AppError>;
 
     /// Check if password meets security requirements
-    fn validate_password_strength(&self, password: &str) -> Result<(), VibeStreamError>;
+    fn validate_password_strength(&self, password: &str) -> Result<(), AppError>;
 
     /// Generate secure token for email verification, password reset, etc.
     fn generate_secure_token(&self) -> String;
 
     /// Validate secure token
-    fn validate_secure_token(&self, token: &str, created_at: DateTime<Utc>) -> Result<bool, VibeStreamError>;
+    fn validate_secure_token(&self, token: &str, created_at: DateTime<Utc>) -> Result<bool, AppError>;
 }
 
 /// User domain service for complex business logic
@@ -46,37 +47,37 @@ pub trait UserDomainService: Send + Sync {
         email: Email,
         username: Username,
         password: String,
-    ) -> Result<UserAggregate, VibeStreamError>;
+    ) -> Result<UserAggregate, AppError>;
 
     /// Check if user can upgrade to tier
     async fn can_upgrade_to_tier(
         &self,
         user_id: &UserId,
         target_tier: &UserTier,
-    ) -> Result<bool, VibeStreamError>;
+    ) -> Result<bool, AppError>;
 
     /// Calculate tier upgrade requirements
     async fn get_tier_upgrade_requirements(
         &self,
         user_id: &UserId,
         target_tier: &UserTier,
-    ) -> Result<TierUpgradeRequirements, VibeStreamError>;
+    ) -> Result<TierUpgradeRequirements, AppError>;
 
     /// Check for achievement eligibility
-    async fn check_achievements(&self, user_id: &UserId) -> Result<Vec<Achievement>, VibeStreamError>;
+    async fn check_achievements(&self, user_id: &UserId) -> Result<Vec<Achievement>, AppError>;
 
     /// Calculate user reputation score
-    async fn calculate_reputation_score(&self, user_id: &UserId) -> Result<f64, VibeStreamError>;
+    async fn calculate_reputation_score(&self, user_id: &UserId) -> Result<f64, AppError>;
 
     /// Check if user is eligible for special features
     async fn check_feature_eligibility(
         &self,
         user_id: &UserId,
         feature: &str,
-    ) -> Result<bool, VibeStreamError>;
+    ) -> Result<bool, AppError>;
 
     /// Get user activity summary
-    async fn get_activity_summary(&self, user_id: &UserId) -> Result<UserActivitySummary, VibeStreamError>;
+    async fn get_activity_summary(&self, user_id: &UserId) -> Result<UserActivitySummary, AppError>;
 }
 
 /// Password domain service for password-related operations
@@ -87,42 +88,37 @@ impl PasswordDomainService {
         Self
     }
 
-    pub fn hash_password(&self, password: &str) -> Result<PasswordHash, VibeStreamError> {
+    pub fn hash_password(&self, password: &str) -> Result<PasswordHash, AppError> {
         let hash_result = hash(password, DEFAULT_COST)
-            .map_err(|e| VibeStreamError::Internal {
-                message: format!("Error hashing password: {}", e),
-            })?;
+            .map_err(|e| AppError::Internal(format!("Error hashing password: {}", e)))?;
         Ok(PasswordHash::new(hash_result))
     }
 
-    pub fn verify_password(&self, password: &str, hash: &PasswordHash) -> Result<bool, VibeStreamError> {
+    pub fn verify_password(&self, password: &str, hash: &PasswordHash) -> Result<bool, AppError> {
         verify(password, hash.value())
-            .map_err(|e| VibeStreamError::Internal {
-                message: format!("Error verifying password: {}", e),
-            })
+            .map_err(|e| AppError::Internal(format!("Error verifying password: {}", e)))
     }
 
-    pub fn validate_password_strength(&self, password: &str) -> Result<(), VibeStreamError> {
+    pub fn validate_password_strength(&self, password: &str) -> Result<(), AppError> {
         let spec = PasswordSpecification::new();
-        if spec.is_satisfied_by(password) {
+        if spec.is_satisfied_by(&password) {
             Ok(())
         } else {
-            Err(VibeStreamError::ValidationError {
-                field: "password".to_string(),
-                message: "Password does not meet security requirements".to_string(),
-            })
+            Err(AppError::ValidationError("Password does not meet strength requirements".to_string()))
         }
     }
 }
 
 /// User validation service
 pub struct UserValidationService {
-    user_repository: Box<dyn UserRepository>,
+    user_repository: Arc<dyn UserRepository>,
 }
 
 impl UserValidationService {
-    pub fn new(user_repository: Box<dyn UserRepository>) -> Self {
-        Self { user_repository }
+    pub fn new(user_repository: Arc<dyn UserRepository>) -> Self {
+        Self {
+            user_repository,
+        }
     }
 
     /// Validate user registration data
@@ -131,47 +127,32 @@ impl UserValidationService {
         email: &Email,
         username: &Username,
         password: &str,
-    ) -> Result<(), VibeStreamError> {
+    ) -> Result<(), AppError> {
         // Check email specification
         let email_spec = EmailSpecification::new();
         if !email_spec.is_satisfied_by(email) {
-            return Err(VibeStreamError::ValidationError {
-                field: "email".to_string(),
-                message: "Email format is invalid".to_string(),
-            });
+            return Err(AppError::ValidationError("Email format is invalid".to_string()));
         }
 
         // Check username specification
         let username_spec = UsernameSpecification::new();
         if !username_spec.is_satisfied_by(username) {
-            return Err(VibeStreamError::ValidationError {
-                field: "username".to_string(),
-                message: "Username format is invalid".to_string(),
-            });
+            return Err(AppError::ValidationError("Username format is invalid".to_string()));
         }
 
         // Check password specification
         let password_spec = PasswordSpecification::new();
-        if !password_spec.is_satisfied_by(password) {
-            return Err(VibeStreamError::ValidationError {
-                field: "password".to_string(),
-                message: "Password does not meet requirements".to_string(),
-            });
+        if !password_spec.is_satisfied_by(&password) {
+            return Err(AppError::ValidationError("Password does not meet requirements".to_string()));
         }
 
         // Check uniqueness
         if self.user_repository.email_exists(email).await? {
-            return Err(VibeStreamError::ValidationError {
-                field: "email".to_string(),
-                message: "Email already exists".to_string(),
-            });
+            return Err(AppError::ValidationError("Email already exists".to_string()));
         }
 
         if self.user_repository.username_exists(username).await? {
-            return Err(VibeStreamError::ValidationError {
-                field: "username".to_string(),
-                message: "Username already exists".to_string(),
-            });
+            return Err(AppError::ValidationError("Username already exists".to_string()));
         }
 
         Ok(())
@@ -182,28 +163,19 @@ impl UserValidationService {
         &self,
         display_name: &Option<String>,
         bio: &Option<String>,
-    ) -> Result<(), VibeStreamError> {
+    ) -> Result<(), AppError> {
         if let Some(name) = display_name {
             if name.trim().is_empty() {
-                return Err(VibeStreamError::ValidationError {
-                    field: "display_name".to_string(),
-                    message: "Display name cannot be empty".to_string(),
-                });
+                return Err(AppError::ValidationError("Display name cannot be empty".to_string()));
             }
             if name.len() > 100 {
-                return Err(VibeStreamError::ValidationError {
-                    field: "display_name".to_string(),
-                    message: "Display name too long (max 100 characters)".to_string(),
-                });
+                return Err(AppError::ValidationError("Display name too long (max 100 characters)".to_string()));
             }
         }
 
         if let Some(bio_text) = bio {
             if bio_text.len() > 500 {
-                return Err(VibeStreamError::ValidationError {
-                    field: "bio".to_string(),
-                    message: "Bio too long (max 500 characters)".to_string(),
-                });
+                return Err(AppError::ValidationError("Bio too long (max 500 characters)".to_string()));
             }
         }
 
@@ -273,12 +245,12 @@ pub struct UserActivitySummary {
 
 /// Default authentication service implementation
 pub struct DefaultAuthenticationService {
-    user_repository: Box<dyn UserRepository>,
+    user_repository: Arc<dyn UserRepository>,
     password_service: PasswordDomainService,
 }
 
 impl DefaultAuthenticationService {
-    pub fn new(user_repository: Box<dyn UserRepository>) -> Self {
+    pub fn new(user_repository: Arc<dyn UserRepository>) -> Self {
         Self {
             user_repository,
             password_service: PasswordDomainService::new(),
@@ -292,28 +264,19 @@ impl AuthenticationDomainService for DefaultAuthenticationService {
         &self,
         credential: String,
         password: String,
-    ) -> Result<UserAggregate, VibeStreamError> {
+    ) -> Result<UserAggregate, AppError> {
         // Try to find user by email first, then by username
         let user_aggregate = if credential.contains('@') {
             let email = Email::new(credential)
-                .map_err(|e| VibeStreamError::ValidationError {
-                    field: "email".to_string(),
-                    message: e,
-                })?;
+                .map_err(|e| AppError::ValidationError(e))?;
             self.user_repository.find_by_email(&email).await?
         } else {
             let username = Username::new(credential)
-                .map_err(|e| VibeStreamError::ValidationError {
-                    field: "username".to_string(),
-                    message: e,
-                })?;
+                .map_err(|e| AppError::ValidationError(e))?;
             self.user_repository.find_by_username(&username).await?
         };
 
-        let mut user_aggregate = user_aggregate.ok_or(VibeStreamError::NotFound {
-            entity: "User".to_string(),
-            id: "N/A".to_string(),
-        })?;
+        let mut user_aggregate = user_aggregate.ok_or(AppError::NotFound("User not found".to_string()))?;
 
         // Verify password
         let password_hash = self.hash_password(&password)?;
@@ -322,15 +285,15 @@ impl AuthenticationDomainService for DefaultAuthenticationService {
         Ok(user_aggregate)
     }
 
-    fn hash_password(&self, password: &str) -> Result<PasswordHash, VibeStreamError> {
+    fn hash_password(&self, password: &str) -> Result<PasswordHash, AppError> {
         self.password_service.hash_password(password)
     }
 
-    fn verify_password(&self, password: &str, hash: &PasswordHash) -> Result<bool, VibeStreamError> {
+    fn verify_password(&self, password: &str, hash: &PasswordHash) -> Result<bool, AppError> {
         self.password_service.verify_password(password, hash)
     }
 
-    fn validate_password_strength(&self, password: &str) -> Result<(), VibeStreamError> {
+    fn validate_password_strength(&self, password: &str) -> Result<(), AppError> {
         self.password_service.validate_password_strength(password)
     }
 
@@ -342,7 +305,7 @@ impl AuthenticationDomainService for DefaultAuthenticationService {
             .collect()
     }
 
-    fn validate_secure_token(&self, _token: &str, created_at: DateTime<Utc>) -> Result<bool, VibeStreamError> {
+    fn validate_secure_token(&self, _token: &str, created_at: DateTime<Utc>) -> Result<bool, AppError> {
         // Token expires after 24 hours
         let now = Utc::now();
         let expiry = created_at + Duration::hours(24);
@@ -352,13 +315,13 @@ impl AuthenticationDomainService for DefaultAuthenticationService {
 
 /// Default user domain service implementation
 pub struct DefaultUserDomainService {
-    user_repository: Box<dyn UserRepository>,
+    user_repository: Arc<dyn UserRepository>,
     auth_service: DefaultAuthenticationService,
     validation_service: UserValidationService,
 }
 
 impl DefaultUserDomainService {
-    pub fn new(user_repository: Box<dyn UserRepository>) -> Self {
+    pub fn new(user_repository: Arc<dyn UserRepository>) -> Self {
         let auth_service = DefaultAuthenticationService::new(user_repository.clone());
         let validation_service = UserValidationService::new(user_repository.clone());
         
@@ -377,7 +340,7 @@ impl UserDomainService for DefaultUserDomainService {
         email: Email,
         username: Username,
         password: String,
-    ) -> Result<UserAggregate, VibeStreamError> {
+    ) -> Result<UserAggregate, AppError> {
         // Validate registration data
         self.validation_service
             .validate_registration(&email, &username, &password)
@@ -388,10 +351,7 @@ impl UserDomainService for DefaultUserDomainService {
 
         // Create user aggregate
         let user_aggregate = UserAggregate::create(email, username, password_hash)
-            .map_err(|e| VibeStreamError::ValidationError {
-                field: "user".to_string(),
-                message: e,
-            })?;
+            .map_err(|e| AppError::ValidationError(e))?;
 
         Ok(user_aggregate)
     }
@@ -400,14 +360,11 @@ impl UserDomainService for DefaultUserDomainService {
         &self,
         user_id: &UserId,
         target_tier: &UserTier,
-    ) -> Result<bool, VibeStreamError> {
+    ) -> Result<bool, AppError> {
         let user_aggregate = self.user_repository
             .find_by_id(user_id)
             .await?
-            .ok_or(VibeStreamError::NotFound {
-                entity: "User".to_string(),
-                id: user_id.to_string(),
-            })?;
+            .ok_or(AppError::NotFound(format!("User with id {} not found", user_id)))?;
 
         let required_points = target_tier.points_required();
         let current_points = user_aggregate.stats.tier_points;
@@ -419,14 +376,11 @@ impl UserDomainService for DefaultUserDomainService {
         &self,
         user_id: &UserId,
         target_tier: &UserTier,
-    ) -> Result<TierUpgradeRequirements, VibeStreamError> {
+    ) -> Result<TierUpgradeRequirements, AppError> {
         let user_aggregate = self.user_repository
             .find_by_id(user_id)
             .await?
-            .ok_or(VibeStreamError::NotFound {
-                entity: "User".to_string(),
-                id: user_id.to_string(),
-            })?;
+            .ok_or(AppError::NotFound(format!("User with id {} not found", user_id)))?;
 
         let required_points = target_tier.points_required();
         let current_points = user_aggregate.stats.tier_points;
@@ -442,19 +396,16 @@ impl UserDomainService for DefaultUserDomainService {
         })
     }
 
-    async fn check_achievements(&self, _user_id: &UserId) -> Result<Vec<Achievement>, VibeStreamError> {
+    async fn check_achievements(&self, _user_id: &UserId) -> Result<Vec<Achievement>, AppError> {
         // TODO: Implement achievement checking logic
         Ok(vec![])
     }
 
-    async fn calculate_reputation_score(&self, user_id: &UserId) -> Result<f64, VibeStreamError> {
+    async fn calculate_reputation_score(&self, user_id: &UserId) -> Result<f64, AppError> {
         let user_aggregate = self.user_repository
             .find_by_id(user_id)
             .await?
-            .ok_or(VibeStreamError::NotFound {
-                entity: "User".to_string(),
-                id: user_id.to_string(),
-            })?;
+            .ok_or(AppError::NotFound(format!("User with id {} not found", user_id)))?;
 
         // Simple reputation calculation based on various factors
         let listening_score = (user_aggregate.stats.total_listening_time_minutes as f64 / 60.0) * 0.1;
@@ -470,26 +421,20 @@ impl UserDomainService for DefaultUserDomainService {
         &self,
         user_id: &UserId,
         feature: &str,
-    ) -> Result<bool, VibeStreamError> {
+    ) -> Result<bool, AppError> {
         let user_aggregate = self.user_repository
             .find_by_id(user_id)
             .await?
-            .ok_or(VibeStreamError::NotFound {
-                entity: "User".to_string(),
-                id: user_id.to_string(),
-            })?;
+            .ok_or(AppError::NotFound(format!("User with id {} not found", user_id)))?;
 
         Ok(user_aggregate.can_access_feature(feature))
     }
 
-    async fn get_activity_summary(&self, user_id: &UserId) -> Result<UserActivitySummary, VibeStreamError> {
+    async fn get_activity_summary(&self, user_id: &UserId) -> Result<UserActivitySummary, AppError> {
         let user_aggregate = self.user_repository
             .find_by_id(user_id)
             .await?
-            .ok_or(VibeStreamError::NotFound {
-                entity: "User".to_string(),
-                id: user_id.to_string(),
-            })?;
+            .ok_or(AppError::NotFound(format!("User with id {} not found", user_id)))?;
 
         let days_since_registration = (Utc::now() - user_aggregate.user.created_at).num_days();
         let total_listening_hours = user_aggregate.stats.total_listening_time_minutes as f64 / 60.0;

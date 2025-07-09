@@ -92,7 +92,7 @@ impl FractionalShare {
             contract_id: contract_id.value(),
             share_id: share_id.value(),
             buyer_id: owner_id.value(),
-            song_id: song_id.value(),
+            song_id: *song_id.value(),
             ownership_percentage: ownership_percentage.value(),
             purchase_price: purchase_price.value(),
             transaction_hash: None, // Will be set by blockchain service
@@ -134,7 +134,7 @@ impl FractionalShare {
             share_id: self.id.value(),
             from_user_id: old_owner.value(),
             to_user_id: new_owner.value(),
-            song_id: self.song_id.value(),
+            song_id: *self.song_id.value(),
             ownership_percentage: self.ownership_percentage.value(),
             trade_price: trade_price.value(),
             transaction_hash: None,
@@ -414,7 +414,7 @@ impl RevenueDistribution {
         Ok(RevenueDistributed {
             aggregate_id: self.contract_id.value(),
             contract_id: self.contract_id.value(),
-            song_id: self.song_id.value(),
+            song_id: *self.song_id.value(),
             total_revenue: self.total_revenue.value(),
             distribution_period_start: self.distribution_period_start,
             distribution_period_end: self.distribution_period_end,

@@ -153,6 +153,6 @@ mod tests {
         
         // Verify main components exist
         assert!(std::sync::Arc::strong_count(&context.application_service) >= 1);
-        assert!(std::sync::Arc::strong_count(&context.controller) >= 1);
+        assert!(std::sync::Arc::strong_count(&context.app_state) >= 1);
     }
 } 

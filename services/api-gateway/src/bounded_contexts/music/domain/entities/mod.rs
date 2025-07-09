@@ -4,9 +4,9 @@ pub mod playlist;
 pub mod artist;
 pub mod genre_stats;
 
-// Re-export main entities
-pub use song::{Song, SongMetadata, SongTrendingScore};
-pub use album::{Album, AlbumTrack, AlbumMetadata};
-pub use playlist::{Playlist, PlaylistTrack, PlaylistMetadata};
-pub use artist::{Artist, ArtistProfile, ArtistStats};
-pub use genre_stats::{GenreStats, GenrePopularity}; 
+// Re-export main entities and value objects
+pub use song::{Song, SongMetadata};
+pub use album::{Album, AlbumTrack};
+pub use playlist::{Playlist, PlaylistTrack};
+pub use artist::{Artist, ArtistProfile, ArtistStats, ArtistTier};
+pub use genre_stats::{GenreStats}; 

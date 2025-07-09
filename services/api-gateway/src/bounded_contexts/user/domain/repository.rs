@@ -7,65 +7,65 @@ use super::{
     entities::{User, UserProfile, UserPreferences, UserStats},
     value_objects::{UserId, Email, Username},
 };
-use crate::shared::domain::errors::VibeStreamError;
+use crate::shared::domain::errors::AppError;
 
 /// Repository trait for User aggregate
 #[async_trait]
 pub trait UserRepository: Send + Sync {
     /// Save user aggregate (create or update)
-    async fn save(&self, aggregate: &UserAggregate) -> Result<(), VibeStreamError>;
+    async fn save(&self, aggregate: &UserAggregate) -> Result<(), AppError>;
 
     /// Find user aggregate by ID
-    async fn find_by_id(&self, id: &UserId) -> Result<Option<UserAggregate>, VibeStreamError>;
+    async fn find_by_id(&self, id: &UserId) -> Result<Option<UserAggregate>, AppError>;
 
     /// Find user by email
-    async fn find_by_email(&self, email: &Email) -> Result<Option<UserAggregate>, VibeStreamError>;
+    async fn find_by_email(&self, email: &Email) -> Result<Option<UserAggregate>, AppError>;
 
     /// Find user by username
-    async fn find_by_username(&self, username: &Username) -> Result<Option<UserAggregate>, VibeStreamError>;
+    async fn find_by_username(&self, username: &Username) -> Result<Option<UserAggregate>, AppError>;
 
     /// Check if email exists
-    async fn email_exists(&self, email: &Email) -> Result<bool, VibeStreamError>;
+    async fn email_exists(&self, email: &Email) -> Result<bool, AppError>;
 
     /// Check if username exists
-    async fn username_exists(&self, username: &Username) -> Result<bool, VibeStreamError>;
+    async fn username_exists(&self, username: &Username) -> Result<bool, AppError>;
 
     /// Find users by criteria
-    async fn find_users(&self, criteria: UserSearchCriteria) -> Result<Vec<UserSummary>, VibeStreamError>;
+    async fn find_users(&self, criteria: UserSearchCriteria) -> Result<Vec<UserSummary>, AppError>;
 
     /// Find active users
-    async fn find_active_users(&self, page: u32, page_size: u32) -> Result<Vec<UserSummary>, VibeStreamError>;
+    async fn find_active_users(&self, page: u32, page_size: u32) -> Result<Vec<UserSummary>, AppError>;
 
     /// Find users by tier
-    async fn find_by_tier(&self, tier: &str, page: u32, page_size: u32) -> Result<Vec<UserSummary>, VibeStreamError>;
+    async fn find_by_tier(&self, tier: &str, page: u32, page_size: u32) -> Result<Vec<UserSummary>, AppError>;
 
     /// Find users by role
-    async fn find_by_role(&self, role: &str, page: u32, page_size: u32) -> Result<Vec<UserSummary>, VibeStreamError>;
+    async fn find_by_role(&self, role: &str, page: u32, page_size: u32) -> Result<Vec<UserSummary>, AppError>;
 
     /// Get user count
-    async fn count_users(&self) -> Result<u64, VibeStreamError>;
+    async fn count_users(&self) -> Result<u64, AppError>;
 
     /// Get user statistics
-    async fn get_user_stats(&self, user_id: &UserId) -> Result<Option<UserStats>, VibeStreamError>;
+    async fn get_user_stats(&self, user_id: &UserId) -> Result<Option<UserStats>, AppError>;
 
     /// Delete user (soft delete - deactivate)
-    async fn delete(&self, id: &UserId) -> Result<(), VibeStreamError>;
+    async fn delete(&self, id: &UserId) -> Result<(), AppError>;
 
     /// Get users registered in date range
     async fn find_users_registered_between(
         &self,
         start_date: chrono::DateTime<chrono::Utc>,
         end_date: chrono::DateTime<chrono::Utc>
-    ) -> Result<Vec<UserSummary>, VibeStreamError>;
+    ) -> Result<Vec<UserSummary>, AppError>;
 
     /// Get top users by rewards
-    async fn find_top_users_by_rewards(&self, limit: u32) -> Result<Vec<UserSummary>, VibeStreamError>;
+    async fn find_top_users_by_rewards(&self, limit: u32) -> Result<Vec<UserSummary>, AppError>;
 
     /// Get top users by listening time
-    async fn find_top_users_by_listening_time(&self, limit: u32) -> Result<Vec<UserSummary>, VibeStreamError>;
+    async fn find_top_users_by_listening_time(&self, limit: u32) -> Result<Vec<UserSummary>, AppError>;
 
     /// Find users with linked wallets
-    async fn find_users_with_wallets(&self, page: u32, page_size: u32) -> Result<Vec<UserSummary>, VibeStreamError>;
+    async fn find_users_with_wallets(&self, page: u32, page_size: u32) -> Result<Vec<UserSummary>, AppError>;
 
     /// Find users by tier points range
     async fn find_users_by_tier_points_range(
@@ -74,7 +74,7 @@ pub trait UserRepository: Send + Sync {
         max_points: u32,
         page: u32,
         page_size: u32
-    ) -> Result<Vec<UserSummary>, VibeStreamError>;
+    ) -> Result<Vec<UserSummary>, AppError>;
 }
 
 /// Search criteria for finding users
@@ -268,13 +268,13 @@ pub trait UserAnalyticsRepository: Send + Sync {
         period: AnalyticsPeriod,
         start_date: chrono::DateTime<chrono::Utc>,
         end_date: chrono::DateTime<chrono::Utc>,
-    ) -> Result<Vec<RegistrationStat>, VibeStreamError>;
+    ) -> Result<Vec<RegistrationStat>, AppError>;
 
     /// Get user tier distribution
-    async fn get_tier_distribution(&self) -> Result<HashMap<String, u64>, VibeStreamError>;
+    async fn get_tier_distribution(&self) -> Result<HashMap<String, u64>, AppError>;
 
     /// Get user role distribution
-    async fn get_role_distribution(&self) -> Result<HashMap<String, u64>, VibeStreamError>;
+    async fn get_role_distribution(&self) -> Result<HashMap<String, u64>, AppError>;
 
     /// Get user activity statistics
     async fn get_activity_stats(
@@ -282,7 +282,7 @@ pub trait UserAnalyticsRepository: Send + Sync {
         period: AnalyticsPeriod,
         start_date: chrono::DateTime<chrono::Utc>,
         end_date: chrono::DateTime<chrono::Utc>,
-    ) -> Result<Vec<ActivityStat>, VibeStreamError>;
+    ) -> Result<Vec<ActivityStat>, AppError>;
 
     /// Get user retention metrics
     async fn get_retention_metrics(
@@ -290,7 +290,7 @@ pub trait UserAnalyticsRepository: Send + Sync {
         cohort_period: AnalyticsPeriod,
         start_date: chrono::DateTime<chrono::Utc>,
         end_date: chrono::DateTime<chrono::Utc>,
-    ) -> Result<Vec<RetentionMetric>, VibeStreamError>;
+    ) -> Result<Vec<RetentionMetric>, AppError>;
 }
 
 /// Analytics period for grouping data

@@ -13,10 +13,8 @@ pub use dtos::{
 };
 
 pub use commands::{
-    CreateUserCommand, UpdateUserCommand, DeleteUserCommand,
-    ChangePasswordCommand, LinkWalletCommand, UnlinkWalletCommand,
-    VerifyEmailCommand, UpgradeTierCommand, UpdateProfileCommand,
-    DeactivateUserCommand, ReactivateUserCommand
+    RegisterUser, RegisterUserResult, UpdateUser, FollowUser, DeleteUser,
+    RegisterUserHandler, UpdateUserHandler, FollowUserHandler
 };
 
 pub use queries::{
@@ -30,5 +28,5 @@ pub use handlers::{
 };
 
 pub use services::{
-    UserApplicationService, UserQueryService
+    UserApplicationService
 }; 

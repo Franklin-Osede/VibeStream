@@ -11,6 +11,7 @@ use crate::bounded_contexts::music::domain::events::{
     SongAddedToPlaylist, SongRemovedFromPlaylist, PlaylistShared
 };
 use crate::shared::domain::events::DomainEvent;
+use crate::bounded_contexts::music::domain::value_objects::IpfsHash;
 
 /// Playlist entity for organizing songs
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -31,6 +32,7 @@ pub struct Playlist {
     follower_count: u64,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
+    cover_image_ipfs: Option<IpfsHash>,
 }
 
 /// Track within a playlist
@@ -108,6 +110,7 @@ impl Playlist {
             follower_count: 0,
             created_at: now,
             updated_at: now,
+            cover_image_ipfs: None,
         }
     }
 
@@ -137,7 +140,49 @@ impl Playlist {
             follower_count: 0,
             created_at: now,
             updated_at: now,
+            cover_image_ipfs: None,
         }
+    }
+
+    /// Create Playlist from database persistence data
+    pub fn from_persistence(
+        id: PlaylistId,
+        name: PlaylistName,
+        creator_id: Uuid,
+        description: Option<String>,
+        is_public: bool,
+        cover_image_ipfs: Option<IpfsHash>,
+        total_duration: Option<SongDuration>,
+        listen_count: u64,
+        created_at: DateTime<Utc>,
+        updated_at: DateTime<Utc>,
+    ) -> Self {
+        Self {
+            id,
+            name,
+            creator_id,
+            description,
+            is_public,
+            tracks: Vec::new(), // Tracks loaded separately
+            is_collaborative: false,
+            is_featured: false,
+            collaborators: HashSet::new(),
+            tags: Vec::new(),
+            total_duration,
+            listen_count,
+            like_count: 0,
+            follower_count: 0,
+            created_at,
+            updated_at,
+            cover_image_ipfs,
+        }
+    }
+
+    /// Get cover image URL (method missing from original)
+    pub fn cover_image_url(&self) -> Option<String> {
+        self.cover_image_ipfs.as_ref().map(|hash| 
+            format!("https://ipfs.io/ipfs/{}", hash.value())
+        )
     }
 
     // Getters
@@ -626,6 +671,24 @@ impl Playlist {
 }
 
 impl PlaylistTrack {
+    pub fn new(
+        song_id: SongId,
+        title: String,
+        artist_name: String,
+        duration: SongDuration,
+        track_order: u32,
+    ) -> Self {
+        Self {
+            song_id,
+            position: track_order, // Assuming position is the track_order
+            title,
+            artist_name,
+            duration,
+            added_by: Uuid::new_v4(), // Placeholder, actual added_by will be set later
+            added_at: Utc::now(),
+        }
+    }
+
     pub fn song_id(&self) -> &SongId {
         &self.song_id
     }

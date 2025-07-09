@@ -1,11 +1,10 @@
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+// Create Campaign Use Case
+// This module handles the creation of new campaigns
 
-use crate::shared::domain::errors::AppError;
+use serde::{Serialize, Deserialize};
+use chrono::{DateTime, Utc};
 use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
 use crate::bounded_contexts::campaign::domain::aggregates::CampaignAggregate;
-use crate::bounded_contexts::campaign::domain::value_objects::CampaignId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateCampaignCommand {

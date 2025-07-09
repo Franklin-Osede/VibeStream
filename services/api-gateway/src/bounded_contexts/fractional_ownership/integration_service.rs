@@ -9,7 +9,7 @@ use crate::bounded_contexts::fractional_ownership::{
     domain::repository::OwnershipContractRepository,
     
     // Application
-    application::FractionalOwnershipApplicationService,
+    application::{FractionalOwnershipApplicationService, queries::GetUserPortfolio},
     
     // Infrastructure
     infrastructure::{
@@ -23,6 +23,7 @@ use crate::bounded_contexts::fractional_ownership::{
     presentation::{AppState, ConcreteApplicationService, create_routes},
 };
 
+#[derive(Debug)]
 pub struct FractionalOwnershipBoundedContext<R: OwnershipContractRepository> {
     pub application_service: Arc<FractionalOwnershipApplicationService<R>>,
     pub app_state: AppState,
@@ -134,10 +135,13 @@ impl<R: OwnershipContractRepository> FractionalOwnershipBoundedContext<R> {
     }
 
     async fn check_repository_health(&self) -> Result<bool, AppError> {
-        // Try to get total market value as a health check
-        match self.application_service.repository.get_total_market_value().await {
-            Ok(_) => Ok(true),
-            Err(_) => Ok(false),
+        // Try to get a simple query as a health check instead of accessing private repository
+        // Use a public method from the application service
+        match self.application_service.get_user_portfolio(GetUserPortfolio {
+            user_id: uuid::Uuid::new_v4(), // Dummy UUID for health check
+        }).await {
+            Ok(_) | Err(AppError::NotFound(_)) => Ok(true), // Both OK and NotFound mean repository is working
+            Err(_) => Ok(false), // Other errors indicate repository issues
         }
     }
 

@@ -335,7 +335,7 @@ impl OwnershipContractAggregate {
         )?;
 
         // Get all active shares
-        let active_shares: Vec<_> = self.shares.values().collect();
+        let active_shares: Vec<FractionalShare> = self.shares.values().cloned().collect();
         
         // Process distribution
         let distribution_event = distribution.process_distribution(&active_shares)?;
@@ -382,7 +382,7 @@ impl OwnershipContractAggregate {
         let event = OwnershipContractTerminated {
             aggregate_id: self.contract.id.value(),
             contract_id: self.contract.id.value(),
-            song_id: self.contract.song_id.value(),
+            song_id: *self.contract.song_id.value(),
             termination_reason: reason,
             final_distributions,
             terminated_by: terminated_by.value(),
@@ -453,7 +453,7 @@ impl OwnershipContractAggregate {
             return Ok(Some(InvestmentThresholdReached {
                 aggregate_id: self.contract.id.value(),
                 contract_id: self.contract.id.value(),
-                song_id: self.contract.song_id.value(),
+                song_id: *self.contract.song_id.value(),
                 threshold_type: ThresholdType::MinimumInvestment,
                 threshold_value: 25.0,
                 current_value: completion,

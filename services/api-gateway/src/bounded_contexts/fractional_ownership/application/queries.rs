@@ -302,8 +302,8 @@ impl<R: OwnershipContractRepository> QueryHandler<GetOwnershipContract> for GetO
 
         Ok(GetOwnershipContractResult {
             contract_id: query.contract_id,
-            song_id: contract.song_id().value(),
-            artist_id: contract.artist_id().value(),
+            song_id: *contract.song_id().value(),
+            artist_id: *contract.artist_id().value(),
             total_shares: contract.total_shares(),
             price_per_share: contract.price_per_share().value(),
             artist_retained_percentage: contract.artist_retained_percentage().value(),
@@ -347,20 +347,20 @@ impl<R: OwnershipContractRepository> QueryHandler<GetOwnershipContractBySongId> 
         let contract = aggregate.contract();
 
         Ok(GetOwnershipContractBySongIdResult {
-            contract_id: contract.id.value(),
-            song_id: contract.song_id.value(),
-            artist_id: contract.artist_id.value(),
-            total_shares: contract.total_shares,
-            price_per_share: contract.price_per_share.value(),
-            artist_retained_percentage: contract.artist_retained_percentage.value(),
-            shares_available_for_sale: contract.shares_available_for_sale,
-            shares_sold: contract.shares_sold,
+            contract_id: contract.id().value(),
+            song_id: *contract.song_id().value(),
+            artist_id: *contract.artist_id().value(),
+            total_shares: contract.total_shares(),
+            price_per_share: contract.price_per_share().value(),
+            artist_retained_percentage: contract.artist_retained_percentage().value(),
+            shares_available_for_sale: contract.shares_available_for_sale(),
+            shares_sold: contract.shares_sold(),
             completion_percentage: aggregate.completion_percentage(),
             total_investment_value: aggregate.total_investment_value(),
-            contract_status: format!("{:?}", contract.contract_status),
+            contract_status: format!("{:?}", contract.contract_status()),
             can_accept_investment: aggregate.can_accept_investment(),
-            created_at: contract.created_at,
-            updated_at: contract.updated_at,
+            created_at: contract.created_at(),
+            updated_at: contract.updated_at(),
         })
     }
 }
@@ -391,7 +391,7 @@ impl<R: OwnershipContractRepository> QueryHandler<GetUserPortfolio> for GetUserP
                 let share_item = SharePortfolioItem {
                     share_id: share.id().value(),
                     contract_id: share.contract_id().value(),
-                    song_id: share.song_id().value(),
+                    song_id: *share.song_id().value(),
                     ownership_percentage: share.ownership_percentage().value(),
                     purchase_price: share.purchase_price().value(),
                     current_market_value: share.current_market_value().value(),
@@ -490,7 +490,7 @@ impl<R: OwnershipContractRepository> QueryHandler<GetContractAnalytics> for GetC
 
         Ok(GetContractAnalyticsResult {
             contract_id: query.contract_id,
-            song_id: analytics.contract_id, // Usar contract_id en lugar de song_id
+            song_id: analytics.contract_id.value(), // Usar el valor del contract_id
             analytics,
             recent_activity,
             shareholder_breakdown,

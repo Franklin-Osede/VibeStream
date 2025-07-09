@@ -23,6 +23,7 @@ pub enum RepositoryError {
 pub trait SongRepository: Send + Sync {
     // Basic CRUD operations
     async fn save(&self, song: &Song) -> RepositoryResult<()>;
+    async fn update(&self, song: &Song) -> RepositoryResult<()>;
     async fn find_by_id(&self, id: &SongId) -> RepositoryResult<Option<Song>>;
     async fn delete(&self, id: &SongId) -> RepositoryResult<()>;
     

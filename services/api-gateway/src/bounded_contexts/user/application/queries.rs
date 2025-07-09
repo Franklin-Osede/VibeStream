@@ -1,9 +1,15 @@
-use serde::{Deserialize, Serialize};
+// User Application Queries
+// This module contains query structures and handlers for user operations
+
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use crate::shared::application::query::{Query, QueryHandler};
+use crate::shared::domain::errors::AppError;
+use crate::bounded_contexts::user::domain::entities::User;
+use crate::bounded_contexts::user::domain::repository::UserRepository;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use std::collections::HashMap;
-
-use crate::shared::application::queries::Query;
 
 /// Get user by ID query
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -14,11 +20,7 @@ pub struct GetUserQuery {
     pub include_preferences: bool,
 }
 
-impl Query for GetUserQuery {
-    fn query_type(&self) -> &'static str {
-        "GetUser"
-    }
-}
+impl Query for GetUserQuery {}
 
 /// Get user by email query
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,11 +30,7 @@ pub struct GetUserByEmailQuery {
     pub include_stats: bool,
 }
 
-impl Query for GetUserByEmailQuery {
-    fn query_type(&self) -> &'static str {
-        "GetUserByEmail"
-    }
-}
+impl Query for GetUserByEmailQuery {}
 
 /// Get user by username query
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -42,11 +40,7 @@ pub struct GetUserByUsernameQuery {
     pub include_stats: bool,
 }
 
-impl Query for GetUserByUsernameQuery {
-    fn query_type(&self) -> &'static str {
-        "GetUserByUsername"
-    }
-}
+impl Query for GetUserByUsernameQuery {}
 
 /// Get user statistics query
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -55,11 +49,7 @@ pub struct GetUserStatsQuery {
     pub detailed: bool,
 }
 
-impl Query for GetUserStatsQuery {
-    fn query_type(&self) -> &'static str {
-        "GetUserStats"
-    }
-}
+impl Query for GetUserStatsQuery {}
 
 /// Get user preferences query
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,11 +57,7 @@ pub struct GetUserPreferencesQuery {
     pub user_id: Uuid,
 }
 
-impl Query for GetUserPreferencesQuery {
-    fn query_type(&self) -> &'static str {
-        "GetUserPreferences"
-    }
-}
+impl Query for GetUserPreferencesQuery {}
 
 /// Search users query
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,11 +82,7 @@ pub struct SearchUsersQuery {
     pub sort_order: Option<String>,
 }
 
-impl Query for SearchUsersQuery {
-    fn query_type(&self) -> &'static str {
-        "SearchUsers"
-    }
-}
+impl Query for SearchUsersQuery {}
 
 impl Default for SearchUsersQuery {
     fn default() -> Self {
@@ -138,11 +120,7 @@ pub struct GetUserListQuery {
     pub sort_order: Option<String>,
 }
 
-impl Query for GetUserListQuery {
-    fn query_type(&self) -> &'static str {
-        "GetUserList"
-    }
-}
+impl Query for GetUserListQuery {}
 
 impl Default for GetUserListQuery {
     fn default() -> Self {
@@ -166,11 +144,7 @@ pub struct GetTopUsersQuery {
     pub tier_filter: Option<String>,
 }
 
-impl Query for GetTopUsersQuery {
-    fn query_type(&self) -> &'static str {
-        "GetTopUsers"
-    }
-}
+impl Query for GetTopUsersQuery {}
 
 /// Get users by tier query
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -182,11 +156,7 @@ pub struct GetUsersByTierQuery {
     pub sort_order: Option<String>,
 }
 
-impl Query for GetUsersByTierQuery {
-    fn query_type(&self) -> &'static str {
-        "GetUsersByTier"
-    }
-}
+impl Query for GetUsersByTierQuery {}
 
 /// Get users by role query
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -198,11 +168,7 @@ pub struct GetUsersByRoleQuery {
     pub sort_order: Option<String>,
 }
 
-impl Query for GetUsersByRoleQuery {
-    fn query_type(&self) -> &'static str {
-        "GetUsersByRole"
-    }
-}
+impl Query for GetUsersByRoleQuery {}
 
 /// Get users with wallets query
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -214,11 +180,7 @@ pub struct GetUsersWithWalletsQuery {
     pub sort_order: Option<String>,
 }
 
-impl Query for GetUsersWithWalletsQuery {
-    fn query_type(&self) -> &'static str {
-        "GetUsersWithWallets"
-    }
-}
+impl Query for GetUsersWithWalletsQuery {}
 
 /// Get user analytics query
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -232,11 +194,7 @@ pub struct GetUserAnalyticsQuery {
     pub include_activity_stats: bool,
 }
 
-impl Query for GetUserAnalyticsQuery {
-    fn query_type(&self) -> &'static str {
-        "GetUserAnalytics"
-    }
-}
+impl Query for GetUserAnalyticsQuery {}
 
 /// Get user activity summary query
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -246,11 +204,7 @@ pub struct GetUserActivitySummaryQuery {
     pub include_tier_progress: bool,
 }
 
-impl Query for GetUserActivitySummaryQuery {
-    fn query_type(&self) -> &'static str {
-        "GetUserActivitySummary"
-    }
-}
+impl Query for GetUserActivitySummaryQuery {}
 
 /// Get user achievements query
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -260,11 +214,7 @@ pub struct GetUserAchievementsQuery {
     pub category: Option<String>,
 }
 
-impl Query for GetUserAchievementsQuery {
-    fn query_type(&self) -> &'static str {
-        "GetUserAchievements"
-    }
-}
+impl Query for GetUserAchievementsQuery {}
 
 /// Get tier upgrade requirements query
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -273,11 +223,7 @@ pub struct GetTierUpgradeRequirementsQuery {
     pub target_tier: String,
 }
 
-impl Query for GetTierUpgradeRequirementsQuery {
-    fn query_type(&self) -> &'static str {
-        "GetTierUpgradeRequirements"
-    }
-}
+impl Query for GetTierUpgradeRequirementsQuery {}
 
 /// Get recently registered users query
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -287,11 +233,7 @@ pub struct GetRecentUsersQuery {
     pub include_unverified: bool,
 }
 
-impl Query for GetRecentUsersQuery {
-    fn query_type(&self) -> &'static str {
-        "GetRecentUsers"
-    }
-}
+impl Query for GetRecentUsersQuery {}
 
 /// Get inactive users query
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -301,11 +243,7 @@ pub struct GetInactiveUsersQuery {
     pub page_size: u32,
 }
 
-impl Query for GetInactiveUsersQuery {
-    fn query_type(&self) -> &'static str {
-        "GetInactiveUsers"
-    }
-}
+impl Query for GetInactiveUsersQuery {}
 
 /// Check username availability query
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -313,11 +251,7 @@ pub struct CheckUsernameAvailabilityQuery {
     pub username: String,
 }
 
-impl Query for CheckUsernameAvailabilityQuery {
-    fn query_type(&self) -> &'static str {
-        "CheckUsernameAvailability"
-    }
-}
+impl Query for CheckUsernameAvailabilityQuery {}
 
 /// Check email availability query
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -325,11 +259,7 @@ pub struct CheckEmailAvailabilityQuery {
     pub email: String,
 }
 
-impl Query for CheckEmailAvailabilityQuery {
-    fn query_type(&self) -> &'static str {
-        "CheckEmailAvailability"
-    }
-}
+impl Query for CheckEmailAvailabilityQuery {}
 
 /// Get user count query
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -340,11 +270,7 @@ pub struct GetUserCountQuery {
     pub role: Option<String>,
 }
 
-impl Query for GetUserCountQuery {
-    fn query_type(&self) -> &'static str {
-        "GetUserCount"
-    }
-}
+impl Query for GetUserCountQuery {}
 
 /// Get user listening history query
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -356,11 +282,7 @@ pub struct GetUserListeningHistoryQuery {
     pub end_date: Option<DateTime<Utc>>,
 }
 
-impl Query for GetUserListeningHistoryQuery {
-    fn query_type(&self) -> &'static str {
-        "GetUserListeningHistory"
-    }
-}
+impl Query for GetUserListeningHistoryQuery {}
 
 /// Get user investment history query
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -371,11 +293,7 @@ pub struct GetUserInvestmentHistoryQuery {
     pub investment_type: Option<String>,
 }
 
-impl Query for GetUserInvestmentHistoryQuery {
-    fn query_type(&self) -> &'static str {
-        "GetUserInvestmentHistory"
-    }
-}
+impl Query for GetUserInvestmentHistoryQuery {}
 
 /// Get user rewards history query
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -387,11 +305,7 @@ pub struct GetUserRewardsHistoryQuery {
     pub end_date: Option<DateTime<Utc>>,
 }
 
-impl Query for GetUserRewardsHistoryQuery {
-    fn query_type(&self) -> &'static str {
-        "GetUserRewardsHistory"
-    }
-}
+impl Query for GetUserRewardsHistoryQuery {}
 
 /// Get user recommendations query
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -401,11 +315,7 @@ pub struct GetUserRecommendationsQuery {
     pub limit: u32,
 }
 
-impl Query for GetUserRecommendationsQuery {
-    fn query_type(&self) -> &'static str {
-        "GetUserRecommendations"
-    }
-}
+impl Query for GetUserRecommendationsQuery {}
 
 /// Get user social connections query
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -416,11 +326,7 @@ pub struct GetUserSocialConnectionsQuery {
     pub page_size: u32,
 }
 
-impl Query for GetUserSocialConnectionsQuery {
-    fn query_type(&self) -> &'static str {
-        "GetUserSocialConnections"
-    }
-}
+impl Query for GetUserSocialConnectionsQuery {}
 
 /// Get user notifications query
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -432,11 +338,7 @@ pub struct GetUserNotificationsQuery {
     pub page_size: u32,
 }
 
-impl Query for GetUserNotificationsQuery {
-    fn query_type(&self) -> &'static str {
-        "GetUserNotifications"
-    }
-}
+impl Query for GetUserNotificationsQuery {}
 
 /// Get user session history query
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -448,11 +350,7 @@ pub struct GetUserSessionHistoryQuery {
     pub end_date: Option<DateTime<Utc>>,
 }
 
-impl Query for GetUserSessionHistoryQuery {
-    fn query_type(&self) -> &'static str {
-        "GetUserSessionHistory"
-    }
-}
+impl Query for GetUserSessionHistoryQuery {}
 
 /// Advanced user search query
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -462,11 +360,7 @@ pub struct AdvancedUserSearchQuery {
     pub aggregations: Vec<String>, // For analytics
 }
 
-impl Query for AdvancedUserSearchQuery {
-    fn query_type(&self) -> &'static str {
-        "AdvancedUserSearch"
-    }
-}
+impl Query for AdvancedUserSearchQuery {}
 
 /// User search criteria
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -551,7 +445,7 @@ pub struct PaginationInfo {
 impl PaginationInfo {
     pub fn new(page: u32, page_size: u32, total_count: u64) -> Self {
         let total_pages = if page_size > 0 {
-            (total_count as f64 / page_size as f64).ceil() as u32
+            ((total_count as f64) / (page_size as f64)).ceil() as u32
         } else {
             0
         };
@@ -561,7 +455,7 @@ impl PaginationInfo {
             page_size,
             total_count,
             total_pages,
-            has_next_page: page < total_pages.saturating_sub(1),
+            has_next_page: page + 1 < total_pages,
             has_previous_page: page > 0,
         }
     }

@@ -26,6 +26,7 @@ pub struct UserAggregate {
     pub stats: UserStats,
     
     // Domain events
+    #[serde(skip)]
     pending_events: VecDeque<Box<dyn DomainEvent>>,
     version: u64,
 }

@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::bounded_contexts::music::domain::value_objects::{
     SongId, SongTitle, ArtistId, SongDuration, Genre, IpfsHash, 
-    RoyaltyPercentage, ListenCount
+    RoyaltyPercentage, ListenCount, Tempo, ReleaseType, SongMood, FileFormat, AudioQuality
 };
 use crate::bounded_contexts::music::domain::events::{
     DomainEvent, SongListened, SongAvailableForCampaign, SongAvailableForOwnership
@@ -17,6 +17,11 @@ pub struct Song {
     artist_id: ArtistId,
     duration: SongDuration,
     genre: Genre,
+    mood: Option<SongMood>,
+    file_format: Option<FileFormat>,
+    audio_quality: Option<AudioQuality>,
+    tempo: Option<Tempo>,
+    release_type: Option<ReleaseType>,
     ipfs_hash: Option<IpfsHash>,
     royalty_percentage: RoyaltyPercentage,
     listen_count: ListenCount,
@@ -42,6 +47,11 @@ impl Song {
             artist_id,
             duration,
             genre,
+            mood: None,
+            file_format: None,
+            audio_quality: None,
+            tempo: None,
+            release_type: None,
             ipfs_hash: None,
             royalty_percentage,
             listen_count: ListenCount::new(),
@@ -74,6 +84,26 @@ impl Song {
         &self.genre
     }
 
+    pub fn mood(&self) -> Option<&SongMood> {
+        self.mood.as_ref()
+    }
+
+    pub fn file_format(&self) -> Option<&FileFormat> {
+        self.file_format.as_ref()
+    }
+
+    pub fn audio_quality(&self) -> Option<&AudioQuality> {
+        self.audio_quality.as_ref()
+    }
+
+    pub fn tempo(&self) -> Option<&Tempo> {
+        self.tempo.as_ref()
+    }
+
+    pub fn release_type(&self) -> Option<&ReleaseType> {
+        self.release_type.as_ref()
+    }
+
     pub fn ipfs_hash(&self) -> Option<&IpfsHash> {
         self.ipfs_hash.as_ref()
     }
@@ -100,6 +130,10 @@ impl Song {
 
     pub fn created_at(&self) -> DateTime<Utc> {
         self.created_at
+    }
+
+    pub fn updated_at(&self) -> DateTime<Utc> {
+        self.updated_at
     }
 
     // Rich domain behaviors

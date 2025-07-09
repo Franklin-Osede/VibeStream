@@ -1,13 +1,14 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use serde_json;
-use sqlx::{PgPool, Row};
+use sqlx::{PgPool, FromRow};
 use uuid::Uuid;
 
-use crate::bounded_contexts::campaign::domain::aggregates::CampaignAggregate;
-use crate::bounded_contexts::campaign::domain::entities::{Campaign, CampaignStatus};
+use crate::bounded_contexts::campaign::domain::{
+    entities::{Campaign, CampaignStatus},
+    value_objects::{CampaignId, CampaignName},
+    repository::CampaignRepository,
+};
 use crate::bounded_contexts::campaign::domain::value_objects::*;
-use crate::bounded_contexts::campaign::domain::repository::CampaignRepository;
 use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
 use crate::shared::domain::repositories::RepoResult;
 

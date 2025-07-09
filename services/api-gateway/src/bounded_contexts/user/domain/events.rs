@@ -5,7 +5,14 @@ use uuid::Uuid;
 use super::value_objects::{
     UserId, Email, Username, WalletAddress, UserTier, ProfileUrl
 };
-use crate::shared::domain::events::DomainEvent;
+
+// Local simplified DomainEvent trait for user context
+pub trait DomainEvent: Send + Sync + std::fmt::Debug {
+    fn event_type(&self) -> &'static str;
+    fn aggregate_id(&self) -> Uuid;
+    fn occurred_at(&self) -> DateTime<Utc>;
+    fn event_data(&self) -> serde_json::Value;
+}
 
 /// User registered event
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,7 +52,7 @@ impl DomainEvent for UserRegistered {
         self.occurred_at
     }
 
-    fn data(&self) -> serde_json::Value {
+    fn event_data(&self) -> serde_json::Value {
         serde_json::to_value(self).unwrap_or_default()
     }
 }
@@ -81,7 +88,7 @@ impl DomainEvent for UserAuthenticated {
         self.occurred_at
     }
 
-    fn data(&self) -> serde_json::Value {
+    fn event_data(&self) -> serde_json::Value {
         serde_json::to_value(self).unwrap_or_default()
     }
 }
@@ -127,7 +134,7 @@ impl DomainEvent for UserProfileUpdated {
         self.occurred_at
     }
 
-    fn data(&self) -> serde_json::Value {
+    fn event_data(&self) -> serde_json::Value {
         serde_json::to_value(self).unwrap_or_default()
     }
 }
@@ -170,7 +177,7 @@ impl DomainEvent for UserTierUpgraded {
         self.occurred_at
     }
 
-    fn data(&self) -> serde_json::Value {
+    fn event_data(&self) -> serde_json::Value {
         serde_json::to_value(self).unwrap_or_default()
     }
 }
@@ -206,7 +213,7 @@ impl DomainEvent for UserDeactivated {
         self.occurred_at
     }
 
-    fn data(&self) -> serde_json::Value {
+    fn event_data(&self) -> serde_json::Value {
         serde_json::to_value(self).unwrap_or_default()
     }
 }
@@ -240,7 +247,7 @@ impl DomainEvent for UserReactivated {
         self.occurred_at
     }
 
-    fn data(&self) -> serde_json::Value {
+    fn event_data(&self) -> serde_json::Value {
         serde_json::to_value(self).unwrap_or_default()
     }
 }
@@ -280,7 +287,7 @@ impl DomainEvent for UserWalletLinked {
         self.occurred_at
     }
 
-    fn data(&self) -> serde_json::Value {
+    fn event_data(&self) -> serde_json::Value {
         serde_json::to_value(self).unwrap_or_default()
     }
 }
@@ -314,7 +321,7 @@ impl DomainEvent for UserWalletUnlinked {
         self.occurred_at
     }
 
-    fn data(&self) -> serde_json::Value {
+    fn event_data(&self) -> serde_json::Value {
         serde_json::to_value(self).unwrap_or_default()
     }
 }
@@ -350,7 +357,7 @@ impl DomainEvent for UserEmailVerified {
         self.occurred_at
     }
 
-    fn data(&self) -> serde_json::Value {
+    fn event_data(&self) -> serde_json::Value {
         serde_json::to_value(self).unwrap_or_default()
     }
 }
@@ -384,7 +391,7 @@ impl DomainEvent for UserPasswordChanged {
         self.occurred_at
     }
 
-    fn data(&self) -> serde_json::Value {
+    fn event_data(&self) -> serde_json::Value {
         serde_json::to_value(self).unwrap_or_default()
     }
 }
@@ -430,7 +437,7 @@ impl DomainEvent for UserStatsUpdated {
         self.occurred_at
     }
 
-    fn data(&self) -> serde_json::Value {
+    fn event_data(&self) -> serde_json::Value {
         serde_json::to_value(self).unwrap_or_default()
     }
 }

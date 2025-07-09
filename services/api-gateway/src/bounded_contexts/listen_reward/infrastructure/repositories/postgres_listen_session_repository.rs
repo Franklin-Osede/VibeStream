@@ -52,8 +52,8 @@ impl PostgresListenSessionRepository {
         ListenSessionRow {
             id: session.id().value(),
             user_id: session.user_id(),
-            song_id: session.song_id().value(),
-            artist_id: session.artist_id().value(),
+            song_id: *session.song_id().value(),
+            artist_id: *session.artist_id().value(),
             user_tier: session.user_tier().to_string(),
             status: session.status().to_string(),
             listen_duration_seconds: session.listen_duration().map(|d| d.seconds() as i32),

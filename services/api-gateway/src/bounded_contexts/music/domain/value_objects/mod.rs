@@ -15,8 +15,16 @@ impl SongId {
         Self(uuid)
     }
 
+    pub fn from_string(s: &str) -> Result<Self, uuid::Error> {
+        Ok(Self(Uuid::parse_str(s)?))
+    }
+
     pub fn value(&self) -> &Uuid {
         &self.0
+    }
+
+    pub fn to_string(&self) -> String {
+        self.0.to_string()
     }
 }
 
@@ -44,8 +52,16 @@ impl ArtistId {
         Self(uuid)
     }
 
+    pub fn from_string(s: &str) -> Result<Self, uuid::Error> {
+        Ok(Self(Uuid::parse_str(s)?))
+    }
+
     pub fn value(&self) -> &Uuid {
         &self.0
+    }
+
+    pub fn to_string(&self) -> String {
+        self.0.to_string()
     }
 }
 
@@ -378,18 +394,18 @@ pub struct RoyaltyPercentage {
 
 impl RoyaltyPercentage {
     pub fn new(percentage: f64) -> Result<Self, String> {
-        if percentage < 0.0 {
-            return Err("Royalty percentage cannot be negative".to_string());
-        }
-        
-        if percentage > 100.0 {
-            return Err("Royalty percentage cannot exceed 100%".to_string());
+        if percentage < 0.0 || percentage > 100.0 {
+            return Err("Royalty percentage must be between 0 and 100".to_string());
         }
         
         Ok(Self { percentage })
     }
     
     pub fn value(&self) -> f64 {
+        self.percentage
+    }
+
+    pub fn percentage(&self) -> f64 {
         self.percentage
     }
     

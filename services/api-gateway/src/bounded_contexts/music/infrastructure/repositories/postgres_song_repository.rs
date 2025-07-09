@@ -10,6 +10,7 @@ use crate::bounded_contexts::music::domain::repositories::{
     SongRepository, RepositoryResult, RepositoryError
 };
 
+#[derive(Clone)]
 pub struct PostgresSongRepository {
     pool: PgPool,
 }

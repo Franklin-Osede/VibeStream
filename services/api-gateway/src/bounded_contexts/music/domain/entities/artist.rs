@@ -7,10 +7,10 @@ use crate::bounded_contexts::music::domain::value_objects::{
     ArtistId, SongId, AlbumId, Genre, IpfsHash
 };
 use crate::bounded_contexts::music::domain::events::{
-    ArtistProfileCreated, ArtistProfileUpdated, ArtistVerified,
-    ArtistGenreAdded, ArtistGenreRemoved, ArtistFollowed, ArtistUnfollowed
+    ArtistProfileUpdated, ArtistGenreAdded, ArtistGenreRemoved, ArtistVerified,
+    ArtistFollowed, ArtistUnfollowed
 };
-use crate::shared::domain::events::DomainEvent;
+use crate::shared::domain::events::{DomainEvent, EventMetadata};
 
 /// Artist entity representing musicians and content creators
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -85,7 +85,7 @@ pub enum ArtistActivityType {
     AchievementUnlocked,
     MilestoneReached,
     InterviewPublished,
-    Behind the Scenes,
+    BehindTheScenes,
 }
 
 /// Artist tier based on popularity and engagement
@@ -246,7 +246,7 @@ impl Artist {
 
     /// Business logic methods
 
-    /// Update profile information
+    /// Update artist profile
     pub fn update_profile(
         &mut self,
         stage_name: Option<String>,
@@ -256,40 +256,41 @@ impl Artist {
         debut_year: Option<u16>,
         record_label: Option<String>,
     ) -> Result<Box<dyn DomainEvent>, String> {
-        let mut changes = HashMap::new();
+        let mut changes = Vec::new();
 
         if let Some(new_stage_name) = stage_name {
             if new_stage_name.trim().is_empty() {
                 return Err("Stage name cannot be empty".to_string());
             }
-            if new_stage_name.len() > 100 {
-                return Err("Stage name cannot exceed 100 characters".to_string());
+            if new_stage_name.len() > 50 {
+                return Err("Stage name must be 50 characters or less".to_string());
             }
-            changes.insert("stage_name".to_string(), self.profile.stage_name.clone());
             self.profile.stage_name = new_stage_name;
+            changes.push("stage_name".to_string());
         }
 
         if let Some(new_bio) = bio {
             if new_bio.len() > 1000 {
-                return Err("Bio cannot exceed 1000 characters".to_string());
+                return Err("Bio must be 1000 characters or less".to_string());
             }
-            changes.insert("bio".to_string(), self.profile.bio.clone().unwrap_or_default());
             self.profile.bio = Some(new_bio);
+            changes.push("bio".to_string());
         }
 
         if let Some(new_location) = location {
             if new_location.len() > 100 {
-                return Err("Location cannot exceed 100 characters".to_string());
+                return Err("Location must be 100 characters or less".to_string());
             }
             self.profile.location = Some(new_location);
+            changes.push("location".to_string());
         }
 
         if let Some(new_website) = website {
-            // Basic URL validation
             if !new_website.starts_with("http://") && !new_website.starts_with("https://") {
-                return Err("Website must be a valid URL starting with http:// or https://".to_string());
+                return Err("Website must be a valid URL".to_string());
             }
             self.profile.website = Some(new_website);
+            changes.push("website".to_string());
         }
 
         if let Some(new_debut_year) = debut_year {
@@ -297,25 +298,35 @@ impl Artist {
             if new_debut_year > current_year {
                 return Err("Debut year cannot be in the future".to_string());
             }
-            if new_debut_year < 1900 {
-                return Err("Debut year must be after 1900".to_string());
-            }
             self.profile.debut_year = Some(new_debut_year);
+            changes.push("debut_year".to_string());
         }
 
         if let Some(new_record_label) = record_label {
             if new_record_label.len() > 100 {
-                return Err("Record label name cannot exceed 100 characters".to_string());
+                return Err("Record label must be 100 characters or less".to_string());
             }
             self.profile.record_label = Some(new_record_label);
+            changes.push("record_label".to_string());
         }
 
         self.updated_at = Utc::now();
 
+        let metadata = EventMetadata {
+            event_id: Uuid::new_v4(),
+            event_type: "music.artist.profile_updated".to_string(),
+            aggregate_id: *self.id.value(),
+            aggregate_type: "Artist".to_string(),
+            occurred_at: self.updated_at,
+            correlation_id: None,
+            user_id: Some(self.user_id),
+            version: 1,
+        };
+
         Ok(Box::new(ArtistProfileUpdated {
+            metadata,
             artist_id: self.id.clone(),
-            user_id: self.user_id,
-            changes,
+            updated_fields: changes,
             updated_at: self.updated_at,
         }))
     }
@@ -371,9 +382,21 @@ impl Artist {
         self.primary_genres.push(genre.clone());
         self.updated_at = Utc::now();
 
+        let metadata = EventMetadata {
+            event_id: Uuid::new_v4(),
+            event_type: "music.artist.genre_added".to_string(),
+            aggregate_id: *self.id.value(),
+            aggregate_type: "Artist".to_string(),
+            occurred_at: self.updated_at,
+            correlation_id: None,
+            user_id: Some(self.user_id),
+            version: 1,
+        };
+
         Ok(Box::new(ArtistGenreAdded {
+            metadata,
             artist_id: self.id.clone(),
-            genre: genre.value().to_string(),
+            genre: genre.clone(),
             added_at: self.updated_at,
         }))
     }
@@ -392,9 +415,21 @@ impl Artist {
         self.primary_genres.remove(index);
         self.updated_at = Utc::now();
 
+        let metadata = EventMetadata {
+            event_id: Uuid::new_v4(),
+            event_type: "music.artist.genre_removed".to_string(),
+            aggregate_id: *self.id.value(),
+            aggregate_type: "Artist".to_string(),
+            occurred_at: self.updated_at,
+            correlation_id: None,
+            user_id: Some(self.user_id),
+            version: 1,
+        };
+
         Ok(Box::new(ArtistGenreRemoved {
+            metadata,
             artist_id: self.id.clone(),
-            genre: genre.value().to_string(),
+            genre: genre.clone(),
             removed_at: self.updated_at,
         }))
     }
@@ -412,11 +447,22 @@ impl Artist {
         self.is_verified = true;
         self.updated_at = Utc::now();
 
+        let metadata = EventMetadata {
+            event_id: Uuid::new_v4(),
+            event_type: "music.artist.verified".to_string(),
+            aggregate_id: *self.id.value(),
+            aggregate_type: "Artist".to_string(),
+            occurred_at: self.updated_at,
+            correlation_id: None,
+            user_id: Some(self.user_id),
+            version: 1,
+        };
+
         Ok(Box::new(ArtistVerified {
+            metadata,
             artist_id: self.id.clone(),
-            user_id: self.user_id,
             verified_by,
-            verification_type,
+            verification_type: format!("{:?}", verification_type),
             verified_at: self.updated_at,
         }))
     }
@@ -516,26 +562,50 @@ impl Artist {
     }
 
     /// Add follower
-    pub fn add_follower(&mut self) -> Box<dyn DomainEvent> {
+    pub fn add_follower(&mut self, follower_id: Uuid) -> Box<dyn DomainEvent> {
         self.follower_count += 1;
         self.updated_at = Utc::now();
 
+        let metadata = EventMetadata {
+            event_id: Uuid::new_v4(),
+            event_type: "music.artist.followed".to_string(),
+            aggregate_id: *self.id.value(),
+            aggregate_type: "Artist".to_string(),
+            occurred_at: self.updated_at,
+            correlation_id: None,
+            user_id: Some(follower_id),
+            version: 1,
+        };
+
         Box::new(ArtistFollowed {
+            metadata,
             artist_id: self.id.clone(),
-            follower_count: self.follower_count,
+            follower_id,
             followed_at: self.updated_at,
         })
     }
 
     /// Remove follower
-    pub fn remove_follower(&mut self) -> Option<Box<dyn DomainEvent>> {
+    pub fn remove_follower(&mut self, follower_id: Uuid) -> Option<Box<dyn DomainEvent>> {
         if self.follower_count > 0 {
             self.follower_count -= 1;
             self.updated_at = Utc::now();
 
+            let metadata = EventMetadata {
+                event_id: Uuid::new_v4(),
+                event_type: "music.artist.unfollowed".to_string(),
+                aggregate_id: *self.id.value(),
+                aggregate_type: "Artist".to_string(),
+                occurred_at: self.updated_at,
+                correlation_id: None,
+                user_id: Some(follower_id),
+                version: 1,
+            };
+
             Some(Box::new(ArtistUnfollowed {
+                metadata,
                 artist_id: self.id.clone(),
-                follower_count: self.follower_count,
+                follower_id,
                 unfollowed_at: self.updated_at,
             }))
         } else {
@@ -752,7 +822,7 @@ mod tests {
 
         // Simulate growth
         for _ in 0..15_000 {
-            artist.add_follower();
+            artist.add_follower(Uuid::new_v4());
         }
 
         // Should now be Established

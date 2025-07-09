@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
+use std::hash::{Hash, Hasher, DefaultHasher};
 use uuid::Uuid;
 use regex::Regex;
+use crate::shared::domain::errors::AppError;
 
 /// User ID - Unique identifier for users
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -17,6 +19,10 @@ impl UserId {
     }
 
     pub fn value(&self) -> Uuid {
+        self.0
+    }
+
+    pub fn to_uuid(&self) -> Uuid {
         self.0
     }
 }
@@ -61,6 +67,14 @@ impl Email {
 
     pub fn value(&self) -> &str {
         &self.0
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    pub fn to_string(&self) -> String {
+        self.0.to_string()
     }
 }
 
@@ -107,6 +121,10 @@ impl Username {
     pub fn value(&self) -> &str {
         &self.0
     }
+
+    pub fn to_string(&self) -> String {
+        self.0.to_string()
+    }
 }
 
 impl Display for Username {
@@ -124,8 +142,41 @@ impl PasswordHash {
         Self(hash)
     }
 
+    pub fn from_password(password: String) -> Result<Self, String> {
+        if password.trim().is_empty() {
+            return Err("Password cannot be empty".to_string());
+        }
+
+        if password.len() < 6 {
+            return Err("Password must be at least 6 characters".to_string());
+        }
+
+        if password.len() > 128 {
+            return Err("Password too long (max 128 characters)".to_string());
+        }
+
+        // En un entorno real, usarías bcrypt o argon2
+        // Por ahora, usamos un hash simple para no agregar dependencias
+        
+        let mut hasher = DefaultHasher::new();
+        password.hash(&mut hasher);
+        let hash = format!("hash_{}", hasher.finish());
+        
+        Ok(Self(hash))
+    }
+
     pub fn value(&self) -> &str {
         &self.0
+    }
+
+    pub fn verify(&self, password: &str) -> bool {
+        // En un entorno real, usarías bcrypt::verify
+        // Por ahora, recreamos el hash y comparamos
+        let mut hasher = DefaultHasher::new();
+        password.hash(&mut hasher);
+        let hash = format!("hash_{}", hasher.finish());
+        
+        self.0 == hash
     }
 }
 
@@ -207,6 +258,16 @@ impl UserTier {
             Self::Artist => vec!["basic_streaming", "artist_dashboard", "upload_music", "campaign_creation", "advanced_analytics", "priority_support"],
         }
     }
+
+    pub fn from_str(tier: &str) -> Result<Self, String> {
+        match tier.to_lowercase().as_str() {
+            "free" => Ok(Self::Free),
+            "premium" => Ok(Self::Premium),
+            "vip" => Ok(Self::Vip),
+            "artist" => Ok(Self::Artist),
+            _ => Err(format!("Invalid tier: {}", tier)),
+        }
+    }
 }
 
 impl Display for UserTier {
@@ -242,6 +303,16 @@ impl UserRole {
     pub fn can(&self, permission: &str) -> bool {
         let permissions = self.permissions();
         permissions.contains(&"*") || permissions.contains(&permission)
+    }
+
+    pub fn from_str(role: &str) -> Result<Self, String> {
+        match role.to_lowercase().as_str() {
+            "user" => Ok(Self::User),
+            "artist" => Ok(Self::Artist),
+            "moderator" => Ok(Self::Moderator),
+            "admin" => Ok(Self::Admin),
+            _ => Err(format!("Invalid role: {}", role)),
+        }
     }
 }
 

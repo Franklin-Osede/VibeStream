@@ -78,6 +78,26 @@ serde_yaml = "0.9"
 
 futures-util = "0.3"
 
+# Random number generation (moved from dev-dependencies)
+rand = "0.8"
+
 [dev-dependencies]
-# Testing
-tokio-test = "0.4" 
+# Testing framework
+tokio-test = "0.4"
+tower-test = "0.4"
+rstest = "0.18"
+
+# HTTP testing  
+reqwest = { version = "0.11", features = ["json"] }
+
+# Assertions
+assert_matches = "1.5"
+pretty_assertions = "1.4"
+
+# Mock data generation
+fake = { version = "2.9", features = ["derive", "chrono", "uuid"] }
+rand = "0.8"
+
+# Test utilities
+tempfile = "3.8"
+serial_test = "3.0" 

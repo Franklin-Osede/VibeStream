@@ -1,8 +1,7 @@
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-use chrono::{DateTime, Utc};
+// End Campaign Use Case
+// This module handles the ending of campaigns
 
-use crate::bounded_contexts::campaign::domain::value_objects::CampaignId;
+use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EndCampaignCommand {
@@ -34,6 +33,7 @@ impl EndCampaignUseCase {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use uuid::Uuid;
 
     fn create_valid_command() -> EndCampaignCommand {
         EndCampaignCommand {

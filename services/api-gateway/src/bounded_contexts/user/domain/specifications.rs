@@ -187,8 +187,9 @@ impl PasswordSpecification {
     }
 }
 
-impl Specification<str> for PasswordSpecification {
-    fn is_satisfied_by(&self, password: &str) -> bool {
+impl Specification<&str> for PasswordSpecification {
+    fn is_satisfied_by(&self, password: &&str) -> bool {
+        let password = *password; // Dereference to get &str
         // Length check
         if password.len() < self.min_length || password.len() > self.max_length {
             return false;

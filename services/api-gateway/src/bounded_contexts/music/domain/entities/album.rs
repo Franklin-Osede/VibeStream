@@ -122,6 +122,43 @@ impl Album {
         }
     }
 
+    /// Create Album from database persistence data
+    pub fn from_persistence(
+        id: AlbumId,
+        title: AlbumTitle,
+        artist_id: ArtistId,
+        description: Option<String>,
+        release_type: ReleaseType,
+        genre: Genre,
+        release_date: Option<DateTime<Utc>>,
+        cover_art_ipfs: Option<IpfsHash>,
+        is_published: bool,
+        is_featured: bool,
+        listen_count: u64,
+        revenue_generated: f64,
+        created_at: DateTime<Utc>,
+        updated_at: DateTime<Utc>,
+    ) -> Self {
+        Self {
+            id,
+            title,
+            artist_id,
+            description,
+            release_type,
+            genre,
+            release_date,
+            tracks: Vec::new(), // Tracks loaded separately
+            cover_art_ipfs,
+            total_duration: None, // Calculated when tracks are loaded
+            is_published,
+            is_featured,
+            listen_count,
+            revenue_generated,
+            created_at,
+            updated_at,
+        }
+    }
+
     // Getters
     pub fn id(&self) -> &AlbumId {
         &self.id
@@ -459,26 +496,27 @@ impl Album {
 
     /// Renumber tracks after removal
     fn renumber_tracks(&mut self) {
-        // Separate regular and bonus tracks
-        let mut regular_tracks: Vec<_> = self.tracks
-            .iter_mut()
-            .filter(|t| !t.is_bonus_track)
-            .collect();
+        // First pass: collect indices for regular and bonus tracks
+        let mut regular_indices = Vec::new();
+        let mut bonus_indices = Vec::new();
         
-        let mut bonus_tracks: Vec<_> = self.tracks
-            .iter_mut()
-            .filter(|t| t.is_bonus_track)
-            .collect();
+        for (i, track) in self.tracks.iter().enumerate() {
+            if track.is_bonus_track {
+                bonus_indices.push(i);
+            } else {
+                regular_indices.push(i);
+            }
+        }
 
         // Renumber regular tracks
-        for (i, track) in regular_tracks.iter_mut().enumerate() {
-            track.track_number = (i + 1) as u32;
+        for (new_number, &index) in regular_indices.iter().enumerate() {
+            self.tracks[index].track_number = (new_number + 1) as u32;
         }
 
         // Renumber bonus tracks
-        let regular_count = regular_tracks.len();
-        for (i, track) in bonus_tracks.iter_mut().enumerate() {
-            track.track_number = (regular_count + i + 1) as u32;
+        let regular_count = regular_indices.len();
+        for (bonus_index, &index) in bonus_indices.iter().enumerate() {
+            self.tracks[index].track_number = (regular_count + bonus_index + 1) as u32;
         }
     }
 

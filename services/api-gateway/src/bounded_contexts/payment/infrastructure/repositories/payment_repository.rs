@@ -26,7 +26,7 @@ impl PostgreSQLPaymentRepository {
 #[async_trait]
 impl PaymentRepository for PostgreSQLPaymentRepository {
     async fn save(&self, payment: &PaymentAggregate) -> Result<(), AppError> {
-        let mut tx = self.pool.begin().await.map_err(AppError::Database)?;
+        let mut tx = self.pool.begin().await.map_err(|e| AppError::DatabaseError(e.to_string()))?;
         
         // Save payment
         sqlx::query!(
@@ -62,7 +62,7 @@ impl PaymentRepository for PostgreSQLPaymentRepository {
         )
         .execute(&mut *tx)
         .await
-        .map_err(AppError::Database)?;
+        .map_err(AppError::DatabaseError)?;
         
         // Save payment events
         for event in payment.uncommitted_events() {
@@ -77,10 +77,10 @@ impl PaymentRepository for PostgreSQLPaymentRepository {
             )
             .execute(&mut *tx)
             .await
-            .map_err(AppError::Database)?;
+            .map_err(AppError::DatabaseError)?;
         }
         
-        tx.commit().await.map_err(AppError::Database)?;
+        tx.commit().await.map_err(AppError::DatabaseError)?;
         Ok(())
     }
     
@@ -91,7 +91,7 @@ impl PaymentRepository for PostgreSQLPaymentRepository {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(AppError::Database)?;
+        .map_err(AppError::DatabaseError)?;
         
         match payment_row {
             Some(row) => {
@@ -118,7 +118,7 @@ impl PaymentRepository for PostgreSQLPaymentRepository {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(AppError::Database)?;
+        .map_err(AppError::DatabaseError)?;
         
         match payment_row {
             Some(row) => {
@@ -137,7 +137,7 @@ impl PaymentRepository for PostgreSQLPaymentRepository {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(AppError::Database)?;
+        .map_err(AppError::DatabaseError)?;
         
         match payment_row {
             Some(row) => {
@@ -178,7 +178,7 @@ impl PaymentRepository for PostgreSQLPaymentRepository {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(AppError::Database)?;
+        .map_err(AppError::DatabaseError)?;
         
         let mut payment_aggregates = Vec::new();
         for row in rows {
@@ -196,7 +196,7 @@ impl PaymentRepository for PostgreSQLPaymentRepository {
         )
         .fetch_one(&self.pool)
         .await
-        .map_err(AppError::Database)?;
+        .map_err(AppError::DatabaseError)?;
         
         Ok(row.count.unwrap_or(0) as u64)
     }
@@ -212,7 +212,7 @@ impl PaymentRepository for PostgreSQLPaymentRepository {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(AppError::Database)?;
+        .map_err(AppError::DatabaseError)?;
         
         match batch_row {
             Some(row) => {
@@ -249,7 +249,7 @@ impl PaymentRepository for PostgreSQLPaymentRepository {
         )
         .execute(&self.pool)
         .await
-        .map_err(AppError::Database)?;
+        .map_err(AppError::DatabaseError)?;
         
         Ok(())
     }
@@ -263,7 +263,7 @@ impl PostgreSQLPaymentRepository {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(AppError::Database)?;
+        .map_err(AppError::DatabaseError)?;
         
         let mut events = Vec::new();
         for row in rows {
@@ -282,29 +282,29 @@ impl PostgreSQLPaymentRepository {
     
     fn row_to_payment(&self, row: &sqlx::postgres::PgRow) -> Result<Payment, AppError> {
         // Simplified conversion
-        let payment_id = PaymentId::from_uuid(row.try_get("id").map_err(AppError::Database)?);
-        let payer_id: Uuid = row.try_get("payer_id").map_err(AppError::Database)?;
-        let payee_id: Uuid = row.try_get("payee_id").map_err(AppError::Database)?;
-        let amount_value: f64 = row.try_get("amount").map_err(AppError::Database)?;
-        let currency: Currency = row.try_get("currency").map_err(AppError::Database)?;
-        let amount = Amount::new(amount_value, currency).map_err(AppError::DomainError)?;
+        let payment_id = PaymentId::from_uuid(row.try_get("id").map_err(AppError::DatabaseError)?);
+        let payer_id: Uuid = row.try_get("payer_id").map_err(AppError::DatabaseError)?;
+        let payee_id: Uuid = row.try_get("payee_id").map_err(AppError::DatabaseError)?;
+        let amount_value: f64 = row.try_get("amount").map_err(AppError::DatabaseError)?;
+        let currency: Currency = row.try_get("currency").map_err(AppError::DatabaseError)?;
+        let amount = Amount::new(amount_value, currency).map_err(AppError::DomainRuleViolation)?;
         
-        let net_amount_value: f64 = row.try_get("net_amount").map_err(AppError::Database)?;
-        let net_amount = Amount::new(net_amount_value, currency).map_err(AppError::DomainError)?;
+        let net_amount_value: f64 = row.try_get("net_amount").map_err(AppError::DatabaseError)?;
+        let net_amount = Amount::new(net_amount_value, currency).map_err(AppError::DomainRuleViolation)?;
         
-        let platform_fee = row.try_get::<Option<f64>, _>("platform_fee").map_err(AppError::Database)?
-            .map(|fee| Amount::new(fee, currency).map_err(AppError::DomainError))
+        let platform_fee = row.try_get::<Option<f64>, _>("platform_fee").map_err(AppError::DatabaseError)?
+            .map(|fee| Amount::new(fee, currency).map_err(AppError::DomainRuleViolation))
             .transpose()?;
         
         let payment_method: PaymentMethod = serde_json::from_value(
-            row.try_get("payment_method").map_err(AppError::Database)?
-        ).map_err(AppError::JsonError)?;
+            row.try_get("payment_method").map_err(AppError::DatabaseError)?
+        ).map_err(AppError::SerializationError)?;
         
         let purpose: PaymentPurpose = serde_json::from_value(
-            row.try_get("purpose_type").map_err(AppError::Database)?
-        ).map_err(AppError::JsonError)?;
+            row.try_get("purpose_type").map_err(AppError::DatabaseError)?
+        ).map_err(AppError::SerializationError)?;
         
-        let status_str: String = row.try_get("status").map_err(AppError::Database)?;
+        let status_str: String = row.try_get("status").map_err(AppError::DatabaseError)?;
         let status = match status_str.as_str() {
             "Pending" => PaymentStatus::Pending,
             "Processing" => PaymentStatus::Processing,
@@ -315,19 +315,19 @@ impl PostgreSQLPaymentRepository {
             _ => PaymentStatus::Pending,
         };
         
-        let blockchain_hash = row.try_get::<Option<String>, _>("blockchain_hash").map_err(AppError::Database)?
-            .map(|hash| TransactionHash::new(hash).map_err(AppError::DomainError))
+        let blockchain_hash = row.try_get::<Option<String>, _>("blockchain_hash").map_err(AppError::DatabaseError)?
+            .map(|hash| TransactionHash::new(hash).map_err(AppError::DomainRuleViolation))
             .transpose()?;
         
-        let created_at: DateTime<Utc> = row.try_get("created_at").map_err(AppError::Database)?;
-        let updated_at: DateTime<Utc> = row.try_get("updated_at").map_err(AppError::Database)?;
-        let completed_at: Option<DateTime<Utc>> = row.try_get("completed_at").map_err(AppError::Database)?;
-        let failure_reason: Option<String> = row.try_get("failure_reason").map_err(AppError::Database)?;
-        let idempotency_key: Option<String> = row.try_get("idempotency_key").map_err(AppError::Database)?;
+        let created_at: DateTime<Utc> = row.try_get("created_at").map_err(AppError::DatabaseError)?;
+        let updated_at: DateTime<Utc> = row.try_get("updated_at").map_err(AppError::DatabaseError)?;
+        let completed_at: Option<DateTime<Utc>> = row.try_get("completed_at").map_err(AppError::DatabaseError)?;
+        let failure_reason: Option<String> = row.try_get("failure_reason").map_err(AppError::DatabaseError)?;
+        let idempotency_key: Option<String> = row.try_get("idempotency_key").map_err(AppError::DatabaseError)?;
         
         let metadata: PaymentMetadata = serde_json::from_value(
-            row.try_get("metadata").map_err(AppError::Database)?
-        ).map_err(AppError::JsonError)?;
+            row.try_get("metadata").map_err(AppError::DatabaseError)?
+        ).map_err(AppError::SerializationError)?;
         
         let payment = Payment::new(
             payment_id,
@@ -352,20 +352,20 @@ impl PostgreSQLPaymentRepository {
     }
     
     fn row_to_payment_batch(&self, row: &sqlx::postgres::PgRow) -> Result<PaymentBatch, AppError> {
-        let id: Uuid = row.try_get("id").map_err(AppError::Database)?;
-        let batch_type: String = row.try_get("batch_type").map_err(AppError::Database)?;
-        let total_amount_value: f64 = row.try_get("total_amount").map_err(AppError::Database)?;
-        let currency: Currency = row.try_get("currency").map_err(AppError::Database)?;
-        let total_amount = Amount::new(total_amount_value, currency).map_err(AppError::DomainError)?;
+        let id: Uuid = row.try_get("id").map_err(AppError::DatabaseError)?;
+        let batch_type: String = row.try_get("batch_type").map_err(AppError::DatabaseError)?;
+        let total_amount_value: f64 = row.try_get("total_amount").map_err(AppError::DatabaseError)?;
+        let currency: Currency = row.try_get("currency").map_err(AppError::DatabaseError)?;
+        let total_amount = Amount::new(total_amount_value, currency).map_err(AppError::DomainRuleViolation)?;
         
-        let payment_count: i32 = row.try_get("payment_count").map_err(AppError::Database)?;
-        let successful_payments: i32 = row.try_get("successful_payments").map_err(AppError::Database)?;
-        let failed_payments: i32 = row.try_get("failed_payments").map_err(AppError::Database)?;
-        let status: String = row.try_get("status").map_err(AppError::Database)?;
+        let payment_count: i32 = row.try_get("payment_count").map_err(AppError::DatabaseError)?;
+        let successful_payments: i32 = row.try_get("successful_payments").map_err(AppError::DatabaseError)?;
+        let failed_payments: i32 = row.try_get("failed_payments").map_err(AppError::DatabaseError)?;
+        let status: String = row.try_get("status").map_err(AppError::DatabaseError)?;
         
-        let created_at: DateTime<Utc> = row.try_get("created_at").map_err(AppError::Database)?;
-        let completed_at: Option<DateTime<Utc>> = row.try_get("completed_at").map_err(AppError::Database)?;
-        let created_by: Uuid = row.try_get("created_by").map_err(AppError::Database)?;
+        let created_at: DateTime<Utc> = row.try_get("created_at").map_err(AppError::DatabaseError)?;
+        let completed_at: Option<DateTime<Utc>> = row.try_get("completed_at").map_err(AppError::DatabaseError)?;
+        let created_by: Uuid = row.try_get("created_by").map_err(AppError::DatabaseError)?;
         
         let batch = PaymentBatch::new(
             id,
