@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use uuid::Uuid;
 use crate::bounded_contexts::music::domain::aggregates::MusicCatalogAggregate;
 use crate::bounded_contexts::music::domain::repositories::{MusicCatalogRepository, RepositoryResult, RepositoryError};
-use crate::bounded_contexts::music::domain::events::DomainEvent;
+use crate::shared::domain::events::DomainEvent;
 
 pub struct TemporaryMusicCatalogRepository;
 

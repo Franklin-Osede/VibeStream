@@ -239,10 +239,10 @@ impl CampaignController {
         // self.event_publisher.publish_events(campaign_aggregate.pending_events()).await?;
 
         let response = CreateCampaignResponse {
-            campaign_id: campaign.id().value(),
+            campaign_id: campaign.id().value().clone(),
             name: campaign.name().to_string(),
-            song_id: campaign.song_id().value(),
-            artist_id: campaign.artist_id().value(),
+            song_id: campaign.song_id().value().clone(),
+            artist_id: campaign.artist_id().value().clone(),
             status: format!("{:?}", campaign.status()),
             start_date: campaign.date_range().start(),
             end_date: campaign.date_range().end(),

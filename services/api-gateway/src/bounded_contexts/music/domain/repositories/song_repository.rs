@@ -4,6 +4,7 @@ use uuid::Uuid;
 use crate::bounded_contexts::music::domain::{
     Song, SongId, ArtistId, Genre, MusicCatalogAggregate
 };
+use crate::shared::domain::events::DomainEvent;
 
 pub type RepositoryResult<T> = Result<T, RepositoryError>;
 
@@ -46,5 +47,5 @@ pub trait MusicCatalogRepository: Send + Sync {
     async fn load_aggregate(&self, aggregate_id: &Uuid) -> RepositoryResult<Option<MusicCatalogAggregate>>;
     
     // Event sourcing support
-    async fn get_events_since(&self, aggregate_id: &Uuid, version: u64) -> RepositoryResult<Vec<Box<dyn crate::bounded_contexts::music::domain::events::DomainEvent>>>;
+    async fn get_events_since(&self, aggregate_id: &Uuid, version: u64) -> RepositoryResult<Vec<Box<dyn DomainEvent>>>;
 } 

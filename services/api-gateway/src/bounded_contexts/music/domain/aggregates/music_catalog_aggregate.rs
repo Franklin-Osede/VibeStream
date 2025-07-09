@@ -7,8 +7,9 @@ use crate::bounded_contexts::music::domain::entities::Song;
 use crate::bounded_contexts::music::domain::value_objects::{
     SongId, SongTitle, ArtistId, SongDuration, Genre, RoyaltyPercentage, AlbumId, AlbumTitle
 };
+use crate::shared::domain::events::DomainEvent;
 use crate::bounded_contexts::music::domain::events::{
-    DomainEvent, SongUploaded, AlbumCreated, PlaylistCreated
+    SongUploaded, AlbumCreated, PlaylistCreated
 };
 
 // Business configuration - easily changeable
@@ -189,6 +190,7 @@ impl MusicCatalogAggregate {
             genre: genre.clone(),
             duration_seconds: duration.seconds(),
             uploaded_at: Utc::now(),
+            metadata: crate::shared::domain::events::EventMetadata::new(),
         });
 
         self.songs.insert(song_id.clone(), song);
@@ -247,6 +249,7 @@ impl MusicCatalogAggregate {
             title: album.title().value().to_string(),
             song_ids,
             created_at: Utc::now(),
+            metadata: crate::shared::domain::events::EventMetadata::new(),
         });
 
         self.albums.insert(album_id.clone(), album);
@@ -283,11 +286,12 @@ impl MusicCatalogAggregate {
 
         // Create domain event
         let event = Box::new(PlaylistCreated {
-            playlist_id,
+            playlist_id: playlist_id.clone(),
             user_id,
             name,
             song_ids,
             created_at: Utc::now(),
+            metadata: crate::shared::domain::events::EventMetadata::new(),
         });
 
         self.playlists.insert(playlist_id, playlist);

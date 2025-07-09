@@ -9,8 +9,9 @@ use crate::bounded_contexts::listen_reward::domain::value_objects::{
 use crate::bounded_contexts::listen_reward::domain::entities::{
     ListenSession
 };
+use crate::shared::domain::events::DomainEvent;
 use crate::bounded_contexts::listen_reward::domain::events::{
-    DomainEvent, RewardDistributed, ArtistRoyaltyPaid, RewardPoolDepleted, RewardDistributionCreated
+    RewardDistributed, ArtistRoyaltyPaid, RewardPoolDepleted, RewardDistributionCreated
 };
 use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId, RoyaltyPercentage};
 

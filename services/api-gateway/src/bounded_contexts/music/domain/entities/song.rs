@@ -6,8 +6,9 @@ use crate::bounded_contexts::music::domain::value_objects::{
     SongId, SongTitle, ArtistId, SongDuration, Genre, IpfsHash, 
     RoyaltyPercentage, ListenCount, Tempo, ReleaseType, SongMood, FileFormat, AudioQuality
 };
+use crate::shared::domain::events::DomainEvent;
 use crate::bounded_contexts::music::domain::events::{
-    DomainEvent, SongListened, SongAvailableForCampaign, SongAvailableForOwnership
+    SongListened, SongAvailableForCampaign, SongAvailableForOwnership
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -173,6 +174,7 @@ impl Song {
             listen_count: self.listen_count.value(),
             listen_duration_seconds,
             listened_at: Utc::now(),
+            metadata: crate::shared::domain::events::EventMetadata::new(),
         }))
     }
 
@@ -193,6 +195,7 @@ impl Song {
                 artist_id: self.artist_id.clone(),
                 revenue_threshold_reached: self.revenue_generated,
                 marked_at: Utc::now(),
+                metadata: crate::shared::domain::events::EventMetadata::new(),
             })));
         }
 

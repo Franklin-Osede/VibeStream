@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
-use crate::bounded_contexts::music::domain::events::DomainEvent;
+use crate::shared::domain::events::DomainEvent;
 
 pub type EventResult<T> = Result<T, EventBusError>;
 

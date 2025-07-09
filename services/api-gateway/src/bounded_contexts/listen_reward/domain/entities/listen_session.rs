@@ -5,8 +5,9 @@ use chrono::{DateTime, Utc};
 use crate::bounded_contexts::listen_reward::domain::value_objects::{
     ListenSessionId, RewardAmount, ListenDuration, QualityScore, ZkProofHash, RewardTier
 };
+use crate::shared::domain::events::DomainEvent;
 use crate::bounded_contexts::listen_reward::domain::events::{
-    DomainEvent, ListenSessionStarted, ListenSessionCompleted, RewardCalculated, 
+    ListenSessionStarted, ListenSessionCompleted, RewardCalculated, 
     ZkProofVerificationFailed
 };
 use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};

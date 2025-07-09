@@ -48,7 +48,7 @@ impl AppState {
             blockchain_service: Arc::new(()),
             zk_service: Arc::new(()),
             ipfs_service: Arc::new(()),
-            db_pool: Arc::new(PgPool::connect("").await.unwrap()), // Mock
+            db_pool: Arc::new(unsafe { std::mem::zeroed() }), // Mock pool
         }
     }
 }
