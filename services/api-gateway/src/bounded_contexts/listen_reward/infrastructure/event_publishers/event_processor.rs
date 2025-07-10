@@ -2,7 +2,8 @@
 use async_trait::async_trait;
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use crate::bounded_contexts::listen_reward::domain::events::DomainEvent;
+use crate::shared::domain::events::DomainEvent;
+use super::{EventPublisher, EventPublishResult};
 
 #[async_trait]
 pub trait EventProcessor: Send + Sync {

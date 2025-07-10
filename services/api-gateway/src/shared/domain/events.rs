@@ -14,6 +14,34 @@ pub struct EventMetadata {
     pub version: i32,
 }
 
+impl EventMetadata {
+    pub fn new() -> Self {
+        Self {
+            event_id: Uuid::new_v4(),
+            event_type: String::new(),
+            aggregate_id: Uuid::new_v4(),
+            aggregate_type: String::new(),
+            occurred_at: Utc::now(),
+            correlation_id: None,
+            user_id: None,
+            version: 1,
+        }
+    }
+
+    pub fn with_type_and_aggregate(event_type: &str, aggregate_type: &str, aggregate_id: Uuid) -> Self {
+        Self {
+            event_id: Uuid::new_v4(),
+            event_type: event_type.to_string(),
+            aggregate_id,
+            aggregate_type: aggregate_type.to_string(),
+            occurred_at: Utc::now(),
+            correlation_id: None,
+            user_id: None,
+            version: 1,
+        }
+    }
+}
+
 pub trait DomainEvent: std::fmt::Debug + Send + Sync {
     fn metadata(&self) -> &EventMetadata;
     fn event_type(&self) -> &str;

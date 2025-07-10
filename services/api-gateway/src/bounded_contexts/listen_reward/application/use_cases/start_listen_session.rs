@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::bounded_contexts::listen_reward::domain::{
-    ListenSession, RewardTier, DomainEvent
-};
+use crate::bounded_contexts::listen_reward::domain::entities::ListenSession;
+use crate::bounded_contexts::listen_reward::domain::value_objects::RewardTier;
+use crate::shared::domain::events::DomainEvent;
 use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

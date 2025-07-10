@@ -6,14 +6,7 @@ use crate::bounded_contexts::listen_reward::domain::value_objects::{
     ListenSessionId, RewardAmount, ListenDuration, QualityScore, ZkProofHash, RewardTier
 };
 use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
-
-// Base trait for all domain events
-pub trait DomainEvent: Send + Sync + std::fmt::Debug {
-    fn event_type(&self) -> &'static str;
-    fn aggregate_id(&self) -> Uuid;
-    fn timestamp(&self) -> DateTime<Utc>;
-    fn data(&self) -> serde_json::Value;
-}
+use crate::shared::domain::events::{DomainEvent, EventMetadata};
 
 // Listen session started
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -22,8 +15,9 @@ pub struct ListenSessionStarted {
     pub user_id: Uuid,
     pub song_id: SongId,
     pub artist_id: ArtistId,
-    pub user_tier: RewardTier,
+    pub quality_score: QualityScore,
     pub started_at: DateTime<Utc>,
+    pub metadata: EventMetadata,
 }
 
 impl ListenSessionStarted {
@@ -32,47 +26,59 @@ impl ListenSessionStarted {
         user_id: Uuid,
         song_id: SongId,
         artist_id: ArtistId,
-        user_tier: RewardTier,
+        quality_score: QualityScore,
+        started_at: DateTime<Utc>,
     ) -> Self {
         Self {
             session_id,
             user_id,
             song_id,
             artist_id,
-            user_tier,
-            started_at: Utc::now(),
+            quality_score,
+            started_at,
+            metadata: EventMetadata::new(),
         }
     }
 }
 
 impl DomainEvent for ListenSessionStarted {
-    fn event_type(&self) -> &'static str {
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+
+    fn event_type(&self) -> &str {
         "ListenSessionStarted"
     }
 
     fn aggregate_id(&self) -> Uuid {
-        self.session_id.value()
+        self.session_id.to_uuid()
     }
 
-    fn timestamp(&self) -> DateTime<Utc> {
+    fn aggregate_type(&self) -> &str {
+        "ListenSession"
+    }
+
+    fn occurred_at(&self) -> DateTime<Utc> {
         self.started_at
     }
 
-    fn data(&self) -> serde_json::Value {
-        serde_json::to_value(self).unwrap_or_default()
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or(serde_json::Value::Null)
     }
 }
 
-// Listen session completed with ZK proof
+// Listen session completed
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListenSessionCompleted {
     pub session_id: ListenSessionId,
     pub user_id: Uuid,
     pub song_id: SongId,
-    pub listen_duration: ListenDuration,
+    pub artist_id: ArtistId,
+    pub duration: ListenDuration,
     pub quality_score: QualityScore,
-    pub zk_proof: ZkProofHash,
+    pub completion_percentage: f64,
     pub completed_at: DateTime<Utc>,
+    pub metadata: EventMetadata,
 }
 
 impl ListenSessionCompleted {
@@ -80,194 +86,53 @@ impl ListenSessionCompleted {
         session_id: ListenSessionId,
         user_id: Uuid,
         song_id: SongId,
-        listen_duration: ListenDuration,
+        artist_id: ArtistId,
+        duration: ListenDuration,
         quality_score: QualityScore,
-        zk_proof: ZkProofHash,
+        completion_percentage: f64,
+        completed_at: DateTime<Utc>,
     ) -> Self {
         Self {
             session_id,
             user_id,
             song_id,
-            listen_duration,
+            artist_id,
+            duration,
             quality_score,
-            zk_proof,
-            completed_at: Utc::now(),
+            completion_percentage,
+            completed_at,
+            metadata: EventMetadata::new(),
         }
     }
 }
 
 impl DomainEvent for ListenSessionCompleted {
-    fn event_type(&self) -> &'static str {
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+
+    fn event_type(&self) -> &str {
         "ListenSessionCompleted"
     }
 
     fn aggregate_id(&self) -> Uuid {
-        self.session_id.value()
+        self.session_id.to_uuid()
     }
 
-    fn timestamp(&self) -> DateTime<Utc> {
+    fn aggregate_type(&self) -> &str {
+        "ListenSession"
+    }
+
+    fn occurred_at(&self) -> DateTime<Utc> {
         self.completed_at
     }
 
-    fn data(&self) -> serde_json::Value {
-        serde_json::to_value(self).unwrap_or_default()
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or(serde_json::Value::Null)
     }
 }
 
-// Reward calculated and ready for distribution
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RewardCalculated {
-    pub session_id: ListenSessionId,
-    pub user_id: Uuid,
-    pub song_id: SongId,
-    pub artist_id: ArtistId,
-    pub base_reward: RewardAmount,
-    pub final_reward: RewardAmount,
-    pub user_tier: RewardTier,
-    pub quality_multiplier: f64,
-    pub calculated_at: DateTime<Utc>,
-}
-
-impl RewardCalculated {
-    pub fn new(
-        session_id: ListenSessionId,
-        user_id: Uuid,
-        song_id: SongId,
-        artist_id: ArtistId,
-        base_reward: RewardAmount,
-        final_reward: RewardAmount,
-        user_tier: RewardTier,
-        quality_multiplier: f64,
-    ) -> Self {
-        Self {
-            session_id,
-            user_id,
-            song_id,
-            artist_id,
-            base_reward,
-            final_reward,
-            user_tier,
-            quality_multiplier,
-            calculated_at: Utc::now(),
-        }
-    }
-}
-
-impl DomainEvent for RewardCalculated {
-    fn event_type(&self) -> &'static str {
-        "RewardCalculated"
-    }
-
-    fn aggregate_id(&self) -> Uuid {
-        self.session_id.value()
-    }
-
-    fn timestamp(&self) -> DateTime<Utc> {
-        self.calculated_at
-    }
-
-    fn data(&self) -> serde_json::Value {
-        serde_json::to_value(self).unwrap_or_default()
-    }
-}
-
-// Reward distributed to user
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RewardDistributed {
-    pub session_id: ListenSessionId,
-    pub user_id: Uuid,
-    pub reward_amount: RewardAmount,
-    pub transaction_hash: String,
-    pub distributed_at: DateTime<Utc>,
-}
-
-impl RewardDistributed {
-    pub fn new(
-        session_id: ListenSessionId,
-        user_id: Uuid,
-        reward_amount: RewardAmount,
-        transaction_hash: String,
-    ) -> Self {
-        Self {
-            session_id,
-            user_id,
-            reward_amount,
-            transaction_hash,
-            distributed_at: Utc::now(),
-        }
-    }
-}
-
-impl DomainEvent for RewardDistributed {
-    fn event_type(&self) -> &'static str {
-        "RewardDistributed"
-    }
-
-    fn aggregate_id(&self) -> Uuid {
-        self.session_id.value()
-    }
-
-    fn timestamp(&self) -> DateTime<Utc> {
-        self.distributed_at
-    }
-
-    fn data(&self) -> serde_json::Value {
-        serde_json::to_value(self).unwrap_or_default()
-    }
-}
-
-// Artist royalty paid from listen rewards
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ArtistRoyaltyPaid {
-    pub session_id: ListenSessionId,
-    pub artist_id: ArtistId,
-    pub song_id: SongId,
-    pub royalty_amount: RewardAmount,
-    pub royalty_percentage: f64,
-    pub transaction_hash: String,
-    pub paid_at: DateTime<Utc>,
-}
-
-impl ArtistRoyaltyPaid {
-    pub fn new(
-        session_id: ListenSessionId,
-        artist_id: ArtistId,
-        song_id: SongId,
-        royalty_amount: RewardAmount,
-        royalty_percentage: f64,
-        transaction_hash: String,
-    ) -> Self {
-        Self {
-            session_id,
-            artist_id,
-            song_id,
-            royalty_amount,
-            royalty_percentage,
-            transaction_hash,
-            paid_at: Utc::now(),
-        }
-    }
-}
-
-impl DomainEvent for ArtistRoyaltyPaid {
-    fn event_type(&self) -> &'static str {
-        "ArtistRoyaltyPaid"
-    }
-
-    fn aggregate_id(&self) -> Uuid {
-        self.session_id.value()
-    }
-
-    fn timestamp(&self) -> DateTime<Utc> {
-        self.paid_at
-    }
-
-    fn data(&self) -> serde_json::Value {
-        serde_json::to_value(self).unwrap_or_default()
-    }
-}
-
-// ZK proof verification failed
+// ZK Proof verification failed
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZkProofVerificationFailed {
     pub session_id: ListenSessionId,
@@ -276,6 +141,7 @@ pub struct ZkProofVerificationFailed {
     pub proof_hash: ZkProofHash,
     pub failure_reason: String,
     pub failed_at: DateTime<Utc>,
+    pub metadata: EventMetadata,
 }
 
 impl ZkProofVerificationFailed {
@@ -285,6 +151,7 @@ impl ZkProofVerificationFailed {
         song_id: SongId,
         proof_hash: ZkProofHash,
         failure_reason: String,
+        failed_at: DateTime<Utc>,
     ) -> Self {
         Self {
             session_id,
@@ -292,68 +159,97 @@ impl ZkProofVerificationFailed {
             song_id,
             proof_hash,
             failure_reason,
-            failed_at: Utc::now(),
+            failed_at,
+            metadata: EventMetadata::new(),
         }
     }
 }
 
 impl DomainEvent for ZkProofVerificationFailed {
-    fn event_type(&self) -> &'static str {
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+
+    fn event_type(&self) -> &str {
         "ZkProofVerificationFailed"
     }
 
     fn aggregate_id(&self) -> Uuid {
-        self.session_id.value()
+        self.session_id.to_uuid()
     }
 
-    fn timestamp(&self) -> DateTime<Utc> {
+    fn aggregate_type(&self) -> &str {
+        "ListenSession"
+    }
+
+    fn occurred_at(&self) -> DateTime<Utc> {
         self.failed_at
     }
 
-    fn data(&self) -> serde_json::Value {
-        serde_json::to_value(self).unwrap_or_default()
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or(serde_json::Value::Null)
     }
 }
 
-// Reward pool depleted
+// Reward calculated
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RewardPoolDepleted {
-    pub pool_id: Uuid,
-    pub remaining_tokens: RewardAmount,
-    pub total_distributed: RewardAmount,
-    pub depleted_at: DateTime<Utc>,
+pub struct RewardCalculated {
+    pub session_id: ListenSessionId,
+    pub user_id: Uuid,
+    pub song_id: SongId,
+    pub artist_id: ArtistId,
+    pub reward_amount: RewardAmount,
+    pub reward_tier: RewardTier,
+    pub calculated_at: DateTime<Utc>,
+    pub metadata: EventMetadata,
 }
 
-impl RewardPoolDepleted {
+impl RewardCalculated {
     pub fn new(
-        pool_id: Uuid,
-        remaining_tokens: RewardAmount,
-        total_distributed: RewardAmount,
+        session_id: ListenSessionId,
+        user_id: Uuid,
+        song_id: SongId,
+        artist_id: ArtistId,
+        reward_amount: RewardAmount,
+        reward_tier: RewardTier,
+        calculated_at: DateTime<Utc>,
     ) -> Self {
         Self {
-            pool_id,
-            remaining_tokens,
-            total_distributed,
-            depleted_at: Utc::now(),
+            session_id,
+            user_id,
+            song_id,
+            artist_id,
+            reward_amount,
+            reward_tier,
+            calculated_at,
+            metadata: EventMetadata::new(),
         }
     }
 }
 
-impl DomainEvent for RewardPoolDepleted {
-    fn event_type(&self) -> &'static str {
-        "RewardPoolDepleted"
+impl DomainEvent for RewardCalculated {
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+
+    fn event_type(&self) -> &str {
+        "RewardCalculated"
     }
 
     fn aggregate_id(&self) -> Uuid {
-        self.pool_id
+        self.session_id.to_uuid()
     }
 
-    fn timestamp(&self) -> DateTime<Utc> {
-        self.depleted_at
+    fn aggregate_type(&self) -> &str {
+        "ListenSession"
     }
 
-    fn data(&self) -> serde_json::Value {
-        serde_json::to_value(self).unwrap_or_default()
+    fn occurred_at(&self) -> DateTime<Utc> {
+        self.calculated_at
+    }
+
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or(serde_json::Value::Null)
     }
 }
 
@@ -361,28 +257,50 @@ impl DomainEvent for RewardPoolDepleted {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RewardDistributionCreated {
     pub distribution_id: Uuid,
-    pub pool_id: Uuid,
-    pub total_tokens: f64,
+    pub session_id: ListenSessionId,
+    pub user_id: Uuid,
+    pub artist_id: ArtistId,
+    pub total_amount: RewardAmount,
+    pub user_share: RewardAmount,
+    pub artist_share: RewardAmount,
+    pub platform_fee: RewardAmount,
     pub created_at: DateTime<Utc>,
+    pub metadata: EventMetadata,
 }
 
 impl RewardDistributionCreated {
     pub fn new(
         distribution_id: Uuid,
-        pool_id: Uuid,
-        total_tokens: f64,
+        session_id: ListenSessionId,
+        user_id: Uuid,
+        artist_id: ArtistId,
+        total_amount: RewardAmount,
+        user_share: RewardAmount,
+        artist_share: RewardAmount,
+        platform_fee: RewardAmount,
+        created_at: DateTime<Utc>,
     ) -> Self {
         Self {
             distribution_id,
-            pool_id,
-            total_tokens,
-            created_at: Utc::now(),
+            session_id,
+            user_id,
+            artist_id,
+            total_amount,
+            user_share,
+            artist_share,
+            platform_fee,
+            created_at,
+            metadata: EventMetadata::new(),
         }
     }
 }
 
 impl DomainEvent for RewardDistributionCreated {
-    fn event_type(&self) -> &'static str {
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+
+    fn event_type(&self) -> &str {
         "RewardDistributionCreated"
     }
 
@@ -390,11 +308,189 @@ impl DomainEvent for RewardDistributionCreated {
         self.distribution_id
     }
 
-    fn timestamp(&self) -> DateTime<Utc> {
+    fn aggregate_type(&self) -> &str {
+        "RewardDistribution"
+    }
+
+    fn occurred_at(&self) -> DateTime<Utc> {
         self.created_at
     }
 
-    fn data(&self) -> serde_json::Value {
-        serde_json::to_value(self).unwrap_or_default()
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or(serde_json::Value::Null)
+    }
+}
+
+// Reward distributed
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RewardDistributed {
+    pub distribution_id: Uuid,
+    pub user_id: Uuid,
+    pub artist_id: ArtistId,
+    pub amount: RewardAmount,
+    pub recipient_type: String, // "user", "artist", "platform"
+    pub distributed_at: DateTime<Utc>,
+    pub metadata: EventMetadata,
+}
+
+impl RewardDistributed {
+    pub fn new(
+        distribution_id: Uuid,
+        user_id: Uuid,
+        artist_id: ArtistId,
+        amount: RewardAmount,
+        recipient_type: String,
+        distributed_at: DateTime<Utc>,
+    ) -> Self {
+        Self {
+            distribution_id,
+            user_id,
+            artist_id,
+            amount,
+            recipient_type,
+            distributed_at,
+            metadata: EventMetadata::new(),
+        }
+    }
+}
+
+impl DomainEvent for RewardDistributed {
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+
+    fn event_type(&self) -> &str {
+        "RewardDistributed"
+    }
+
+    fn aggregate_id(&self) -> Uuid {
+        self.distribution_id
+    }
+
+    fn aggregate_type(&self) -> &str {
+        "RewardDistribution"
+    }
+
+    fn occurred_at(&self) -> DateTime<Utc> {
+        self.distributed_at
+    }
+
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or(serde_json::Value::Null)
+    }
+}
+
+// Artist royalty paid
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArtistRoyaltyPaid {
+    pub payment_id: Uuid,
+    pub artist_id: ArtistId,
+    pub song_id: SongId,
+    pub amount: RewardAmount,
+    pub period_start: DateTime<Utc>,
+    pub period_end: DateTime<Utc>,
+    pub paid_at: DateTime<Utc>,
+    pub metadata: EventMetadata,
+}
+
+impl ArtistRoyaltyPaid {
+    pub fn new(
+        payment_id: Uuid,
+        artist_id: ArtistId,
+        song_id: SongId,
+        amount: RewardAmount,
+        period_start: DateTime<Utc>,
+        period_end: DateTime<Utc>,
+        paid_at: DateTime<Utc>,
+    ) -> Self {
+        Self {
+            payment_id,
+            artist_id,
+            song_id,
+            amount,
+            period_start,
+            period_end,
+            paid_at,
+            metadata: EventMetadata::new(),
+        }
+    }
+}
+
+impl DomainEvent for ArtistRoyaltyPaid {
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+
+    fn event_type(&self) -> &str {
+        "ArtistRoyaltyPaid"
+    }
+
+    fn aggregate_id(&self) -> Uuid {
+        self.payment_id
+    }
+
+    fn aggregate_type(&self) -> &str {
+        "ArtistPayment"
+    }
+
+    fn occurred_at(&self) -> DateTime<Utc> {
+        self.paid_at
+    }
+
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or(serde_json::Value::Null)
+    }
+}
+
+// Reward pool depleted
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RewardPoolDepleted {
+    pub pool_id: Uuid,
+    pub remaining_amount: RewardAmount,
+    pub threshold_percentage: f64,
+    pub depleted_at: DateTime<Utc>,
+    pub metadata: EventMetadata,
+}
+
+impl RewardPoolDepleted {
+    pub fn new(
+        pool_id: Uuid,
+        remaining_amount: RewardAmount,
+        threshold_percentage: f64,
+        depleted_at: DateTime<Utc>,
+    ) -> Self {
+        Self {
+            pool_id,
+            remaining_amount,
+            threshold_percentage,
+            depleted_at,
+            metadata: EventMetadata::new(),
+        }
+    }
+}
+
+impl DomainEvent for RewardPoolDepleted {
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+
+    fn event_type(&self) -> &str {
+        "RewardPoolDepleted"
+    }
+
+    fn aggregate_id(&self) -> Uuid {
+        self.pool_id
+    }
+
+    fn aggregate_type(&self) -> &str {
+        "RewardPool"
+    }
+
+    fn occurred_at(&self) -> DateTime<Utc> {
+        self.depleted_at
+    }
+
+    fn event_data(&self) -> serde_json::Value {
+        serde_json::to_value(self).unwrap_or(serde_json::Value::Null)
     }
 } 

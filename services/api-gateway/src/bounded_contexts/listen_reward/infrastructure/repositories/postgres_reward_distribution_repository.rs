@@ -9,15 +9,13 @@ use chrono::{DateTime, Utc};
 use async_trait::async_trait;
 use serde_json;
 
-use crate::bounded_contexts::listen_reward::domain::{
-    aggregates::reward_distribution::{RewardDistribution, RewardPool},
-    value_objects::{RewardPoolId, RewardAmount, ValidationPeriod},
-    events::DomainEvent,
+use crate::bounded_contexts::listen_reward::domain::aggregates::RewardDistribution;
+use crate::bounded_contexts::listen_reward::domain::value_objects::{
+    ListenSessionId, RewardAmount, RewardTier, ZkProofHash,
 };
-
-use super::{
-    RewardDistributionRepository, RepositoryResult, Pagination
-};
+use crate::shared::domain::events::DomainEvent;
+use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
+use super::{RewardDistributionRepository, RepositoryResult, Pagination};
 
 // Estructura para mapear la tabla reward_distributions
 #[derive(sqlx::FromRow, Debug)]

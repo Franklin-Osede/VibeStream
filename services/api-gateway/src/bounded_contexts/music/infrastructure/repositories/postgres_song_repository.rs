@@ -1,16 +1,14 @@
 use async_trait::async_trait;
-use sqlx::{PgPool, Row};
+use sqlx::PgPool;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 use crate::bounded_contexts::music::domain::{
-    Song, SongId, ArtistId, Genre, SongTitle, SongDuration, RoyaltyPercentage, ListenCount
+    Song, SongId, ArtistId, Genre, 
+    value_objects::{SongTitle, SongDuration, RoyaltyPercentage, ListenCount}
 };
-use crate::bounded_contexts::music::domain::repositories::{
-    SongRepository, RepositoryResult, RepositoryError
-};
+use crate::bounded_contexts::music::domain::repositories::{SongRepository, RepositoryResult, RepositoryError};
+use crate::shared::domain::errors::AppError;
 
-#[derive(Clone)]
 pub struct PostgresSongRepository {
     pool: PgPool,
 }
@@ -19,319 +17,288 @@ impl PostgresSongRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
+
+    /// Convert database row to Song entity
+    fn row_to_song(&self, row: sqlx::postgres::PgRow) -> Result<Song, RepositoryError> {
+        use sqlx::Row;
+        
+        let id = SongId::from_uuid(
+            row.try_get("id").map_err(|e| RepositoryError::Serialization(e.to_string()))?
+        );
+        
+        let title = SongTitle::new(
+            row.try_get("title").map_err(|e| RepositoryError::Serialization(e.to_string()))?
+        ).map_err(|e| RepositoryError::Serialization(e))?;
+        
+        let artist_id = ArtistId::from_uuid(
+            row.try_get("artist_id").map_err(|e| RepositoryError::Serialization(e.to_string()))?
+        );
+        
+        let duration = SongDuration::new(
+            row.try_get("duration_seconds").map_err(|e| RepositoryError::Serialization(e.to_string()))?
+        ).map_err(|e| RepositoryError::Serialization(e))?;
+        
+        let genre = Genre::new(
+            row.try_get("genre").map_err(|e| RepositoryError::Serialization(e.to_string()))?
+        ).map_err(|e| RepositoryError::Serialization(e))?;
+        
+        let royalty_percentage = RoyaltyPercentage::new(
+            row.try_get("royalty_percentage").map_err(|e| RepositoryError::Serialization(e.to_string()))?
+        ).map_err(|e| RepositoryError::Serialization(e))?;
+
+        // Create song with basic fields first
+        let mut song = Song::new(title, artist_id, duration, genre, royalty_percentage);
+
+        // Set additional fields from database
+        let listen_count: i64 = row.try_get("listen_count").unwrap_or(0);
+        song.set_listen_count(ListenCount::new(listen_count as u64));
+
+        let revenue: f64 = row.try_get("revenue_generated").unwrap_or(0.0);
+        song.set_revenue_generated(revenue);
+
+        Ok(song)
+    }
 }
 
 #[async_trait]
 impl SongRepository for PostgresSongRepository {
     async fn save(&self, song: &Song) -> RepositoryResult<()> {
-        let query = r#"
-            INSERT INTO songs (
-                id, title, artist_id, duration_seconds, genre, 
-                royalty_percentage, listen_count, revenue_generated,
-                is_available_for_campaign, is_available_for_ownership,
-                created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-            ON CONFLICT (id) DO UPDATE SET
-                title = EXCLUDED.title,
-                duration_seconds = EXCLUDED.duration_seconds,
-                genre = EXCLUDED.genre,
-                royalty_percentage = EXCLUDED.royalty_percentage,
-                listen_count = EXCLUDED.listen_count,
-                revenue_generated = EXCLUDED.revenue_generated,
-                is_available_for_campaign = EXCLUDED.is_available_for_campaign,
-                is_available_for_ownership = EXCLUDED.is_available_for_ownership,
-                updated_at = EXCLUDED.updated_at
-        "#;
-
-        sqlx::query(query)
-            .bind(song.id().value())
-            .bind(song.title().value())
-            .bind(song.artist_id().value())
-            .bind(song.duration().seconds() as i32)
-            .bind(song.genre().value())
-            .bind(song.royalty_percentage().value())
-            .bind(song.listen_count().value() as i64)
-            .bind(song.revenue_generated())
-            .bind(song.is_available_for_campaign())
-            .bind(song.is_available_for_ownership())
-            .bind(song.created_at())
-            .bind(Utc::now()) // updated_at
-            .execute(&self.pool)
-            .await
-            .map_err(|e| RepositoryError::Database(e.to_string()))?;
+        sqlx::query(
+            r#"INSERT INTO songs (id, title, artist_id, duration_seconds, genre, royalty_percentage, 
+                                  listen_count, revenue_generated, is_available_for_campaign, 
+                                  is_available_for_ownership, created_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+               ON CONFLICT (id) DO UPDATE SET
+                   title = EXCLUDED.title,
+                   genre = EXCLUDED.genre,
+                   royalty_percentage = EXCLUDED.royalty_percentage,
+                   listen_count = EXCLUDED.listen_count,
+                   revenue_generated = EXCLUDED.revenue_generated,
+                   is_available_for_campaign = EXCLUDED.is_available_for_campaign,
+                   is_available_for_ownership = EXCLUDED.is_available_for_ownership,
+                   updated_at = EXCLUDED.updated_at"#
+        )
+        .bind(song.id().to_uuid())
+        .bind(song.title().to_string())
+        .bind(song.artist_id().to_uuid())
+        .bind(song.duration().seconds())
+        .bind(song.genre().to_string())
+        .bind(song.royalty_percentage().value())
+        .bind(song.listen_count().count() as i64)
+        .bind(song.revenue_generated())
+        .bind(song.is_available_for_campaign())
+        .bind(song.is_available_for_ownership())
+        .bind(song.created_at())
+        .bind(song.updated_at())
+        .execute(&self.pool)
+        .await
+        .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
         Ok(())
     }
 
     async fn update(&self, song: &Song) -> RepositoryResult<()> {
-        let query = r#"
-            UPDATE songs SET
-                title = $2,
-                duration_seconds = $3,
-                genre = $4,
-                royalty_percentage = $5,
-                listen_count = $6,
-                revenue_generated = $7,
-                is_available_for_campaign = $8,
-                is_available_for_ownership = $9,
-                updated_at = $10
-            WHERE id = $1
-        "#;
+        let affected_rows = sqlx::query(
+            r#"UPDATE songs SET 
+                   title = $2,
+                   genre = $3,
+                   royalty_percentage = $4,
+                   listen_count = $5,
+                   revenue_generated = $6,
+                   is_available_for_campaign = $7,
+                   is_available_for_ownership = $8,
+                   updated_at = $9
+               WHERE id = $1"#
+        )
+        .bind(song.id().to_uuid())
+        .bind(song.title().to_string())
+        .bind(song.genre().to_string())
+        .bind(song.royalty_percentage().value())
+        .bind(song.listen_count().count() as i64)
+        .bind(song.revenue_generated())
+        .bind(song.is_available_for_campaign())
+        .bind(song.is_available_for_ownership())
+        .bind(song.updated_at())
+        .execute(&self.pool)
+        .await
+        .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
-        let result = sqlx::query(query)
-            .bind(song.id().value())
-            .bind(song.title().value())
-            .bind(song.duration().seconds() as i32)
-            .bind(song.genre().value())
-            .bind(song.royalty_percentage().value())
-            .bind(song.listen_count().value() as i64)
-            .bind(song.revenue_generated())
-            .bind(song.is_available_for_campaign())
-            .bind(song.is_available_for_ownership())
-            .bind(Utc::now()) // updated_at
-            .execute(&self.pool)
-            .await
-            .map_err(|e| RepositoryError::Database(e.to_string()))?;
-
-        if result.rows_affected() == 0 {
-            return Err(RepositoryError::NotFound(format!("Song with id {} not found", song.id().value())));
+        if affected_rows.rows_affected() == 0 {
+            return Err(RepositoryError::NotFound(format!("Song with id {} not found", song.id().to_uuid())));
         }
 
         Ok(())
     }
 
     async fn find_by_id(&self, id: &SongId) -> RepositoryResult<Option<Song>> {
-        let query = r#"
-            SELECT id, title, artist_id, duration_seconds, genre,
-                   royalty_percentage, listen_count, revenue_generated,
-                   is_available_for_campaign, is_available_for_ownership,
-                   created_at, updated_at
-            FROM songs WHERE id = $1
-        "#;
+        let row = sqlx::query(
+            r#"SELECT id, title, artist_id, duration_seconds, genre, royalty_percentage,
+                      listen_count, revenue_generated, is_available_for_campaign,
+                      is_available_for_ownership, created_at, updated_at
+               FROM songs WHERE id = $1"#
+        )
+        .bind(id.to_uuid())
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
-        let row = sqlx::query(query)
-            .bind(id.value())
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|e| RepositoryError::Database(e.to_string()))?;
-
-        if let Some(row) = row {
-            let song = self.row_to_song(row)?;
-            Ok(Some(song))
-        } else {
-            Ok(None)
+        match row {
+            Some(row) => Ok(Some(self.row_to_song(row)?)),
+            None => Ok(None),
         }
     }
 
     async fn delete(&self, id: &SongId) -> RepositoryResult<()> {
-        let query = "DELETE FROM songs WHERE id = $1";
-        
-        sqlx::query(query)
-            .bind(id.value())
+        let affected_rows = sqlx::query("DELETE FROM songs WHERE id = $1")
+            .bind(id.to_uuid())
             .execute(&self.pool)
             .await
             .map_err(|e| RepositoryError::Database(e.to_string()))?;
+
+        if affected_rows.rows_affected() == 0 {
+            return Err(RepositoryError::NotFound(format!("Song with id {} not found", id.to_uuid())));
+        }
 
         Ok(())
     }
 
     async fn find_by_artist(&self, artist_id: &ArtistId) -> RepositoryResult<Vec<Song>> {
-        let query = r#"
-            SELECT id, title, artist_id, duration_seconds, genre,
-                   royalty_percentage, listen_count, revenue_generated,
-                   is_available_for_campaign, is_available_for_ownership,
-                   created_at, updated_at
-            FROM songs WHERE artist_id = $1
-            ORDER BY created_at DESC
-        "#;
+        let rows = sqlx::query(
+            r#"SELECT id, title, artist_id, duration_seconds, genre, royalty_percentage,
+                      listen_count, revenue_generated, is_available_for_campaign,
+                      is_available_for_ownership, created_at, updated_at
+               FROM songs WHERE artist_id = $1
+               ORDER BY created_at DESC"#
+        )
+        .bind(artist_id.to_uuid())
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
-        let rows = sqlx::query(query)
-            .bind(artist_id.value())
-            .fetch_all(&self.pool)
-            .await
-            .map_err(|e| RepositoryError::Database(e.to_string()))?;
-
-        let songs = rows.into_iter()
-            .map(|row| self.row_to_song(row))
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut songs = Vec::new();
+        for row in rows {
+            songs.push(self.row_to_song(row)?);
+        }
 
         Ok(songs)
     }
 
     async fn find_by_genre(&self, genre: &Genre) -> RepositoryResult<Vec<Song>> {
-        let query = r#"
-            SELECT id, title, artist_id, duration_seconds, genre,
-                   royalty_percentage, listen_count, revenue_generated,
-                   is_available_for_campaign, is_available_for_ownership,
-                   created_at, updated_at
-            FROM songs WHERE genre = $1
-            ORDER BY listen_count DESC
-        "#;
+        let rows = sqlx::query(
+            r#"SELECT id, title, artist_id, duration_seconds, genre, royalty_percentage,
+                      listen_count, revenue_generated, is_available_for_campaign,
+                      is_available_for_ownership, created_at, updated_at
+               FROM songs WHERE genre = $1
+               ORDER BY created_at DESC"#
+        )
+        .bind(genre.to_string())
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
-        let rows = sqlx::query(query)
-            .bind(genre.value())
-            .fetch_all(&self.pool)
-            .await
-            .map_err(|e| RepositoryError::Database(e.to_string()))?;
-
-        let songs = rows.into_iter()
-            .map(|row| self.row_to_song(row))
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut songs = Vec::new();
+        for row in rows {
+            songs.push(self.row_to_song(row)?);
+        }
 
         Ok(songs)
     }
 
     async fn find_trending(&self, limit: Option<usize>) -> RepositoryResult<Vec<Song>> {
-        let limit = limit.unwrap_or(50) as i64;
+        let limit_val = limit.unwrap_or(50) as i64;
         
-        let query = r#"
-            SELECT id, title, artist_id, duration_seconds, genre,
-                   royalty_percentage, listen_count, revenue_generated,
-                   is_available_for_campaign, is_available_for_ownership,
-                   created_at, updated_at
-            FROM songs 
-            WHERE created_at > NOW() - INTERVAL '30 days'
-              AND listen_count > 0
-            ORDER BY (listen_count::float / EXTRACT(EPOCH FROM (NOW() - created_at)) * 86400) DESC
-            LIMIT $1
-        "#;
+        let rows = sqlx::query(
+            r#"SELECT id, title, artist_id, duration_seconds, genre, royalty_percentage,
+                      listen_count, revenue_generated, is_available_for_campaign,
+                      is_available_for_ownership, created_at, updated_at
+               FROM songs 
+               WHERE created_at > NOW() - INTERVAL '7 days'
+               ORDER BY listen_count DESC, created_at DESC
+               LIMIT $1"#
+        )
+        .bind(limit_val)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
-        let rows = sqlx::query(query)
-            .bind(limit)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(|e| RepositoryError::Database(e.to_string()))?;
-
-        let songs = rows.into_iter()
-            .map(|row| self.row_to_song(row))
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut songs = Vec::new();
+        for row in rows {
+            songs.push(self.row_to_song(row)?);
+        }
 
         Ok(songs)
     }
 
     async fn find_popular(&self, limit: Option<usize>) -> RepositoryResult<Vec<Song>> {
-        let limit = limit.unwrap_or(100) as i64;
+        let limit_val = limit.unwrap_or(50) as i64;
         
-        let query = r#"
-            SELECT id, title, artist_id, duration_seconds, genre,
-                   royalty_percentage, listen_count, revenue_generated,
-                   is_available_for_campaign, is_available_for_ownership,
-                   created_at, updated_at
-            FROM songs 
-            WHERE listen_count >= 10000
-            ORDER BY listen_count DESC
-            LIMIT $1
-        "#;
+        let rows = sqlx::query(
+            r#"SELECT id, title, artist_id, duration_seconds, genre, royalty_percentage,
+                      listen_count, revenue_generated, is_available_for_campaign,
+                      is_available_for_ownership, created_at, updated_at
+               FROM songs 
+               ORDER BY listen_count DESC, revenue_generated DESC
+               LIMIT $1"#
+        )
+        .bind(limit_val)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
-        let rows = sqlx::query(query)
-            .bind(limit)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(|e| RepositoryError::Database(e.to_string()))?;
-
-        let songs = rows.into_iter()
-            .map(|row| self.row_to_song(row))
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut songs = Vec::new();
+        for row in rows {
+            songs.push(self.row_to_song(row)?);
+        }
 
         Ok(songs)
     }
 
     async fn search_by_title(&self, query: &str, limit: Option<usize>) -> RepositoryResult<Vec<Song>> {
-        let limit = limit.unwrap_or(50) as i64;
-        let search_term = format!("%{}%", query.to_lowercase());
+        let limit_val = limit.unwrap_or(50) as i64;
+        let search_pattern = format!("%{}%", query);
         
-        let sql_query = r#"
-            SELECT id, title, artist_id, duration_seconds, genre,
-                   royalty_percentage, listen_count, revenue_generated,
-                   is_available_for_campaign, is_available_for_ownership,
-                   created_at, updated_at
-            FROM songs 
-            WHERE LOWER(title) LIKE $1
-            ORDER BY listen_count DESC
-            LIMIT $2
-        "#;
+        let rows = sqlx::query(
+            r#"SELECT id, title, artist_id, duration_seconds, genre, royalty_percentage,
+                      listen_count, revenue_generated, is_available_for_campaign,
+                      is_available_for_ownership, created_at, updated_at
+               FROM songs 
+               WHERE title ILIKE $1
+               ORDER BY listen_count DESC, created_at DESC
+               LIMIT $2"#
+        )
+        .bind(search_pattern)
+        .bind(limit_val)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
-        let rows = sqlx::query(sql_query)
-            .bind(search_term)
-            .bind(limit)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(|e| RepositoryError::Database(e.to_string()))?;
-
-        let songs = rows.into_iter()
-            .map(|row| self.row_to_song(row))
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut songs = Vec::new();
+        for row in rows {
+            songs.push(self.row_to_song(row)?);
+        }
 
         Ok(songs)
     }
 
     async fn count_by_artist(&self, artist_id: &ArtistId) -> RepositoryResult<usize> {
-        let query = "SELECT COUNT(*) as count FROM songs WHERE artist_id = $1";
-        
-        let row = sqlx::query(query)
-            .bind(artist_id.value())
+        let row = sqlx::query("SELECT COUNT(*) as count FROM songs WHERE artist_id = $1")
+            .bind(artist_id.to_uuid())
             .fetch_one(&self.pool)
             .await
             .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
-        let count: i64 = row.get("count");
+        let count: i64 = row.try_get("count").map_err(|e| RepositoryError::Serialization(e.to_string()))?;
         Ok(count as usize)
     }
 
     async fn get_total_listens(&self) -> RepositoryResult<u64> {
-        let query = "SELECT SUM(listen_count) as total FROM songs";
-        
-        let row = sqlx::query(query)
+        let row = sqlx::query("SELECT SUM(listen_count) as total FROM songs")
             .fetch_one(&self.pool)
             .await
             .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
-        let total: Option<i64> = row.get("total");
+        let total: Option<i64> = row.try_get("total").ok();
         Ok(total.unwrap_or(0) as u64)
-    }
-}
-
-impl PostgresSongRepository {
-    fn row_to_song(&self, row: sqlx::postgres::PgRow) -> RepositoryResult<Song> {
-        let id: Uuid = row.get("id");
-        let title: String = row.get("title");
-        let artist_id: Uuid = row.get("artist_id");
-        let duration_seconds: i32 = row.get("duration_seconds");
-        let genre: String = row.get("genre");
-        let royalty_percentage: f64 = row.get("royalty_percentage");
-        let listen_count: i64 = row.get("listen_count");
-        let revenue_generated: f64 = row.get("revenue_generated");
-        let is_available_for_campaign: bool = row.get("is_available_for_campaign");
-        let is_available_for_ownership: bool = row.get("is_available_for_ownership");
-        let created_at: DateTime<Utc> = row.get("created_at");
-
-        // Reconstruct Song (this is a simplified version - in real implementation 
-        // you might need to use a builder pattern or factory)
-        let song_id = SongId::from_uuid(id);
-        let song_title = SongTitle::new(title)
-            .map_err(|e| RepositoryError::Serialization(e))?;
-        let song_artist_id = ArtistId::from_uuid(artist_id);
-        let song_duration = SongDuration::new(duration_seconds as u32)
-            .map_err(|e| RepositoryError::Serialization(e))?;
-        let song_genre = Genre::new(genre)
-            .map_err(|e| RepositoryError::Serialization(e))?;
-        let song_royalty = RoyaltyPercentage::new(royalty_percentage)
-            .map_err(|e| RepositoryError::Serialization(e))?;
-
-        // Create song with basic data
-        let mut song = Song::new(
-            song_title,
-            song_artist_id,
-            song_duration,
-            song_genre,
-            song_royalty,
-        );
-
-        // Note: In a real implementation, you'd need to add methods to Song 
-        // to set these fields or use a more sophisticated reconstruction approach
-        // For now, this is a conceptual implementation
-
-        Ok(song)
     }
 }
 

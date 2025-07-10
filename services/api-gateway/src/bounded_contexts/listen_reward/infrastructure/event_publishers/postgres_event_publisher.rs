@@ -1,8 +1,9 @@
 // PostgreSQL Event Publisher
 use async_trait::async_trait;
 use sqlx::PgPool;
-use crate::bounded_contexts::listen_reward::domain::events::DomainEvent;
-use super::{EventPublisher, EventPublishResult, EventMetadata};
+use uuid::Uuid;
+use crate::shared::domain::events::DomainEvent;
+use super::{EventPublisher, EventPublishResult};
 
 pub struct PostgresEventPublisher {
     pool: PgPool,

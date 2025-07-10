@@ -218,20 +218,74 @@ impl UserRepository for UserPostgresRepository {
     }
 
     // Basic implementations for other required methods
-    async fn find_users(&self, _criteria: crate::bounded_contexts::user::domain::repository::UserSearchCriteria) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
-        Ok(vec![]) // TODO: Implement properly
+    async fn find_users(&self, criteria: crate::bounded_contexts::user::domain::repository::UserSearchCriteria) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
+        // Simple implementation for now - just handle basic pagination
+        let offset = criteria.page * criteria.page_size;
+        
+        let rows = sqlx::query(
+            r#"SELECT id, username, email, display_name, avatar_url, tier, role, tier_points, 
+                      total_rewards, is_verified, is_active, created_at 
+               FROM users WHERE is_active = true
+               ORDER BY created_at DESC
+               LIMIT $1 OFFSET $2"#
+        )
+        .bind(criteria.page_size as i64)
+        .bind(offset as i64)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        let mut summaries = Vec::new();
+        for row in rows {
+            let summary = crate::bounded_contexts::user::domain::aggregates::UserSummary {
+                id: UserId::from_uuid(row.try_get("id").map_err(|e| AppError::DatabaseError(e.to_string()))?),
+                username: Username::new(row.try_get("username").map_err(|e| AppError::DatabaseError(e.to_string()))?)
+                    .map_err(|e| AppError::ValidationError(e))?,
+                email: Email::new(row.try_get("email").map_err(|e| AppError::DatabaseError(e.to_string()))?)
+                    .map_err(|e| AppError::ValidationError(e))?,
+                display_name: row.try_get("display_name").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                avatar_url: row.try_get("avatar_url").ok(),
+                tier: row.try_get("tier").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                role: row.try_get("role").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                tier_points: row.try_get("tier_points").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                total_rewards: row.try_get("total_rewards").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                is_verified: row.try_get("is_verified").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                is_active: row.try_get("is_active").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                created_at: row.try_get("created_at").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+            };
+            summaries.push(summary);
+        }
+
+        Ok(summaries)
     }
 
-    async fn find_active_users(&self, _page: u32, _page_size: u32) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
-        Ok(vec![]) // TODO: Implement properly
+    async fn find_active_users(&self, page: u32, page_size: u32) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
+        let criteria = crate::bounded_contexts::user::domain::repository::UserSearchCriteria {
+            page,
+            page_size,
+            ..Default::default()
+        };
+        self.find_users(criteria).await
     }
 
-    async fn find_by_tier(&self, _tier: &str, _page: u32, _page_size: u32) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
-        Ok(vec![]) // TODO: Implement properly
+    async fn find_by_tier(&self, tier: &str, page: u32, page_size: u32) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
+        let criteria = crate::bounded_contexts::user::domain::repository::UserSearchCriteria {
+            tier: Some(tier.to_string()),
+            page,
+            page_size,
+            ..Default::default()
+        };
+        self.find_users(criteria).await
     }
 
-    async fn find_by_role(&self, _role: &str, _page: u32, _page_size: u32) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
-        Ok(vec![]) // TODO: Implement properly
+    async fn find_by_role(&self, role: &str, page: u32, page_size: u32) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
+        let criteria = crate::bounded_contexts::user::domain::repository::UserSearchCriteria {
+            role: Some(role.to_string()),
+            page,
+            page_size,
+            ..Default::default()
+        };
+        self.find_users(criteria).await
     }
 
     async fn count_users(&self) -> Result<u64, AppError> {
@@ -244,27 +298,239 @@ impl UserRepository for UserPostgresRepository {
         Ok(count as u64)
     }
 
-    async fn get_user_stats(&self, _user_id: &UserId) -> Result<Option<crate::bounded_contexts::user::domain::entities::UserStats>, AppError> {
-        Ok(None) // TODO: Implement properly
+    async fn get_user_stats(&self, user_id: &UserId) -> Result<Option<crate::bounded_contexts::user::domain::entities::UserStats>, AppError> {
+        let row = sqlx::query(
+            r#"SELECT id, tier_points, total_rewards, listen_time, total_investments, investment_count,
+                      nfts_owned, campaigns_participated, current_streak, longest_streak, achievements
+               FROM users WHERE id = $1 AND is_active = true"#
+        )
+        .bind(user_id.to_uuid())
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        match row {
+            Some(row) => {
+                let achievements: Vec<String> = row.try_get::<Option<serde_json::Value>, _>("achievements")
+                    .unwrap_or(None)
+                    .and_then(|v| serde_json::from_value(v).ok())
+                    .unwrap_or_default();
+
+                let stats = crate::bounded_contexts::user::domain::entities::UserStats {
+                    user_id: user_id.clone(),
+                    tier_points: row.try_get("tier_points").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                    total_listening_time_minutes: row.try_get("listen_time").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                    total_songs_listened: 0, // TODO: Calculate from listen_sessions table
+                    total_rewards_earned: row.try_get("total_rewards").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                    current_listening_streak: row.try_get("current_streak").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                    longest_listening_streak: row.try_get("longest_streak").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                    total_investments: row.try_get("total_investments").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                    investment_count: row.try_get("investment_count").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                    nfts_owned: row.try_get("nfts_owned").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                    campaigns_participated: row.try_get("campaigns_participated").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                    achievements_unlocked: achievements,
+                    created_at: chrono::Utc::now(),
+                    updated_at: chrono::Utc::now(),
+                };
+                Ok(Some(stats))
+            }
+            None => Ok(None),
+        }
     }
 
-    async fn find_users_registered_between(&self, _start_date: chrono::DateTime<chrono::Utc>, _end_date: chrono::DateTime<chrono::Utc>) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
-        Ok(vec![]) // TODO: Implement properly
+    async fn find_users_registered_between(&self, start_date: chrono::DateTime<chrono::Utc>, end_date: chrono::DateTime<chrono::Utc>) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
+        let rows = sqlx::query(
+            r#"SELECT id, username, email, display_name, avatar_url, tier, role, tier_points, 
+                      total_rewards, is_verified, is_active, created_at 
+               FROM users 
+               WHERE created_at BETWEEN $1 AND $2 AND is_active = true
+               ORDER BY created_at DESC"#
+        )
+        .bind(start_date)
+        .bind(end_date)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        let mut summaries = Vec::new();
+        for row in rows {
+            let summary = crate::bounded_contexts::user::domain::aggregates::UserSummary {
+                id: UserId::from_uuid(row.try_get("id").map_err(|e| AppError::DatabaseError(e.to_string()))?),
+                username: Username::new(row.try_get("username").map_err(|e| AppError::DatabaseError(e.to_string()))?)
+                    .map_err(|e| AppError::ValidationError(e))?,
+                email: Email::new(row.try_get("email").map_err(|e| AppError::DatabaseError(e.to_string()))?)
+                    .map_err(|e| AppError::ValidationError(e))?,
+                display_name: row.try_get("display_name").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                avatar_url: row.try_get("avatar_url").ok(),
+                tier: row.try_get("tier").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                role: row.try_get("role").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                tier_points: row.try_get("tier_points").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                total_rewards: row.try_get("total_rewards").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                is_verified: row.try_get("is_verified").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                is_active: row.try_get("is_active").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                created_at: row.try_get("created_at").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+            };
+            summaries.push(summary);
+        }
+
+        Ok(summaries)
     }
 
-    async fn find_top_users_by_rewards(&self, _limit: u32) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
-        Ok(vec![]) // TODO: Implement properly
+    async fn find_top_users_by_rewards(&self, limit: u32) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
+        let rows = sqlx::query(
+            r#"SELECT id, username, email, display_name, avatar_url, tier, role, tier_points, 
+                      total_rewards, is_verified, is_active, created_at 
+               FROM users 
+               WHERE is_active = true
+               ORDER BY total_rewards DESC
+               LIMIT $1"#
+        )
+        .bind(limit as i64)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        let mut summaries = Vec::new();
+        for row in rows {
+            let summary = crate::bounded_contexts::user::domain::aggregates::UserSummary {
+                id: UserId::from_uuid(row.try_get("id").map_err(|e| AppError::DatabaseError(e.to_string()))?),
+                username: Username::new(row.try_get("username").map_err(|e| AppError::DatabaseError(e.to_string()))?)
+                    .map_err(|e| AppError::ValidationError(e))?,
+                email: Email::new(row.try_get("email").map_err(|e| AppError::DatabaseError(e.to_string()))?)
+                    .map_err(|e| AppError::ValidationError(e))?,
+                display_name: row.try_get("display_name").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                avatar_url: row.try_get("avatar_url").ok(),
+                tier: row.try_get("tier").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                role: row.try_get("role").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                tier_points: row.try_get("tier_points").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                total_rewards: row.try_get("total_rewards").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                is_verified: row.try_get("is_verified").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                is_active: row.try_get("is_active").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                created_at: row.try_get("created_at").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+            };
+            summaries.push(summary);
+        }
+
+        Ok(summaries)
     }
 
-    async fn find_top_users_by_listening_time(&self, _limit: u32) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
-        Ok(vec![]) // TODO: Implement properly
+    async fn find_top_users_by_listening_time(&self, limit: u32) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
+        let rows = sqlx::query(
+            r#"SELECT id, username, email, display_name, avatar_url, tier, role, tier_points, 
+                      total_rewards, is_verified, is_active, created_at 
+               FROM users 
+               WHERE is_active = true
+               ORDER BY listen_time DESC
+               LIMIT $1"#
+        )
+        .bind(limit as i64)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        let mut summaries = Vec::new();
+        for row in rows {
+            let summary = crate::bounded_contexts::user::domain::aggregates::UserSummary {
+                id: UserId::from_uuid(row.try_get("id").map_err(|e| AppError::DatabaseError(e.to_string()))?),
+                username: Username::new(row.try_get("username").map_err(|e| AppError::DatabaseError(e.to_string()))?)
+                    .map_err(|e| AppError::ValidationError(e))?,
+                email: Email::new(row.try_get("email").map_err(|e| AppError::DatabaseError(e.to_string()))?)
+                    .map_err(|e| AppError::ValidationError(e))?,
+                display_name: row.try_get("display_name").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                avatar_url: row.try_get("avatar_url").ok(),
+                tier: row.try_get("tier").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                role: row.try_get("role").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                tier_points: row.try_get("tier_points").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                total_rewards: row.try_get("total_rewards").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                is_verified: row.try_get("is_verified").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                is_active: row.try_get("is_active").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                created_at: row.try_get("created_at").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+            };
+            summaries.push(summary);
+        }
+
+        Ok(summaries)
     }
 
-    async fn find_users_with_wallets(&self, _page: u32, _page_size: u32) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
-        Ok(vec![]) // TODO: Implement properly
+    async fn find_users_with_wallets(&self, page: u32, page_size: u32) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
+        let offset = page * page_size;
+        let rows = sqlx::query(
+            r#"SELECT id, username, email, display_name, avatar_url, tier, role, tier_points, 
+                      total_rewards, is_verified, is_active, created_at 
+               FROM users 
+               WHERE wallet_address IS NOT NULL AND is_active = true
+               ORDER BY created_at DESC
+               LIMIT $1 OFFSET $2"#
+        )
+        .bind(page_size as i64)
+        .bind(offset as i64)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        let mut summaries = Vec::new();
+        for row in rows {
+            let summary = crate::bounded_contexts::user::domain::aggregates::UserSummary {
+                id: UserId::from_uuid(row.try_get("id").map_err(|e| AppError::DatabaseError(e.to_string()))?),
+                username: Username::new(row.try_get("username").map_err(|e| AppError::DatabaseError(e.to_string()))?)
+                    .map_err(|e| AppError::ValidationError(e))?,
+                email: Email::new(row.try_get("email").map_err(|e| AppError::DatabaseError(e.to_string()))?)
+                    .map_err(|e| AppError::ValidationError(e))?,
+                display_name: row.try_get("display_name").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                avatar_url: row.try_get("avatar_url").ok(),
+                tier: row.try_get("tier").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                role: row.try_get("role").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                tier_points: row.try_get("tier_points").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                total_rewards: row.try_get("total_rewards").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                is_verified: row.try_get("is_verified").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                is_active: row.try_get("is_active").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                created_at: row.try_get("created_at").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+            };
+            summaries.push(summary);
+        }
+
+        Ok(summaries)
     }
 
-    async fn find_users_by_tier_points_range(&self, _min_points: u32, _max_points: u32, _page: u32, _page_size: u32) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
-        Ok(vec![]) // TODO: Implement properly
+    async fn find_users_by_tier_points_range(&self, min_points: u32, max_points: u32, page: u32, page_size: u32) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
+        let offset = page * page_size;
+        let rows = sqlx::query(
+            r#"SELECT id, username, email, display_name, avatar_url, tier, role, tier_points, 
+                      total_rewards, is_verified, is_active, created_at 
+               FROM users 
+               WHERE tier_points BETWEEN $1 AND $2 AND is_active = true
+               ORDER BY tier_points DESC
+               LIMIT $3 OFFSET $4"#
+        )
+        .bind(min_points as i32)
+        .bind(max_points as i32)
+        .bind(page_size as i64)
+        .bind(offset as i64)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        let mut summaries = Vec::new();
+        for row in rows {
+            let summary = crate::bounded_contexts::user::domain::aggregates::UserSummary {
+                id: UserId::from_uuid(row.try_get("id").map_err(|e| AppError::DatabaseError(e.to_string()))?),
+                username: Username::new(row.try_get("username").map_err(|e| AppError::DatabaseError(e.to_string()))?)
+                    .map_err(|e| AppError::ValidationError(e))?,
+                email: Email::new(row.try_get("email").map_err(|e| AppError::DatabaseError(e.to_string()))?)
+                    .map_err(|e| AppError::ValidationError(e))?,
+                display_name: row.try_get("display_name").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                avatar_url: row.try_get("avatar_url").ok(),
+                tier: row.try_get("tier").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                role: row.try_get("role").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                tier_points: row.try_get("tier_points").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                total_rewards: row.try_get("total_rewards").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                is_verified: row.try_get("is_verified").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                is_active: row.try_get("is_active").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                created_at: row.try_get("created_at").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+            };
+            summaries.push(summary);
+        }
+
+        Ok(summaries)
     }
 } 

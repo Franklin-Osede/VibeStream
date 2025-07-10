@@ -1,10 +1,9 @@
 use async_trait::async_trait;
-use redis::{aio::Connection, AsyncCommands, Client};
-use serde_json::json;
-
-use crate::bounded_contexts::listen_reward::domain::events::DomainEvent;
-
-use super::{EventMetadata, EventPublishResult, EventPublisher};
+use redis::{Client, Commands, Connection};
+use serde_json;
+use uuid::Uuid;
+use crate::shared::domain::events::DomainEvent;
+use super::{EventPublisher, EventPublishResult};
 
 /// Publicador de eventos usando Redis Streams (`XADD`).
 /// Cada evento se guarda como un entry con los campos:

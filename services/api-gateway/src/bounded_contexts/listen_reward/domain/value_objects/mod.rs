@@ -23,6 +23,10 @@ impl ListenSessionId {
     pub fn value(&self) -> Uuid {
         self.value
     }
+
+    pub fn to_uuid(&self) -> Uuid {
+        self.value
+    }
 }
 
 impl fmt::Display for ListenSessionId {

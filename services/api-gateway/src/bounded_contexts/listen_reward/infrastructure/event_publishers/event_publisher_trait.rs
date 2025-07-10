@@ -1,6 +1,6 @@
 // Event Publisher Trait
 use async_trait::async_trait;
-use crate::bounded_contexts::listen_reward::domain::events::DomainEvent;
+use crate::shared::domain::events::DomainEvent;
 use super::{EventPublishResult, EventMetadata};
 
 #[async_trait]
