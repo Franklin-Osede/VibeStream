@@ -63,6 +63,43 @@ impl SongRepository for PostgresSongRepository {
         Ok(())
     }
 
+    async fn update(&self, song: &Song) -> RepositoryResult<()> {
+        let query = r#"
+            UPDATE songs SET
+                title = $2,
+                duration_seconds = $3,
+                genre = $4,
+                royalty_percentage = $5,
+                listen_count = $6,
+                revenue_generated = $7,
+                is_available_for_campaign = $8,
+                is_available_for_ownership = $9,
+                updated_at = $10
+            WHERE id = $1
+        "#;
+
+        let result = sqlx::query(query)
+            .bind(song.id().value())
+            .bind(song.title().value())
+            .bind(song.duration().seconds() as i32)
+            .bind(song.genre().value())
+            .bind(song.royalty_percentage().value())
+            .bind(song.listen_count().value() as i64)
+            .bind(song.revenue_generated())
+            .bind(song.is_available_for_campaign())
+            .bind(song.is_available_for_ownership())
+            .bind(Utc::now()) // updated_at
+            .execute(&self.pool)
+            .await
+            .map_err(|e| RepositoryError::Database(e.to_string()))?;
+
+        if result.rows_affected() == 0 {
+            return Err(RepositoryError::NotFound(format!("Song with id {} not found", song.id().value())));
+        }
+
+        Ok(())
+    }
+
     async fn find_by_id(&self, id: &SongId) -> RepositoryResult<Option<Song>> {
         let query = r#"
             SELECT id, title, artist_id, duration_seconds, genre,

@@ -27,6 +27,9 @@ use super::queries::{
 
 use crate::bounded_contexts::fractional_ownership::domain::repository::OwnershipContractRepository;
 
+// Import the infrastructure module to ensure Arc<T> implementation is available
+use crate::bounded_contexts::fractional_ownership::infrastructure::repositories;
+
 /// Orchestrating Application Service for Fractional Ownership
 /// 
 /// This service coordinates the execution of commands and queries,
@@ -57,7 +60,7 @@ impl<R: OwnershipContractRepository> FractionalOwnershipApplicationService<R> {
         command: CreateOwnershipContract,
     ) -> Result<CreateOwnershipContractResult, AppError> {
         let handler = CreateOwnershipContractHandler {
-            repository: &*self.repository,
+            repository: Arc::clone(&self.repository),
         };
 
         // Execute command with transaction boundary

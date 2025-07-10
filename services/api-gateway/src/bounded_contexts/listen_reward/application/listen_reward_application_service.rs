@@ -318,7 +318,7 @@ impl ListenRewardApplicationService {
             .find_by_id(&session_id)
             .await
             .map_err(|e| AppError::DatabaseError(e.to_string()))?
-            .ok_or_else(|| AppError::NotFoundError("Session not found".to_string()))?;
+            .ok_or_else(|| AppError::NotFound("Session not found".to_string()))?;
 
         if *session.status() != SessionStatus::Active {
             return Err(AppError::BusinessLogicError("Session is not active".to_string()));

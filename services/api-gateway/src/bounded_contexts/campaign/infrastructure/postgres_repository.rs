@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use sqlx::{PgPool, FromRow};
+use sqlx::{PgPool, FromRow, Row};
 use uuid::Uuid;
 
 use crate::bounded_contexts::campaign::domain::{
@@ -242,14 +242,14 @@ impl PostgresCampaignRepository {
 
         let mut nfts = std::collections::HashMap::new();
         for row in rows {
-            let nft_id = row.get::<String, _>("id");
-            let token_id = row.get::<Option<String>, _>("token_id");
-            let owner_address = row.get::<Option<String>, _>("owner_address");
-            let metadata_uri = row.get::<String, _>("metadata_uri");
-            let tradeable = row.get::<bool, _>("tradeable");
-            let purchase_price = row.get::<Option<f64>, _>("purchase_price");
-            let purchased_at = row.get::<Option<DateTime<Utc>>, _>("purchased_at");
-            let created_at = row.get::<DateTime<Utc>, _>("created_at");
+            let nft_id = row.try_get::<String, _>("id").map_err(|e| format!("Failed to get nft id: {}", e))?;
+            let token_id = row.try_get::<Option<String>, _>("token_id").map_err(|e| format!("Failed to get token_id: {}", e))?;
+            let owner_address = row.try_get::<Option<String>, _>("owner_address").map_err(|e| format!("Failed to get owner_address: {}", e))?;
+            let metadata_uri = row.try_get::<String, _>("metadata_uri").map_err(|e| format!("Failed to get metadata_uri: {}", e))?;
+            let tradeable = row.try_get::<bool, _>("tradeable").map_err(|e| format!("Failed to get tradeable: {}", e))?;
+            let purchase_price = row.try_get::<Option<f64>, _>("purchase_price").map_err(|e| format!("Failed to get purchase_price: {}", e))?;
+            let purchased_at = row.try_get::<Option<DateTime<Utc>>, _>("purchased_at").map_err(|e| format!("Failed to get purchased_at: {}", e))?;
+            let created_at = row.try_get::<DateTime<Utc>, _>("created_at").map_err(|e| format!("Failed to get created_at: {}", e))?;
 
             let nft = crate::bounded_contexts::campaign::domain::entities::CampaignNFT::new(
                 campaign_id.clone(),
@@ -271,22 +271,22 @@ impl CampaignRow {
         use sqlx::Row;
         
         Ok(CampaignRow {
-            id: row.get("id"),
-            song_id: row.get("song_id"),
-            artist_id: row.get("artist_id"),
-            name: row.get("name"),
-            description: row.get("description"),
-            start_date: row.get("start_date"),
-            end_date: row.get("end_date"),
-            boost_multiplier: row.get("boost_multiplier"),
-            nft_price: row.get("nft_price"),
-            max_nfts: row.get("max_nfts"),
-            nfts_sold: row.get("nfts_sold"),
-            target_revenue: row.get("target_revenue"),
-            status: row.get("status"),
-            nft_contract_address: row.get("nft_contract_address"),
-            created_at: row.get("created_at"),
-            updated_at: row.get("updated_at"),
+            id: row.try_get("id").map_err(|e| format!("Failed to get id: {}", e))?,
+            song_id: row.try_get("song_id").map_err(|e| format!("Failed to get song_id: {}", e))?,
+            artist_id: row.try_get("artist_id").map_err(|e| format!("Failed to get artist_id: {}", e))?,
+            name: row.try_get("name").map_err(|e| format!("Failed to get name: {}", e))?,
+            description: row.try_get("description").map_err(|e| format!("Failed to get description: {}", e))?,
+            start_date: row.try_get("start_date").map_err(|e| format!("Failed to get start_date: {}", e))?,
+            end_date: row.try_get("end_date").map_err(|e| format!("Failed to get end_date: {}", e))?,
+            boost_multiplier: row.try_get("boost_multiplier").map_err(|e| format!("Failed to get boost_multiplier: {}", e))?,
+            nft_price: row.try_get("nft_price").map_err(|e| format!("Failed to get nft_price: {}", e))?,
+            max_nfts: row.try_get("max_nfts").map_err(|e| format!("Failed to get max_nfts: {}", e))?,
+            nfts_sold: row.try_get("nfts_sold").map_err(|e| format!("Failed to get nfts_sold: {}", e))?,
+            target_revenue: row.try_get("target_revenue").map_err(|e| format!("Failed to get target_revenue: {}", e))?,
+            status: row.try_get("status").map_err(|e| format!("Failed to get status: {}", e))?,
+            nft_contract_address: row.try_get("nft_contract_address").map_err(|e| format!("Failed to get nft_contract_address: {}", e))?,
+            created_at: row.try_get("created_at").map_err(|e| format!("Failed to get created_at: {}", e))?,
+            updated_at: row.try_get("updated_at").map_err(|e| format!("Failed to get updated_at: {}", e))?,
         })
     }
 

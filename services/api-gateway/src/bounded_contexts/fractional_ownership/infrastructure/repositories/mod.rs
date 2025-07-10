@@ -6,10 +6,14 @@ use async_trait::async_trait;
 use uuid::Uuid;
 use crate::bounded_contexts::fractional_ownership::domain::{
     repository::OwnershipContractRepository,
-    aggregates::OwnershipContract,
-    entities::{ShareTransaction, RevenueDistribution},
+    aggregates::{OwnershipContractAggregate, OwnershipAnalytics},
+    entities::FractionalShare,
+    value_objects::{OwnershipContractId, ShareId},
 };
+use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
+use crate::bounded_contexts::user::domain::value_objects::UserId;
 use crate::shared::domain::errors::AppError;
+use crate::shared::domain::repositories::RepoResult;
 
 // Implementaciones para Arc<T> para resolver problemas de trait bounds
 #[async_trait]
@@ -17,36 +21,60 @@ impl<T> OwnershipContractRepository for Arc<T>
 where
     T: OwnershipContractRepository + Send + Sync,
 {
-    async fn save(&self, contract: &OwnershipContract) -> Result<(), AppError> {
-        (**self).save(contract).await
+    async fn save(&self, aggregate: &OwnershipContractAggregate) -> RepoResult<()> {
+        (**self).save(aggregate).await
     }
 
-    async fn find_by_id(&self, id: Uuid) -> Result<Option<OwnershipContract>, AppError> {
+    async fn update(&self, aggregate: &OwnershipContractAggregate) -> RepoResult<()> {
+        (**self).update(aggregate).await
+    }
+
+    async fn find_by_id(&self, id: &OwnershipContractId) -> RepoResult<Option<OwnershipContractAggregate>> {
         (**self).find_by_id(id).await
     }
 
-    async fn find_by_song_id(&self, song_id: Uuid) -> Result<Option<OwnershipContract>, AppError> {
+    async fn find_by_song_id(&self, song_id: &SongId) -> RepoResult<Vec<OwnershipContractAggregate>> {
         (**self).find_by_song_id(song_id).await
     }
 
-    async fn find_by_artist_id(&self, artist_id: Uuid) -> Result<Vec<OwnershipContract>, AppError> {
+    async fn find_by_artist_id(&self, artist_id: &ArtistId) -> RepoResult<Vec<OwnershipContractAggregate>> {
         (**self).find_by_artist_id(artist_id).await
     }
 
-    async fn find_active_contracts(&self) -> Result<Vec<OwnershipContract>, AppError> {
+    async fn find_active_contracts(&self) -> RepoResult<Vec<OwnershipContractAggregate>> {
         (**self).find_active_contracts().await
     }
 
-    async fn find_user_portfolio(&self, user_id: Uuid) -> Result<Vec<ShareTransaction>, AppError> {
-        (**self).find_user_portfolio(user_id).await
+    async fn find_contracts_with_user_shares(&self, user_id: &UserId) -> RepoResult<Vec<OwnershipContractAggregate>> {
+        (**self).find_contracts_with_user_shares(user_id).await
     }
 
-    async fn save_transaction(&self, transaction: &ShareTransaction) -> Result<(), AppError> {
-        (**self).save_transaction(transaction).await
+    async fn find_by_status(&self, status: &str) -> RepoResult<Vec<OwnershipContractAggregate>> {
+        (**self).find_by_status(status).await
     }
 
-    async fn save_distribution(&self, distribution: &RevenueDistribution) -> Result<(), AppError> {
-        (**self).save_distribution(distribution).await
+    async fn exists_for_song(&self, song_id: &SongId) -> RepoResult<bool> {
+        (**self).exists_for_song(song_id).await
+    }
+
+    async fn delete(&self, id: &OwnershipContractId) -> RepoResult<()> {
+        (**self).delete(id).await
+    }
+
+    async fn get_contract_analytics(&self, id: &OwnershipContractId) -> RepoResult<Option<OwnershipAnalytics>> {
+        (**self).get_contract_analytics(id).await
+    }
+
+    async fn find_paginated(&self, offset: u32, limit: u32) -> RepoResult<(Vec<OwnershipContractAggregate>, u64)> {
+        (**self).find_paginated(offset, limit).await
+    }
+
+    async fn find_by_completion_range(&self, min_percentage: f64, max_percentage: f64) -> RepoResult<Vec<OwnershipContractAggregate>> {
+        (**self).find_by_completion_range(min_percentage, max_percentage).await
+    }
+
+    async fn get_total_market_value(&self) -> RepoResult<f64> {
+        (**self).get_total_market_value().await
     }
 }
 
@@ -56,35 +84,59 @@ impl<T> OwnershipContractRepository for &T
 where
     T: OwnershipContractRepository + Send + Sync,
 {
-    async fn save(&self, contract: &OwnershipContract) -> Result<(), AppError> {
-        (**self).save(contract).await
+    async fn save(&self, aggregate: &OwnershipContractAggregate) -> RepoResult<()> {
+        (**self).save(aggregate).await
     }
 
-    async fn find_by_id(&self, id: Uuid) -> Result<Option<OwnershipContract>, AppError> {
+    async fn update(&self, aggregate: &OwnershipContractAggregate) -> RepoResult<()> {
+        (**self).update(aggregate).await
+    }
+
+    async fn find_by_id(&self, id: &OwnershipContractId) -> RepoResult<Option<OwnershipContractAggregate>> {
         (**self).find_by_id(id).await
     }
 
-    async fn find_by_song_id(&self, song_id: Uuid) -> Result<Option<OwnershipContract>, AppError> {
+    async fn find_by_song_id(&self, song_id: &SongId) -> RepoResult<Vec<OwnershipContractAggregate>> {
         (**self).find_by_song_id(song_id).await
     }
 
-    async fn find_by_artist_id(&self, artist_id: Uuid) -> Result<Vec<OwnershipContract>, AppError> {
+    async fn find_by_artist_id(&self, artist_id: &ArtistId) -> RepoResult<Vec<OwnershipContractAggregate>> {
         (**self).find_by_artist_id(artist_id).await
     }
 
-    async fn find_active_contracts(&self) -> Result<Vec<OwnershipContract>, AppError> {
+    async fn find_active_contracts(&self) -> RepoResult<Vec<OwnershipContractAggregate>> {
         (**self).find_active_contracts().await
     }
 
-    async fn find_user_portfolio(&self, user_id: Uuid) -> Result<Vec<ShareTransaction>, AppError> {
-        (**self).find_user_portfolio(user_id).await
+    async fn find_contracts_with_user_shares(&self, user_id: &UserId) -> RepoResult<Vec<OwnershipContractAggregate>> {
+        (**self).find_contracts_with_user_shares(user_id).await
     }
 
-    async fn save_transaction(&self, transaction: &ShareTransaction) -> Result<(), AppError> {
-        (**self).save_transaction(transaction).await
+    async fn find_by_status(&self, status: &str) -> RepoResult<Vec<OwnershipContractAggregate>> {
+        (**self).find_by_status(status).await
     }
 
-    async fn save_distribution(&self, distribution: &RevenueDistribution) -> Result<(), AppError> {
-        (**self).save_distribution(distribution).await
+    async fn exists_for_song(&self, song_id: &SongId) -> RepoResult<bool> {
+        (**self).exists_for_song(song_id).await
+    }
+
+    async fn delete(&self, id: &OwnershipContractId) -> RepoResult<()> {
+        (**self).delete(id).await
+    }
+
+    async fn get_contract_analytics(&self, id: &OwnershipContractId) -> RepoResult<Option<OwnershipAnalytics>> {
+        (**self).get_contract_analytics(id).await
+    }
+
+    async fn find_paginated(&self, offset: u32, limit: u32) -> RepoResult<(Vec<OwnershipContractAggregate>, u64)> {
+        (**self).find_paginated(offset, limit).await
+    }
+
+    async fn find_by_completion_range(&self, min_percentage: f64, max_percentage: f64) -> RepoResult<Vec<OwnershipContractAggregate>> {
+        (**self).find_by_completion_range(min_percentage, max_percentage).await
+    }
+
+    async fn get_total_market_value(&self) -> RepoResult<f64> {
+        (**self).get_total_market_value().await
     }
 } 

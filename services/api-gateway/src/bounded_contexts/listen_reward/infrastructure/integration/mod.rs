@@ -47,7 +47,7 @@ impl FractionalOwnershipIntegrationHandler {
         use crate::bounded_contexts::fractional_ownership::application::queries::GetOwnershipContractBySongId;
         
         // 1. Check if the song has fractional ownership
-        let song_id_uuid = event.song_id.value();
+        let song_id_uuid = *event.song_id.value();
 
         let get_contract_query = GetOwnershipContractBySongId {
             song_id: song_id_uuid,
