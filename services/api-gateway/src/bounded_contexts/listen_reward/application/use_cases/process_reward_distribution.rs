@@ -5,10 +5,10 @@ use chrono::{DateTime, Utc};
 use crate::bounded_contexts::listen_reward::domain::{
     entities::ListenSession,
     aggregates::RewardDistribution, 
-    value_objects::{ListenSessionId, RewardAmount, RewardTier, ZkProofHash}
+    value_objects::{ListenSessionId, RewardAmount, RewardTier, ZkProofHash, ValidationPeriod}
 };
 use crate::shared::domain::events::DomainEvent;
-use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
+use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId, RoyaltyPercentage};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProcessRewardDistributionCommand {

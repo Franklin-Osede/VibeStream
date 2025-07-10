@@ -1,5 +1,6 @@
-pub mod postgres_repository;
-pub mod in_memory_repository;
+// Re-export implementations from parent directory
+pub use super::postgres_repository;
+pub use super::in_memory_repository;
 
 use std::sync::Arc;
 use async_trait::async_trait;

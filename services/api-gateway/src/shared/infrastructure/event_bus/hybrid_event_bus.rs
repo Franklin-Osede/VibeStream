@@ -21,6 +21,7 @@ use super::{
     get_partition_key
 };
 use crate::shared::domain::errors::AppError;
+use crate::shared::domain::events::EventMetadata;
 
 /// Hybrid Event Bus that intelligently routes events
 pub struct HybridEventBus {

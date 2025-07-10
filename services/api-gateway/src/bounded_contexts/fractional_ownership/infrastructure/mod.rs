@@ -1,6 +1,7 @@
 pub mod postgres_repository;
 pub mod event_publisher;
 pub mod in_memory_repository;
+pub mod repositories;
 
 // Re-export the main infrastructure components
 pub use postgres_repository::PostgresOwnershipContractRepository;

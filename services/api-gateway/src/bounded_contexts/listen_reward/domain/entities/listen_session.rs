@@ -11,6 +11,7 @@ use crate::bounded_contexts::listen_reward::domain::events::{
     ZkProofVerificationFailed
 };
 use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
+use crate::shared::domain::errors::AppError;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SessionStatus {
@@ -71,7 +72,8 @@ impl ListenSession {
             user_id,
             song_id,
             artist_id,
-            user_tier,
+            QualityScore::new(1.0).unwrap(), // Default perfect quality
+            Utc::now(),
         ));
 
         (session, event)
@@ -176,55 +178,77 @@ impl ListenSession {
             self.id.clone(),
             self.user_id,
             self.song_id.clone(),
+            self.artist_id.clone(),
             listen_duration,
             quality_score,
-            zk_proof,
+            self.quality_score.as_ref().map(|q| q.score()).unwrap_or(0.0),
+            Utc::now(),
         )))
     }
 
-    pub fn verify_and_calculate_reward(
-        &mut self,
-        base_reward_rate: f64,
-        is_zk_proof_valid: bool,
-    ) -> Result<Box<dyn DomainEvent>, String> {
-        if self.status != SessionStatus::Completed {
-            return Err("Session must be completed before verification".to_string());
-        }
-
-        if !is_zk_proof_valid {
-            self.status = SessionStatus::Failed;
-            let zk_proof = self.zk_proof.as_ref().unwrap().clone();
+    /// Verify ZK proof
+    pub fn verify_zk_proof(&self, zk_proof: ZkProofHash) -> Result<Box<dyn DomainEvent>, AppError> {
+        // Simulate ZK proof verification
+        if zk_proof.is_valid() {
+            let default_duration = ListenDuration::new(0).unwrap();
+            let default_quality = QualityScore::new(0.0).unwrap();
+            
+            let duration = self.listen_duration.as_ref().unwrap_or(&default_duration);
+            let quality = self.quality_score.as_ref().unwrap_or(&default_quality);
+            
+            Ok(Box::new(ListenSessionCompleted::new(
+                self.id.clone(),
+                self.user_id,
+                self.song_id.clone(),
+                self.artist_id.clone(),
+                duration.clone(),
+                quality.clone(),
+                quality.score(),
+                Utc::now(),
+            )))
+        } else {
+            let failed_at = Utc::now();
             return Ok(Box::new(ZkProofVerificationFailed::new(
                 self.id.clone(),
                 self.user_id,
                 self.song_id.clone(),
+                self.artist_id.clone(),
                 zk_proof,
                 "ZK proof verification failed".to_string(),
+                failed_at,
             )));
         }
+    }
 
-        // Calculate base reward based on listen duration
-        let listen_duration = self.listen_duration.as_ref().unwrap();
-        let base_reward_tokens = (listen_duration.minutes() * base_reward_rate).min(100.0);
-        let base_reward = RewardAmount::new(base_reward_tokens)
-            .map_err(|e| format!("Invalid base reward: {}", e))?;
+    /// Calculate reward for session
+    pub fn calculate_reward(&self, base_reward: RewardAmount) -> Result<Box<dyn DomainEvent>, AppError> {
+        let multiplier = match self.user_tier {
+            RewardTier::Basic => 1.0,
+            RewardTier::Premium => 1.5,
+            RewardTier::VIP => 2.0,
+            RewardTier::Bronze => 1.0,
+            RewardTier::Silver => 1.5,
+            RewardTier::Gold => 2.0,
+            RewardTier::Platinum => 3.0,
+        };
 
-        // Apply quality multiplier
-        let quality_score = self.quality_score.as_ref().unwrap();
-        let quality_adjusted_reward = quality_score.multiply_reward(&base_reward)
-            .map_err(|e| format!("Failed to apply quality multiplier: {}", e))?;
+        let duration_bonus = if let Some(duration) = &self.listen_duration {
+            if duration.minutes() > 3.0 { 1.2 } else { 1.0 }
+        } else {
+            1.0
+        };
 
-        // Apply tier multiplier
-        let tier_multiplier = self.user_tier.multiplier();
-        let final_reward_tokens = quality_adjusted_reward.tokens() * tier_multiplier;
-        let final_reward = RewardAmount::new(final_reward_tokens)
-            .map_err(|e| format!("Invalid final reward: {}", e))?;
+        let quality_bonus = if let Some(quality) = &self.quality_score {
+            if quality.score() > 0.8 { 1.1 } else { 1.0 }
+        } else {
+            1.0
+        };
 
-        self.base_reward = Some(base_reward.clone());
-        self.final_reward = Some(final_reward.clone());
-        self.status = SessionStatus::Verified;
-        self.verified_at = Some(Utc::now());
+        let final_reward = RewardAmount::new(
+            base_reward.tokens() * multiplier * duration_bonus * quality_bonus
+        ).map_err(|e| AppError::ValidationError(e))?;
 
+        let calculated_at = Utc::now();
         Ok(Box::new(RewardCalculated::new(
             self.id.clone(),
             self.user_id,
@@ -232,8 +256,7 @@ impl ListenSession {
             self.artist_id.clone(),
             base_reward,
             final_reward,
-            self.user_tier.clone(),
-            quality_score.score(),
+            calculated_at,
         )))
     }
 

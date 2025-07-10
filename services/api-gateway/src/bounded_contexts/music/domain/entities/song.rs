@@ -117,8 +117,18 @@ impl Song {
         &self.listen_count
     }
 
+    pub fn set_listen_count(&mut self, listen_count: ListenCount) {
+        self.listen_count = listen_count;
+        self.updated_at = Utc::now();
+    }
+
     pub fn revenue_generated(&self) -> f64 {
         self.revenue_generated
+    }
+
+    pub fn set_revenue_generated(&mut self, revenue: f64) {
+        self.revenue_generated = revenue;
+        self.updated_at = Utc::now();
     }
 
     pub fn is_available_for_campaign(&self) -> bool {

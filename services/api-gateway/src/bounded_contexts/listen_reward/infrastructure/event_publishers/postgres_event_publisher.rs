@@ -2,7 +2,7 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
-use crate::shared::domain::events::DomainEvent;
+use crate::shared::domain::events::{DomainEvent, EventMetadata};
 use super::{EventPublisher, EventPublishResult};
 
 pub struct PostgresEventPublisher {

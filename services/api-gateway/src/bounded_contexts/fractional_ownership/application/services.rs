@@ -27,8 +27,8 @@ use super::queries::{
 
 use crate::bounded_contexts::fractional_ownership::domain::repository::OwnershipContractRepository;
 
-// Import the infrastructure module to ensure Arc<T> implementation is available
-use crate::bounded_contexts::fractional_ownership::infrastructure::repositories;
+// Import the infrastructure to ensure Arc<T> implementations are available
+// Note: Specific repository implementations are injected via dependency injection
 
 /// Orchestrating Application Service for Fractional Ownership
 /// 
@@ -493,7 +493,7 @@ mod tests {
     #[tokio::test]
     async fn test_application_service_create_contract() {
         let repo = Arc::new(MockOwnershipContractRepository::new());
-        let service = FractionalOwnershipApplicationService::new(repo);
+        let service = FractionalOwnershipApplicationService::<MockOwnershipContractRepository>::new(repo);
 
         let command = CreateOwnershipContract {
             song_id: uuid::Uuid::new_v4(),
@@ -514,7 +514,7 @@ mod tests {
     #[tokio::test]
     async fn test_facade_create_and_activate() {
         let repo = Arc::new(MockOwnershipContractRepository::new());
-        let facade = FractionalOwnershipFacade::new(repo);
+        let facade = FractionalOwnershipFacade::<MockOwnershipContractRepository>::new(repo);
 
         let (create_result, activate_result) = facade.create_and_activate_contract(
             uuid::Uuid::new_v4(),
@@ -533,7 +533,7 @@ mod tests {
     #[tokio::test]
     async fn test_facade_invest_in_contract() {
         let repo = Arc::new(MockOwnershipContractRepository::new());
-        let facade = FractionalOwnershipFacade::new(repo);
+        let facade = FractionalOwnershipFacade::<MockOwnershipContractRepository>::new(repo);
 
         // Create and activate contract first
         let (create_result, _) = facade.create_and_activate_contract(
@@ -560,7 +560,7 @@ mod tests {
     #[tokio::test]
     async fn test_application_service_full_workflow() {
         let repo = Arc::new(MockOwnershipContractRepository::new());
-        let service = FractionalOwnershipApplicationService::new(repo);
+        let service = FractionalOwnershipApplicationService::<MockOwnershipContractRepository>::new(repo);
 
         // 1. Create contract
         let create_command = CreateOwnershipContract {

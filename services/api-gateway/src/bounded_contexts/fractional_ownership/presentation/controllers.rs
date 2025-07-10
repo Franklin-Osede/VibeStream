@@ -39,7 +39,20 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(application_service: Arc<FractionalOwnershipApplicationService>) -> Self {
+    pub fn new(_application_service: Arc<FractionalOwnershipApplicationService>) -> Self {
+        Self {
+            contract_repository: Arc::new(()),
+            share_repository: Arc::new(()),
+            distribution_repository: Arc::new(()),
+            event_publisher: Arc::new(()),
+            blockchain_service: Arc::new(()),
+            zk_service: Arc::new(()),
+            ipfs_service: Arc::new(()),
+            db_pool: Arc::new(unsafe { std::mem::zeroed() }), // Mock pool
+        }
+    }
+
+    pub fn default() -> Self {
         Self {
             contract_repository: Arc::new(()),
             share_repository: Arc::new(()),

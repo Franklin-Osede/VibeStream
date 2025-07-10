@@ -215,7 +215,7 @@ pub enum GenreCategory {
 
 impl Default for GenreStats {
     fn default() -> Self {
-        Self::new(Genre::new("Pop".to_string()))
+        Self::new(Genre::new("Pop".to_string()).expect("Pop should be a valid genre"))
     }
 }
 

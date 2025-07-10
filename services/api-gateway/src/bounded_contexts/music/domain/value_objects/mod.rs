@@ -23,6 +23,10 @@ impl SongId {
         &self.0
     }
 
+    pub fn to_uuid(&self) -> Uuid {
+        self.0
+    }
+
     pub fn to_string(&self) -> String {
         self.0.to_string()
     }
@@ -58,6 +62,10 @@ impl ArtistId {
 
     pub fn value(&self) -> &Uuid {
         &self.0
+    }
+
+    pub fn to_uuid(&self) -> Uuid {
+        self.0
     }
 
     pub fn to_string(&self) -> String {
@@ -280,14 +288,18 @@ impl ListenCount {
     }
     
     pub fn increment(&mut self) {
-        self.count += 1;
+        self.count = self.count.saturating_add(1);
     }
     
     pub fn add(&mut self, amount: u64) {
-        self.count += amount;
+        self.count = self.count.saturating_add(amount);
     }
     
     pub fn value(&self) -> u64 {
+        self.count
+    }
+
+    pub fn count(&self) -> u64 {
         self.count
     }
 }

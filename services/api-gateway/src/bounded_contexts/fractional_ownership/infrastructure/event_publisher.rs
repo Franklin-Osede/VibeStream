@@ -15,6 +15,7 @@ use crate::shared::domain::{
 pub trait IntegrationEvent: Send + Sync + std::fmt::Debug {
     fn event_type(&self) -> &str;
     fn target_contexts(&self) -> Vec<String>;
+    fn event_data(&self) -> serde_json::Value;
 }
 
 /// Event Publisher for Fractional Ownership domain events
@@ -166,8 +167,7 @@ impl EventPublisher for PostgresEventPublisher {
     async fn publish_integration_event(&self, event: &dyn IntegrationEvent) -> Result<(), AppError> {
         let event_message = EventMessage::Integration {
             event_type: event.event_type().to_string(),
-            event_data: serde_json::to_value(event)
-                .map_err(|e| AppError::SerializationError(e.to_string()))?,
+            event_data: event.event_data(),
             target_contexts: event.target_contexts(),
             occurred_at: Utc::now(),
         };
@@ -268,8 +268,7 @@ impl EventPublisher for InMemoryEventPublisher {
         let published_event = PublishedEvent {
             aggregate_id: event.aggregate_id(),
             event_type: event.event_type().to_string(),
-            event_data: serde_json::to_value(event)
-                .map_err(|e| AppError::SerializationError(e.to_string()))?,
+            event_data: event.event_data(),
             occurred_at: event.occurred_at(),
             published_at: Utc::now(),
         };
@@ -282,8 +281,7 @@ impl EventPublisher for InMemoryEventPublisher {
         let published_event = PublishedEvent {
             aggregate_id: Uuid::new_v4(), // Integration events don't have aggregate IDs
             event_type: event.event_type().to_string(),
-            event_data: serde_json::to_value(event)
-                .map_err(|e| AppError::SerializationError(e.to_string()))?,
+            event_data: event.event_data(),
             occurred_at: Utc::now(),
             published_at: Utc::now(),
         };

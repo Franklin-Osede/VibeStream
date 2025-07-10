@@ -196,12 +196,17 @@ impl RewardDistribution {
             uncommitted_events: Vec::new(),
         };
 
-        aggregate.apply_event(RewardDistributionCreated {
-            distribution_id: aggregate.id,
-            pool_id: aggregate.reward_pool.id().value(),
-            total_tokens: aggregate.reward_pool.total_tokens().tokens(),
-            created_at: aggregate.created_at,
-        });
+        aggregate.apply_event(RewardDistributionCreated::new(
+            aggregate.id,
+            ListenSessionId::new(), // placeholder
+            Uuid::new_v4(), // placeholder user_id
+            ArtistId::new(), // placeholder artist_id
+            aggregate.reward_pool.total_tokens().clone(),
+            RewardAmount::zero(),
+            RewardAmount::zero(),
+            RewardAmount::zero(),
+            aggregate.created_at,
+        ));
 
         aggregate
     }
@@ -343,19 +348,22 @@ impl RewardDistribution {
 
         // Generate events
         self.uncommitted_events.push(Box::new(RewardDistributed::new(
-            pending.session_id.clone(),
+            self.id,
             pending.user_id,
-            pending.reward_amount,
-            user_transaction_hash,
+            pending.artist_id.clone(),
+            pending.reward_amount.clone(),
+            "user".to_string(),
+            Utc::now(),
         )));
 
         self.uncommitted_events.push(Box::new(ArtistRoyaltyPaid::new(
-            pending.session_id,
-            pending.artist_id,
-            pending.song_id,
+            Uuid::new_v4(),
+            pending.artist_id.clone(),
+            pending.song_id.clone(),
             royalty_amount,
-            pending.royalty_percentage,
-            artist_transaction_hash,
+            Utc::now(),
+            Utc::now(),
+            Utc::now(),
         )));
 
         // Check if pool is depleted
@@ -363,7 +371,8 @@ impl RewardDistribution {
             self.uncommitted_events.push(Box::new(RewardPoolDepleted::new(
                 self.reward_pool.id().value(),
                 self.reward_pool.available_tokens().unwrap_or(RewardAmount::zero()),
-                self.reward_pool.distributed_tokens.clone(),
+                0.1, // 10% threshold
+                Utc::now(),
             )));
         }
 

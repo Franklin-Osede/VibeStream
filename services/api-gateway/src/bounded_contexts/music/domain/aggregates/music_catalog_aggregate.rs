@@ -5,7 +5,8 @@ use uuid::Uuid;
 
 use crate::bounded_contexts::music::domain::entities::Song;
 use crate::bounded_contexts::music::domain::value_objects::{
-    SongId, SongTitle, ArtistId, SongDuration, Genre, RoyaltyPercentage, AlbumId, AlbumTitle
+    SongId, ArtistId, AlbumId, PlaylistId, SongTitle, AlbumTitle, Genre, 
+    RoyaltyPercentage, SongDuration, ListenCount
 };
 use crate::shared::domain::events::DomainEvent;
 use crate::bounded_contexts::music::domain::events::{
@@ -286,7 +287,7 @@ impl MusicCatalogAggregate {
 
         // Create domain event
         let event = Box::new(PlaylistCreated {
-            playlist_id: playlist_id.clone(),
+            playlist_id: PlaylistId::from_uuid(playlist_id),
             user_id,
             name,
             song_ids,

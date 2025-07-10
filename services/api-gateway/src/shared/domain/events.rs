@@ -28,7 +28,7 @@ impl EventMetadata {
         }
     }
 
-    pub fn with_type_and_aggregate(event_type: &str, aggregate_type: &str, aggregate_id: Uuid) -> Self {
+    pub fn with_type_and_aggregate(event_type: &str, aggregate_id: Uuid, aggregate_type: &str) -> Self {
         Self {
             event_id: Uuid::new_v4(),
             event_type: event_type.to_string(),
@@ -42,7 +42,7 @@ impl EventMetadata {
     }
 }
 
-pub trait DomainEvent: std::fmt::Debug + Send + Sync {
+pub trait DomainEvent: Send + Sync + std::fmt::Debug {
     fn metadata(&self) -> &EventMetadata;
     fn event_type(&self) -> &str;
     fn aggregate_id(&self) -> Uuid;

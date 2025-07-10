@@ -386,7 +386,7 @@ mod tests {
     #[tokio::test]
     async fn test_route_creation() {
         let repository = Arc::new(crate::bounded_contexts::fractional_ownership::infrastructure::InMemoryOwnershipContractRepository::new());
-        let service = Arc::new(FractionalOwnershipApplicationService::new(repository));
+        let service = Arc::new(FractionalOwnershipApplicationService::<crate::bounded_contexts::fractional_ownership::infrastructure::InMemoryOwnershipContractRepository>::new(repository));
         let router = create_routes(service);
         
         // Test that router is created successfully

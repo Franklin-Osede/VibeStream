@@ -23,17 +23,34 @@ use crate::bounded_contexts::fractional_ownership::{
     presentation::{AppState, ConcreteApplicationService, create_routes},
 };
 
-#[derive(Debug)]
+// Remove derive Debug and add manual implementation
+pub struct IntegrationService<R: OwnershipContractRepository> {
+    pub application_service: Arc<FractionalOwnershipApplicationService<R>>,
+    pub event_publisher: Arc<dyn EventPublisher>,
+    pub event_processor: Option<EventProcessor>,
+}
+
+impl<R: OwnershipContractRepository> std::fmt::Debug for IntegrationService<R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("IntegrationService")
+            .field("application_service", &"Arc<FractionalOwnershipApplicationService<R>>")
+            .field("event_publisher", &"Arc<dyn EventPublisher>")
+            .field("event_processor", &self.event_processor.is_some())
+            .finish()
+    }
+}
+
+// Type aliases for common configurations
+pub type PostgresFractionalOwnershipBoundedContext = FractionalOwnershipBoundedContext<PostgresOwnershipContractRepository>;
+pub type InMemoryFractionalOwnershipBoundedContext = FractionalOwnershipBoundedContext<InMemoryOwnershipContractRepository>;
+
+/// Main bounded context struct for Fractional Ownership
 pub struct FractionalOwnershipBoundedContext<R: OwnershipContractRepository> {
     pub application_service: Arc<FractionalOwnershipApplicationService<R>>,
     pub app_state: AppState,
     pub event_publisher: Arc<dyn EventPublisher>,
     pub event_processor: Option<EventProcessor>,
 }
-
-// Type aliases for common configurations
-pub type PostgresFractionalOwnershipBoundedContext = FractionalOwnershipBoundedContext<PostgresOwnershipContractRepository>;
-pub type InMemoryFractionalOwnershipBoundedContext = FractionalOwnershipBoundedContext<InMemoryOwnershipContractRepository>;
 
 impl PostgresFractionalOwnershipBoundedContext {
     /// Initialize the complete bounded context with all dependencies
@@ -54,7 +71,7 @@ impl PostgresFractionalOwnershipBoundedContext {
 
         // 4. Initialize presentation state  
         let concrete_service: Arc<ConcreteApplicationService> = Arc::clone(&application_service);
-        let app_state = AppState::new(concrete_service);
+        let app_state = AppState::default();
 
         // 5. Setup event processor with handlers
         let mut event_processor = EventProcessor::new(event_receiver);

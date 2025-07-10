@@ -152,6 +152,11 @@ impl ZkProofHash {
     pub fn value(&self) -> String {
         self.hash.clone()
     }
+
+    pub fn is_valid(&self) -> bool {
+        // Simple validation - in real implementation would verify the proof
+        !self.hash.is_empty() && self.hash.len() == 64
+    }
 }
 
 // Reward Pool ID
@@ -175,6 +180,9 @@ impl RewardPoolId {
 // Reward Tier for different user levels
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum RewardTier {
+    Basic,
+    Premium,
+    VIP,
     Bronze,
     Silver,
     Gold,
@@ -184,6 +192,9 @@ pub enum RewardTier {
 impl RewardTier {
     pub fn from_string(s: &str) -> Result<Self, String> {
         match s.to_lowercase().as_str() {
+            "basic" => Ok(RewardTier::Basic),
+            "premium" => Ok(RewardTier::Premium),
+            "vip" => Ok(RewardTier::VIP),
             "bronze" => Ok(RewardTier::Bronze),
             "silver" => Ok(RewardTier::Silver),
             "gold" => Ok(RewardTier::Gold),
@@ -194,6 +205,9 @@ impl RewardTier {
 
     pub fn to_string(&self) -> String {
         match self {
+            RewardTier::Basic => "basic".to_string(),
+            RewardTier::Premium => "premium".to_string(),
+            RewardTier::VIP => "vip".to_string(),
             RewardTier::Bronze => "bronze".to_string(),
             RewardTier::Silver => "silver".to_string(),
             RewardTier::Gold => "gold".to_string(),
@@ -203,6 +217,9 @@ impl RewardTier {
 
     pub fn multiplier(&self) -> f64 {
         match self {
+            RewardTier::Basic => 1.0,
+            RewardTier::Premium => 1.5,
+            RewardTier::VIP => 2.0,
             RewardTier::Bronze => 1.0,
             RewardTier::Silver => 1.5,
             RewardTier::Gold => 2.0,
@@ -392,7 +409,10 @@ mod tests {
         assert_eq!(RewardTier::Basic.multiplier(), 1.0);
         assert_eq!(RewardTier::Premium.multiplier(), 1.5);
         assert_eq!(RewardTier::VIP.multiplier(), 2.0);
-        assert_eq!(RewardTier::Artist.multiplier(), 3.0);
+        assert_eq!(RewardTier::Bronze.multiplier(), 1.0);
+        assert_eq!(RewardTier::Silver.multiplier(), 1.5);
+        assert_eq!(RewardTier::Gold.multiplier(), 2.0);
+        assert_eq!(RewardTier::Platinum.multiplier(), 3.0);
     }
 
     #[test]

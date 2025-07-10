@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use sqlx::PgPool;
+use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
 use crate::bounded_contexts::music::domain::{
@@ -20,7 +20,6 @@ impl PostgresSongRepository {
 
     /// Convert database row to Song entity
     fn row_to_song(&self, row: sqlx::postgres::PgRow) -> Result<Song, RepositoryError> {
-        use sqlx::Row;
         
         let id = SongId::from_uuid(
             row.try_get("id").map_err(|e| RepositoryError::Serialization(e.to_string()))?
@@ -34,9 +33,8 @@ impl PostgresSongRepository {
             row.try_get("artist_id").map_err(|e| RepositoryError::Serialization(e.to_string()))?
         );
         
-        let duration = SongDuration::new(
-            row.try_get("duration_seconds").map_err(|e| RepositoryError::Serialization(e.to_string()))?
-        ).map_err(|e| RepositoryError::Serialization(e))?;
+        let duration_seconds: i32 = row.try_get("duration_seconds").map_err(|e| RepositoryError::Serialization(e.to_string()))?;
+        let duration = SongDuration::new(duration_seconds as u32).map_err(|e| RepositoryError::ValidationError(e))?;
         
         let genre = Genre::new(
             row.try_get("genre").map_err(|e| RepositoryError::Serialization(e.to_string()))?
@@ -51,7 +49,7 @@ impl PostgresSongRepository {
 
         // Set additional fields from database
         let listen_count: i64 = row.try_get("listen_count").unwrap_or(0);
-        song.set_listen_count(ListenCount::new(listen_count as u64));
+        song.set_listen_count(ListenCount::from_value(listen_count as u64));
 
         let revenue: f64 = row.try_get("revenue_generated").unwrap_or(0.0);
         song.set_revenue_generated(revenue);
@@ -81,10 +79,10 @@ impl SongRepository for PostgresSongRepository {
         .bind(song.id().to_uuid())
         .bind(song.title().to_string())
         .bind(song.artist_id().to_uuid())
-        .bind(song.duration().seconds())
+        .bind(song.duration().seconds() as i32)
         .bind(song.genre().to_string())
         .bind(song.royalty_percentage().value())
-        .bind(song.listen_count().count() as i64)
+        .bind(song.listen_count().value() as i64)
         .bind(song.revenue_generated())
         .bind(song.is_available_for_campaign())
         .bind(song.is_available_for_ownership())
@@ -114,7 +112,7 @@ impl SongRepository for PostgresSongRepository {
         .bind(song.title().to_string())
         .bind(song.genre().to_string())
         .bind(song.royalty_percentage().value())
-        .bind(song.listen_count().count() as i64)
+        .bind(song.listen_count().value() as i64)
         .bind(song.revenue_generated())
         .bind(song.is_available_for_campaign())
         .bind(song.is_available_for_ownership())

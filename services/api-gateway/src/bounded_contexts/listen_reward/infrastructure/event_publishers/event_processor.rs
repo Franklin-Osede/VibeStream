@@ -10,6 +10,7 @@ pub trait EventProcessor: Send + Sync {
     async fn process_event(&self, event: Box<dyn DomainEvent>) -> Result<(), String>;
 }
 
+#[derive(Debug)]
 pub struct ListenRewardEventProcessor {
     // Placeholder for actual event processing logic
 }

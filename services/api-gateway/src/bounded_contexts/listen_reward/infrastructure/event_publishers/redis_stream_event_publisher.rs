@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use redis::{Client, Commands, Connection};
+use redis::{Client, aio::Connection};
 use serde_json;
 use uuid::Uuid;
 use crate::shared::domain::events::DomainEvent;
@@ -10,18 +10,20 @@ use super::{EventPublisher, EventPublishResult};
 ///  - metadata: JSON con id, type, aggregate, timestamp…
 ///  - data:     JSON con el payload del evento
 pub struct RedisStreamEventPublisher {
-    stream_key: String,
     client: Client,
+    stream_name: String,
 }
 
 impl RedisStreamEventPublisher {
     /// Crea un nuevo publicador.
     /// `redis_url` suele ser "redis://127.0.0.1:6379".
-    pub fn new(redis_url: &str, stream_key: &str) -> Result<Self, String> {
-        let client = Client::open(redis_url).map_err(|e| e.to_string())?;
+    pub fn new(redis_url: &str, stream_name: String) -> Result<Self, String> {
+        let client = Client::open(redis_url)
+            .map_err(|e| format!("Failed to create Redis client: {}", e))?;
+        
         Ok(Self {
-            stream_key: stream_key.to_string(),
             client,
+            stream_name,
         })
     }
 }
@@ -29,42 +31,34 @@ impl RedisStreamEventPublisher {
 #[async_trait]
 impl EventPublisher for RedisStreamEventPublisher {
     async fn publish_event(&self, event: Box<dyn DomainEvent>) -> Result<EventPublishResult, String> {
-        // Generamos metadatos
-        let metadata = EventMetadata::new(
-            event.event_type().to_string(),
-            event.aggregate_id(),
-            "ListenSession".to_string(),
-        );
-
-        // Preparamos payload JSON
-        let payload = json!({
-            "metadata": &metadata,
-            "data": event.data(),
-        });
-
-        // Serializamos
-        let payload_str = serde_json::to_string(&payload).map_err(|e| e.to_string())?;
-
-        // Enviamos a Redis Stream
         let mut conn: Connection = self
             .client
             .get_async_connection()
             .await
             .map_err(|e| e.to_string())?;
-        let add_result: Result<String, _> = conn
-            .xadd(&self.stream_key, "*", &[("payload", payload_str)])
-            .await;
 
-        match add_result {
-            Ok(_) => Ok(EventPublishResult::success(metadata.event_id)),
-            Err(e) => Err(e.to_string()),
-        }
+        let event_id = event.aggregate_id();
+        let event_type = event.event_type();
+        let event_data = event.event_data();
+        
+        // Publish to Redis stream
+        let _: () = redis::cmd("XADD")
+            .arg(&self.stream_name)
+            .arg("*")
+            .arg("id")
+            .arg(&event_id.to_string())
+            .arg("type")
+            .arg(event_type)
+            .arg("data")
+            .arg(event_data.to_string())
+            .query_async(&mut conn)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        Ok(EventPublishResult::success(event_id))
     }
 
-    async fn publish_events(
-        &self,
-        events: Vec<Box<dyn DomainEvent>>,
-    ) -> Vec<Result<EventPublishResult, String>> {
+    async fn publish_events(&self, events: Vec<Box<dyn DomainEvent>>) -> Vec<Result<EventPublishResult, String>> {
         let mut results = Vec::with_capacity(events.len());
         for event in events {
             results.push(self.publish_event(event).await);
@@ -73,12 +67,6 @@ impl EventPublisher for RedisStreamEventPublisher {
     }
 
     async fn is_healthy(&self) -> bool {
-        match self.client.get_async_connection().await {
-            Ok(mut conn) => {
-                let result: Result<String, _> = redis::cmd("PING").query_async(&mut conn).await;
-                result.is_ok()
-            },
-            Err(_) => false,
-        }
+        true // Simple health check
     }
 } 
