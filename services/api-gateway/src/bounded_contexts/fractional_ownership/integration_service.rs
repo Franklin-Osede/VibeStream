@@ -180,7 +180,7 @@ impl InMemoryFractionalOwnershipBoundedContext {
         let repository = Arc::new(crate::bounded_contexts::fractional_ownership::infrastructure::InMemoryOwnershipContractRepository::new());
         let event_publisher = Arc::new(InMemoryEventPublisher::new());
         let application_service = Arc::new(FractionalOwnershipApplicationService::new(repository.clone()));
-        let app_state = AppState::new(application_service.clone());
+        let app_state = AppState::default();
 
         Self {
             application_service,

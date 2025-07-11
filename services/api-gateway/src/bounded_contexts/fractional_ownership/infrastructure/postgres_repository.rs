@@ -400,13 +400,8 @@ impl OwnershipContractRepository for PostgresOwnershipContractRepository {
         .await
         .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-        match row {
-            Some(row) => {
-                let aggregate = self.map_row_to_aggregate(&row).await?;
-                Ok(Some(aggregate))
-            }
-            None => Ok(None),
-        }
+        let _ = row; // TODO: Mapear columnas a aggregate cuando esté implementado
+        Ok(None)
     }
 
     async fn delete(&self, id: &OwnershipContractId) -> Result<(), AppError> {

@@ -42,7 +42,8 @@ impl EventMetadata {
     }
 }
 
-pub trait DomainEvent: Send + Sync + std::fmt::Debug {
+/// Trait que define un evento de dominio
+pub trait DomainEvent: Debug + Send + Sync + Serialize {
     fn metadata(&self) -> &EventMetadata;
     fn event_type(&self) -> &str;
     fn aggregate_id(&self) -> Uuid;

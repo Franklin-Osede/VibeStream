@@ -175,6 +175,11 @@ impl Song {
                 artist_id: self.artist_id.clone(),
                 listen_count: self.listen_count.value(),
                 marked_at: Utc::now(),
+                metadata: crate::shared::domain::events::EventMetadata::with_type_and_aggregate(
+                    "SongAvailableForCampaign",
+                    self.id.to_uuid(),
+                    "Song",
+                ),
             }));
         }
 
@@ -263,7 +268,7 @@ impl Song {
             title: self.title.value().to_string(),
             artist_id: self.artist_id.clone(),
             duration_seconds: self.duration.seconds(),
-            duration_minutes: self.duration.minutes(),
+            duration_minutes: self.duration.minutes() as f64,
             genre: self.genre.value().to_string(),
             listen_count: self.listen_count.value(),
             revenue_generated: self.revenue_generated,

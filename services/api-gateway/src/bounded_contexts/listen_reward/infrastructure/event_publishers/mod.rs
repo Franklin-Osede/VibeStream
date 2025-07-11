@@ -106,7 +106,7 @@ impl EventPublisherFactory {
 
     /// Crea un publicador de Redis Stream
     pub async fn create_redis_stream_publisher(&self, redis_url: &str, stream_key: &str) -> Result<Box<dyn EventPublisher>, String> {
-        let publisher = RedisStreamEventPublisher::new(redis_url, stream_key)?;
+        let publisher = RedisStreamEventPublisher::new(redis_url, stream_key.to_string())?;
         Ok(Box::new(publisher))
     }
 

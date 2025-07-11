@@ -18,10 +18,10 @@ impl PostgresEventPublisher {
 #[async_trait]
 impl EventPublisher for PostgresEventPublisher {
     async fn publish_event(&self, event: Box<dyn DomainEvent>) -> Result<EventPublishResult, String> {
-        let metadata = EventMetadata::new(
-            event.event_type().to_string(),
+        let metadata = EventMetadata::with_type_and_aggregate(
+            event.event_type(),
             event.aggregate_id(),
-            "ListenSession".to_string(),
+            "ListenSession",
         );
 
         // TODO: Temporarily disabled due to missing event_outbox table

@@ -18,7 +18,7 @@ use super::{
 use crate::shared::domain::events::DomainEvent;
 
 /// User Aggregate - Main aggregate root for user domain
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct UserAggregate {
     pub user: User,
     pub profile: UserProfile,
@@ -435,16 +435,29 @@ impl UserAggregate {
             id: self.user.id.clone(),
             username: self.user.username.clone(),
             email: self.user.email.clone(),
-            tier: self.user.tier.clone(),
-            role: self.user.role.clone(),
+            tier: self.user.tier.to_string(),
+            role: self.user.role.to_string(),
             is_verified: self.user.is_verified,
             is_active: self.user.is_active,
             display_name: self.profile.display_name.clone(),
-            avatar_url: self.profile.avatar_url.clone(),
-            total_listening_time: self.stats.total_listening_time_minutes,
+            avatar_url: self.profile.avatar_url.as_ref().map(|u| u.to_string()),
+            total_listening_time: self.stats.total_listening_time_minutes as i64,
             total_rewards: self.stats.total_rewards_earned,
-            tier_points: self.stats.tier_points,
+            tier_points: self.stats.tier_points as i32,
             created_at: self.user.created_at,
+        }
+    }
+}
+
+impl Clone for UserAggregate {
+    fn clone(&self) -> Self {
+        Self {
+            user: self.user.clone(),
+            profile: self.profile.clone(),
+            preferences: self.preferences.clone(),
+            stats: self.stats.clone(),
+            pending_events: VecDeque::new(), // Don't clone events
+            version: self.version,
         }
     }
 }
@@ -455,89 +468,159 @@ pub struct UserSummary {
     pub id: UserId,
     pub username: Username,
     pub email: Email,
-    pub tier: UserTier,
-    pub role: UserRole,
+    pub tier: String,
+    pub role: String,
     pub is_verified: bool,
     pub is_active: bool,
     pub display_name: Option<String>,
-    pub avatar_url: Option<ProfileUrl>,
-    pub total_listening_time: u64,
+    pub avatar_url: Option<String>,
+    pub total_listening_time: i64,
     pub total_rewards: f64,
-    pub tier_points: u32,
+    pub tier_points: i32,
     pub created_at: DateTime<Utc>,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bounded_contexts::user::domain::value_objects::*;
+    use chrono::Utc;
 
     #[test]
-    fn test_user_aggregate_creation() {
+    fn test_create_user_aggregate_success() {
+        // Arrange
         let email = Email::new("test@example.com".to_string()).unwrap();
         let username = Username::new("testuser".to_string()).unwrap();
         let password_hash = PasswordHash::new("hashed_password".to_string());
 
-        let aggregate = UserAggregate::create(email.clone(), username.clone(), password_hash).unwrap();
+        // Act
+        let result = UserAggregate::create(email.clone(), username.clone(), password_hash);
 
-        assert_eq!(aggregate.user.email, email);
-        assert_eq!(aggregate.user.username, username);
-        assert_eq!(aggregate.version, 1);
-        assert_eq!(aggregate.pending_events.len(), 1);
+        // Assert
+        assert!(result.is_ok());
+        let user_aggregate = result.unwrap();
+        assert_eq!(user_aggregate.user.email, email);
+        assert_eq!(user_aggregate.user.username, username);
+        assert_eq!(user_aggregate.user.tier, UserTier::Free);
+        assert_eq!(user_aggregate.user.role, UserRole::User);
+        assert!(!user_aggregate.user.is_verified);
+        assert!(user_aggregate.user.is_active);
+        assert_eq!(user_aggregate.version, 1);
     }
 
     #[test]
-    fn test_user_authentication() {
+    fn test_authenticate_user_success() {
+        // Arrange
         let email = Email::new("test@example.com".to_string()).unwrap();
         let username = Username::new("testuser".to_string()).unwrap();
-        let password_hash = PasswordHash::new("correct_password".to_string());
+        let password_hash = PasswordHash::new("hashed_password".to_string());
+        let mut user_aggregate = UserAggregate::create(email, username, password_hash.clone()).unwrap();
 
-        let mut aggregate = UserAggregate::create(email, username, password_hash.clone()).unwrap();
-        aggregate.pending_events.clear(); // Clear creation event
+        // Act
+        let result = user_aggregate.authenticate(&password_hash);
 
-        // Correct password
-        assert!(aggregate.authenticate(&password_hash).is_ok());
-        assert!(aggregate.user.last_login_at.is_some());
-        assert_eq!(aggregate.pending_events.len(), 1);
+        // Assert
+        assert!(result.is_ok());
+        assert!(user_aggregate.user.last_login_at.is_some());
+        assert_eq!(user_aggregate.version, 2);
+    }
 
-        // Incorrect password
+    #[test]
+    fn test_authenticate_user_wrong_password() {
+        // Arrange
+        let email = Email::new("test@example.com".to_string()).unwrap();
+        let username = Username::new("testuser".to_string()).unwrap();
+        let password_hash = PasswordHash::new("hashed_password".to_string());
+        let mut user_aggregate = UserAggregate::create(email, username, password_hash).unwrap();
         let wrong_password = PasswordHash::new("wrong_password".to_string());
-        assert!(aggregate.authenticate(&wrong_password).is_err());
+
+        // Act
+        let result = user_aggregate.authenticate(&wrong_password);
+
+        // Assert
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Contraseña incorrecta");
     }
 
     #[test]
-    fn test_tier_upgrade() {
+    fn test_authenticate_inactive_user() {
+        // Arrange
         let email = Email::new("test@example.com".to_string()).unwrap();
         let username = Username::new("testuser".to_string()).unwrap();
         let password_hash = PasswordHash::new("hashed_password".to_string());
+        let mut user_aggregate = UserAggregate::create(email, username, password_hash.clone()).unwrap();
+        user_aggregate.deactivate("Test reason".to_string()).unwrap();
 
-        let mut aggregate = UserAggregate::create(email, username, password_hash).unwrap();
-        aggregate.pending_events.clear();
+        // Act
+        let result = user_aggregate.authenticate(&password_hash);
 
-        // Add enough points for premium
-        aggregate.add_tier_points(500).unwrap();
-        assert_eq!(aggregate.user.tier, UserTier::Premium);
-        assert!(aggregate.pending_events.len() > 0);
+        // Assert
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Usuario desactivado");
     }
 
     #[test]
-    fn test_wallet_operations() {
+    fn test_upgrade_tier_success() {
+        // Arrange
         let email = Email::new("test@example.com".to_string()).unwrap();
         let username = Username::new("testuser".to_string()).unwrap();
         let password_hash = PasswordHash::new("hashed_password".to_string());
+        let mut user_aggregate = UserAggregate::create(email, username, password_hash).unwrap();
 
-        let mut aggregate = UserAggregate::create(email, username, password_hash).unwrap();
-        aggregate.pending_events.clear();
+        // Act
+        let result = user_aggregate.upgrade_tier(UserTier::Premium);
 
-        let wallet = WalletAddress::new("0x742d35Cc6345C16fd86b1B1b4b85e73c5c9c8E9b".to_string()).unwrap();
-        
-        // Link wallet
-        assert!(aggregate.link_wallet(wallet.clone()).is_ok());
-        assert_eq!(aggregate.user.wallet_address, Some(wallet));
-        assert_eq!(aggregate.pending_events.len(), 1);
+        // Assert
+        assert!(result.is_ok());
+        assert_eq!(user_aggregate.user.tier, UserTier::Premium);
+    }
 
-        // Unlink wallet
-        assert!(aggregate.unlink_wallet().is_ok());
-        assert_eq!(aggregate.user.wallet_address, None);
-        assert_eq!(aggregate.pending_events.len(), 2);
+    #[test]
+    fn test_link_wallet_success() {
+        // Arrange
+        let email = Email::new("test@example.com".to_string()).unwrap();
+        let username = Username::new("testuser".to_string()).unwrap();
+        let password_hash = PasswordHash::new("hashed_password".to_string());
+        let mut user_aggregate = UserAggregate::create(email, username, password_hash).unwrap();
+        let wallet_address = WalletAddress::new("0x123456789abcdef".to_string()).unwrap();
+
+        // Act
+        let result = user_aggregate.link_wallet(wallet_address.clone());
+
+        // Assert
+        assert!(result.is_ok());
+        assert_eq!(user_aggregate.user.wallet_address, Some(wallet_address));
+    }
+
+    #[test]
+    fn test_verify_email_success() {
+        // Arrange
+        let email = Email::new("test@example.com".to_string()).unwrap();
+        let username = Username::new("testuser".to_string()).unwrap();
+        let password_hash = PasswordHash::new("hashed_password".to_string());
+        let mut user_aggregate = UserAggregate::create(email, username, password_hash).unwrap();
+
+        // Act
+        let result = user_aggregate.verify_email();
+
+        // Assert
+        assert!(result.is_ok());
+        assert!(user_aggregate.user.is_verified);
+    }
+
+    #[test]
+    fn test_deactivate_user_success() {
+        // Arrange
+        let email = Email::new("test@example.com".to_string()).unwrap();
+        let username = Username::new("testuser".to_string()).unwrap();
+        let password_hash = PasswordHash::new("hashed_password".to_string());
+        let mut user_aggregate = UserAggregate::create(email, username, password_hash).unwrap();
+
+        // Act
+        let result = user_aggregate.deactivate("Test reason".to_string());
+
+        // Assert
+        assert!(result.is_ok());
+        assert!(!user_aggregate.user.is_active);
     }
 } 

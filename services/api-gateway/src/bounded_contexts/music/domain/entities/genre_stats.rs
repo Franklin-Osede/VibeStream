@@ -225,15 +225,15 @@ mod tests {
 
     #[test]
     fn test_genre_stats_creation() {
-        let stats = GenreStats::new(Genre::Rock);
-        assert_eq!(stats.genre, Genre::Rock);
+        let stats = GenreStats::new(Genre::new("rock".to_string()).unwrap());
+        assert_eq!(stats.genre, Genre::new("rock".to_string()).unwrap());
         assert_eq!(stats.total_songs, 0);
         assert_eq!(stats.total_listens, 0);
     }
 
     #[test]
     fn test_popularity_score_update() {
-        let mut stats = GenreStats::new(Genre::Jazz);
+        let mut stats = GenreStats::new(Genre::new("jazz".to_string()).unwrap());
         stats.update_popularity_score(85.5);
         assert_eq!(stats.popularity_score, 85.5);
         assert_eq!(stats.peak_popularity_score, 85.5);
@@ -242,7 +242,7 @@ mod tests {
 
     #[test]
     fn test_genre_category() {
-        let mut stats = GenreStats::new(Genre::Classical);
+        let mut stats = GenreStats::new(Genre::new("classical".to_string()).unwrap());
         
         stats.update_popularity_score(95.0);
         assert_eq!(stats.get_genre_category(), GenreCategory::Mainstream);
@@ -256,7 +256,7 @@ mod tests {
 
     #[test]
     fn test_trending_check() {
-        let mut stats = GenreStats::new(Genre::Electronic);
+        let mut stats = GenreStats::new(Genre::new("electronic".to_string()).unwrap());
         
         stats.update_trend_score(75.0);
         stats.update_monthly_growth(15.0);

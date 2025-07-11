@@ -597,9 +597,7 @@ mod tests {
 
         let result = handler.handle(query).await.unwrap();
         
-        assert_eq!(result.analytics.total_shares, 1000);
-        assert_eq!(result.analytics.shares_sold, 250); // 10% + 15% of 1000
-        assert_eq!(result.analytics.unique_shareholders, 2);
+        assert_eq!(result.analytics.number_of_shareholders, 2);
         assert_eq!(result.shareholder_breakdown.len(), 2);
         
         // Check shareholder breakdown

@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use uuid::Uuid;
-use sqlx::PgPool;
+use sqlx::{PgPool, Row};
 
 use crate::bounded_contexts::user::domain::{
     aggregates::UserAggregate,
@@ -28,6 +28,7 @@ impl UserPostgresRepository {
         let password_hash: String = row.try_get("password_hash").map_err(|e| AppError::DatabaseError(e.to_string()))?;
         let created_at: chrono::DateTime<chrono::Utc> = row.try_get("created_at").map_err(|e| AppError::DatabaseError(e.to_string()))?;
         let updated_at: chrono::DateTime<chrono::Utc> = row.try_get("updated_at").map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        let last_login_at: Option<chrono::DateTime<chrono::Utc>> = row.try_get("last_login_at").ok();
 
         // Create value objects using proper constructors
         let user_id = UserId::from_uuid(id);
@@ -61,6 +62,7 @@ impl UserPostgresRepository {
             is_active,
             created_at,
             updated_at,
+            last_login_at,
         };
 
         // Create UserProfile
@@ -71,17 +73,25 @@ impl UserPostgresRepository {
         };
 
         // Create UserPreferences (default for now)
-        let preferences = UserPreferences::default();
+        let preferences = UserPreferences::new(user_id.clone());
 
-        // Create UserStats
+        // Create UserStats with correct field names
+        let now = chrono::Utc::now();
         let stats = UserStats {
-            tier_points: tier_points as u32,
-            total_rewards,
-            total_listen_time: listen_time as u64,
-            songs_listened: 0, // Would need to be calculated
-            playlists_created: 0, // Would need to be calculated
-            followers_count: 0, // Would need to be calculated
-            following_count: 0, // Would need to be calculated
+            user_id: user_id.clone(),
+            total_listening_time_minutes: 0, // Changed from total_listen_time
+            total_songs_listened: 0, // Changed from songs_listened  
+            total_rewards_earned: 0.0, // Changed from total_rewards
+            current_listening_streak: 0,
+            longest_listening_streak: 0,
+            total_investments: 0.0,
+            investment_count: 0, // Changed from playlists_created
+            nfts_owned: 0,
+            campaigns_participated: 0, // Changed from followers_count  
+            tier_points: 0, // Changed from following_count
+            achievements_unlocked: Vec::new(),
+            created_at: now,
+            updated_at: now,
         };
 
         Ok(UserAggregate {
@@ -99,12 +109,12 @@ impl UserPostgresRepository {
 impl UserRepository for UserPostgresRepository {
     async fn save(&self, aggregate: &UserAggregate) -> Result<(), AppError> {
         sqlx::query(
-            r#"
-            INSERT INTO users (id, email, username, password_hash, display_name, bio, avatar_url,
-                              wallet_address, tier, role, tier_points, total_rewards, listen_time,
-                              is_verified, is_active, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-            ON CONFLICT (id) DO UPDATE SET
+            r#"INSERT INTO users (
+                   id, email, username, password_hash, display_name, bio, avatar_url,
+                   wallet_address, tier, role, tier_points, total_rewards_earned, total_listening_time_minutes,
+                   is_verified, is_active, created_at, updated_at
+               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+               ON CONFLICT (id) DO UPDATE SET
                 email = EXCLUDED.email,
                 username = EXCLUDED.username,
                 password_hash = EXCLUDED.password_hash,
@@ -115,8 +125,8 @@ impl UserRepository for UserPostgresRepository {
                 tier = EXCLUDED.tier,
                 role = EXCLUDED.role,
                 tier_points = EXCLUDED.tier_points,
-                total_rewards = EXCLUDED.total_rewards,
-                listen_time = EXCLUDED.listen_time,
+                total_rewards_earned = EXCLUDED.total_rewards_earned,
+                total_listening_time_minutes = EXCLUDED.total_listening_time_minutes,
                 is_verified = EXCLUDED.is_verified,
                 is_active = EXCLUDED.is_active,
                 updated_at = EXCLUDED.updated_at
@@ -133,8 +143,8 @@ impl UserRepository for UserPostgresRepository {
         .bind(aggregate.user.tier.to_string())
         .bind(aggregate.user.role.to_string())
         .bind(aggregate.stats.tier_points as i32)
-        .bind(aggregate.stats.total_rewards)
-        .bind(aggregate.stats.total_listen_time as i64)
+        .bind(aggregate.stats.total_rewards_earned) // Changed from total_rewards
+        .bind(aggregate.stats.total_listening_time_minutes as i64) // Changed from total_listen_time
         .bind(aggregate.user.is_verified)
         .bind(aggregate.user.is_active)
         .bind(aggregate.user.created_at)
@@ -146,10 +156,15 @@ impl UserRepository for UserPostgresRepository {
         Ok(())
     }
 
+    async fn update(&self, aggregate: &UserAggregate) -> Result<(), AppError> {
+        // For now, just use save which does upsert
+        self.save(aggregate).await
+    }
+
     async fn find_by_id(&self, id: &UserId) -> Result<Option<UserAggregate>, AppError> {
         let rec = sqlx::query(
             r#"SELECT id, email, username, password_hash, display_name, bio, avatar_url,
-                      wallet_address, tier, role, tier_points, total_rewards, listen_time,
+                      wallet_address, tier, role, tier_points, total_rewards_earned, total_listening_time_minutes,
                       is_verified, is_active, last_login_at, created_at, updated_at
                FROM users WHERE id = $1"#
         )
@@ -167,7 +182,7 @@ impl UserRepository for UserPostgresRepository {
     async fn find_by_email(&self, email: &Email) -> Result<Option<UserAggregate>, AppError> {
         let rec = sqlx::query(
             r#"SELECT id, email, username, password_hash, display_name, bio, avatar_url,
-                      wallet_address, tier, role, tier_points, total_rewards, listen_time,
+                      wallet_address, tier, role, tier_points, total_rewards_earned, total_listening_time_minutes,
                       is_verified, is_active, last_login_at, created_at, updated_at
                FROM users WHERE email = $1"#
         )
@@ -185,7 +200,7 @@ impl UserRepository for UserPostgresRepository {
     async fn find_by_username(&self, username: &Username) -> Result<Option<UserAggregate>, AppError> {
         let rec = sqlx::query(
             r#"SELECT id, email, username, password_hash, display_name, bio, avatar_url,
-                      wallet_address, tier, role, tier_points, total_rewards, listen_time,
+                      wallet_address, tier, role, tier_points, total_rewards_earned, total_listening_time_minutes,
                       is_verified, is_active, last_login_at, created_at, updated_at
                FROM users WHERE username = $1"#
         )
@@ -208,6 +223,35 @@ impl UserRepository for UserPostgresRepository {
         Ok(self.find_by_username(username).await?.is_some())
     }
 
+    async fn search_users(&self, search_text: Option<&str>, limit: u32, offset: u32) -> Result<Vec<UserAggregate>, AppError> {
+        // Construimos un criterio básico y reutilizamos find_users para obtener resúmenes,
+        // luego devolvemos los agregados completos.
+        use crate::bounded_contexts::user::domain::repository::UserSearchCriteria;
+
+        let mut criteria = UserSearchCriteria::new()
+            .page(offset)
+            .page_size(limit);
+
+        if let Some(text) = search_text {
+            let text_owned = text.to_string();
+            criteria = criteria.username_contains(text_owned.clone())
+                .email_contains(text_owned.clone())
+                .display_name_contains(text_owned);
+        }
+
+        let summaries = self.find_users(criteria).await?;
+
+        // Cargar los agregados completos basados en los IDs obtenidos
+        let mut aggregates = Vec::new();
+        for summary in summaries {
+            if let Some(agg) = self.find_by_id(&summary.id).await? {
+                aggregates.push(agg);
+            }
+        }
+
+        Ok(aggregates)
+    }
+
     async fn delete(&self, id: &UserId) -> Result<(), AppError> {
         sqlx::query("UPDATE users SET is_active = false WHERE id = $1")
             .bind(id.to_uuid())
@@ -224,7 +268,7 @@ impl UserRepository for UserPostgresRepository {
         
         let rows = sqlx::query(
             r#"SELECT id, username, email, display_name, avatar_url, tier, role, tier_points, 
-                      total_rewards, is_verified, is_active, created_at 
+                      total_rewards_earned, total_listening_time_minutes, is_verified, is_active, created_at 
                FROM users WHERE is_active = true
                ORDER BY created_at DESC
                LIMIT $1 OFFSET $2"#
@@ -248,7 +292,8 @@ impl UserRepository for UserPostgresRepository {
                 tier: row.try_get("tier").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 role: row.try_get("role").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 tier_points: row.try_get("tier_points").map_err(|e| AppError::DatabaseError(e.to_string()))?,
-                total_rewards: row.try_get("total_rewards").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                total_rewards: row.try_get("total_rewards_earned").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                total_listening_time: row.try_get("total_listening_time_minutes").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 is_verified: row.try_get("is_verified").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 is_active: row.try_get("is_active").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 created_at: row.try_get("created_at").map_err(|e| AppError::DatabaseError(e.to_string()))?,
@@ -493,44 +538,43 @@ impl UserRepository for UserPostgresRepository {
     }
 
     async fn find_users_by_tier_points_range(&self, min_points: u32, max_points: u32, page: u32, page_size: u32) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
-        let offset = page * page_size;
-        let rows = sqlx::query(
-            r#"SELECT id, username, email, display_name, avatar_url, tier, role, tier_points, 
-                      total_rewards, is_verified, is_active, created_at 
-               FROM users 
-               WHERE tier_points BETWEEN $1 AND $2 AND is_active = true
-               ORDER BY tier_points DESC
-               LIMIT $3 OFFSET $4"#
+        let criteria = crate::bounded_contexts::user::domain::repository::UserSearchCriteria {
+            min_tier_points: Some(min_points),
+            max_tier_points: Some(max_points),
+            page,
+            page_size,
+            ..Default::default()
+        };
+        self.find_users(criteria).await
+    }
+
+    async fn add_follower(&self, follower_id: &UserId, followee_id: &UserId) -> Result<(), AppError> {
+        sqlx::query(
+            r#"INSERT INTO user_followers (follower_id, followee_id, created_at)
+               VALUES ($1, $2, $3)
+               ON CONFLICT (follower_id, followee_id) DO NOTHING"#
         )
-        .bind(min_points as i32)
-        .bind(max_points as i32)
-        .bind(page_size as i64)
-        .bind(offset as i64)
-        .fetch_all(&self.pool)
+        .bind(follower_id.to_uuid())
+        .bind(followee_id.to_uuid())
+        .bind(chrono::Utc::now())
+        .execute(&self.pool)
         .await
         .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-        let mut summaries = Vec::new();
-        for row in rows {
-            let summary = crate::bounded_contexts::user::domain::aggregates::UserSummary {
-                id: UserId::from_uuid(row.try_get("id").map_err(|e| AppError::DatabaseError(e.to_string()))?),
-                username: Username::new(row.try_get("username").map_err(|e| AppError::DatabaseError(e.to_string()))?)
-                    .map_err(|e| AppError::ValidationError(e))?,
-                email: Email::new(row.try_get("email").map_err(|e| AppError::DatabaseError(e.to_string()))?)
-                    .map_err(|e| AppError::ValidationError(e))?,
-                display_name: row.try_get("display_name").map_err(|e| AppError::DatabaseError(e.to_string()))?,
-                avatar_url: row.try_get("avatar_url").ok(),
-                tier: row.try_get("tier").map_err(|e| AppError::DatabaseError(e.to_string()))?,
-                role: row.try_get("role").map_err(|e| AppError::DatabaseError(e.to_string()))?,
-                tier_points: row.try_get("tier_points").map_err(|e| AppError::DatabaseError(e.to_string()))?,
-                total_rewards: row.try_get("total_rewards").map_err(|e| AppError::DatabaseError(e.to_string()))?,
-                is_verified: row.try_get("is_verified").map_err(|e| AppError::DatabaseError(e.to_string()))?,
-                is_active: row.try_get("is_active").map_err(|e| AppError::DatabaseError(e.to_string()))?,
-                created_at: row.try_get("created_at").map_err(|e| AppError::DatabaseError(e.to_string()))?,
-            };
-            summaries.push(summary);
-        }
+        Ok(())
+    }
 
-        Ok(summaries)
+    async fn remove_follower(&self, follower_id: &UserId, followee_id: &UserId) -> Result<(), AppError> {
+        sqlx::query(
+            r#"DELETE FROM user_followers 
+               WHERE follower_id = $1 AND followee_id = $2"#
+        )
+        .bind(follower_id.to_uuid())
+        .bind(followee_id.to_uuid())
+        .execute(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        Ok(())
     }
 } 

@@ -222,7 +222,7 @@ mod tests {
         
         assert!(result.is_ok());
         let distribution = result.unwrap();
-        assert_eq!(distribution.reward_pool().total_tokens.tokens(), 1000.0);
+        assert_eq!(distribution.reward_pool().total_tokens().tokens(), 1000.0);
     }
 
     #[test]

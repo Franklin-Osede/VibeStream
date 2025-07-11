@@ -28,6 +28,11 @@ impl UserRepository for PostgresUserRepository {
         Ok(())
     }
 
+    async fn update(&self, user: &UserAggregate) -> Result<(), AppError> {
+         // For now behave like save (upsert)
+         self.save(user).await
+    }
+
     async fn find_by_id(&self, id: &UserId) -> Result<Option<UserAggregate>, AppError> {
         // TODO: Implement actual PostgreSQL find by ID
         Ok(None)
@@ -56,6 +61,21 @@ impl UserRepository for PostgresUserRepository {
     async fn username_exists(&self, username: &Username) -> Result<bool, AppError> {
         // TODO: Implement actual PostgreSQL username existence check
         Ok(false)
+    }
+
+    async fn search_users(&self, _search_text: Option<&str>, _limit: u32, _offset: u32) -> Result<Vec<UserAggregate>, AppError> {
+        // TODO: Real search logic
+        Ok(vec![])
+    }
+
+    async fn add_follower(&self, _follower_id: &UserId, _followee_id: &UserId) -> Result<(), AppError> {
+        // TODO: Implement follow logic
+        Ok(())
+    }
+
+    async fn remove_follower(&self, _follower_id: &UserId, _followee_id: &UserId) -> Result<(), AppError> {
+        // TODO: Implement unfollow logic
+        Ok(())
     }
 
     async fn find_users(&self, criteria: crate::bounded_contexts::user::domain::repository::UserSearchCriteria) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {

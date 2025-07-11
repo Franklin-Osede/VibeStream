@@ -144,23 +144,24 @@ impl VibeStreamOrchestrator {
         listen_duration_seconds: Option<u32>,
         quality_score: Option<f64>,
     ) -> Result<Option<crate::bounded_contexts::listen_reward::infrastructure::RevenueDistributionTriggered>, AppError> {
-        use crate::bounded_contexts::listen_reward::domain::value_objects::{
-            ListenSessionId, QualityScore, ListenDuration, ZkProofHash
-        };
+        use crate::bounded_contexts::listen_reward::domain::value_objects::{ListenSessionId, ListenDuration, QualityScore};
+        use crate::bounded_contexts::music::domain::value_objects::ArtistId;
         use crate::bounded_contexts::music::domain::value_objects::SongId;
+        use crate::shared::domain::events::EventMetadata;
 
         // Create the event with proper value objects
         let event = ListenSessionCompleted {
             session_id: ListenSessionId::from_uuid(session_id),
             user_id,
             song_id: SongId::from_uuid(song_id),
-            listen_duration: ListenDuration::new(listen_duration_seconds.unwrap_or(180))
+            artist_id: ArtistId::new(),
+            duration: ListenDuration::new(listen_duration_seconds.unwrap_or(180))
                 .map_err(|e| AppError::ValidationError(e))?,
             quality_score: QualityScore::new(quality_score.unwrap_or(1.0))
                 .map_err(|e| AppError::ValidationError(e))?,
-            zk_proof: ZkProofHash::new("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_string())
-                .map_err(|e| AppError::ValidationError(e))?,
+            completion_percentage: 100.0,
             completed_at: chrono::Utc::now(),
+            metadata: EventMetadata::new(),
         };
 
         // Process through integration handler

@@ -260,6 +260,50 @@ impl ListenSession {
         )))
     }
 
+    /// Verify ZK proof (simplified) and calculate reward in one step
+    /// `base_multiplier` se usa para ajustar la recompensa base proveniente de la pool.
+    /// `zk_valid` indica si la prueba ya fue verificada externamente (tests lo pasan como true/false).
+    pub fn verify_and_calculate_reward(&mut self, base_multiplier: f64, zk_valid: bool) -> Result<Box<dyn DomainEvent>, AppError> {
+        // Si la sesión no está completada no podemos verificarla
+        if self.status != SessionStatus::Completed {
+            return Err(AppError::ValidationError("Session must be completed first".to_string()));
+        }
+
+        // Simula verificación de la prueba ZK
+        if zk_valid {
+            // Set status verified
+            self.status = SessionStatus::Verified;
+            self.verified_at = Some(chrono::Utc::now());
+
+            // Calcula recompensa usando multiplier
+            let base_reward = RewardAmount::new(base_multiplier).map_err(|e| AppError::ValidationError(e))?;
+            let event = self.calculate_reward(base_reward)?;
+
+            // Guarda final_reward si el evento es RewardCalculated
+            if let Ok(json) = serde_json::to_value(&event) {
+                if let Some(tokens) = json.get("final_reward").and_then(|v| v.get("tokens")).and_then(|v| v.as_f64()) {
+                    self.final_reward = Some(RewardAmount::new(tokens).unwrap());
+                }
+            }
+
+            Ok(event)
+        } else {
+            self.status = SessionStatus::Failed;
+            let failed_at = chrono::Utc::now();
+            // Crea evento de fallo
+            let proof_hash = self.zk_proof.clone().unwrap_or_else(|| ZkProofHash::new("invalid".to_string()).unwrap());
+            Ok(Box::new(ZkProofVerificationFailed::new(
+                self.id.clone(),
+                self.user_id,
+                self.song_id.clone(),
+                self.artist_id.clone(),
+                proof_hash,
+                "ZK proof verification failed".to_string(),
+                failed_at,
+            )))
+        }
+    }
+
     pub fn mark_rewarded(&mut self) -> Result<(), String> {
         if self.status != SessionStatus::Verified {
             return Err("Session must be verified before marking as rewarded".to_string());

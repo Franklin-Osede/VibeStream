@@ -13,12 +13,14 @@ use crate::shared::domain::errors::AppError;
 
 pub struct InMemoryUserRepository {
     users: RwLock<HashMap<UserId, UserAggregate>>,
+    followers: RwLock<HashMap<UserId, Vec<UserId>>>, // followee_id -> list of follower_ids
 }
 
 impl InMemoryUserRepository {
     pub fn new() -> Self {
         Self {
             users: RwLock::new(HashMap::new()),
+            followers: RwLock::new(HashMap::new()),
         }
     }
 }
@@ -29,6 +31,11 @@ impl UserRepository for InMemoryUserRepository {
         let mut users = self.users.write().unwrap();
         users.insert(aggregate.user.id.clone(), aggregate.clone());
         Ok(())
+    }
+
+    async fn update(&self, aggregate: &UserAggregate) -> Result<(), AppError> {
+        // For in-memory, update is same as save
+        self.save(aggregate).await
     }
 
     async fn find_by_id(&self, id: &UserId) -> Result<Option<UserAggregate>, AppError> {
@@ -52,6 +59,34 @@ impl UserRepository for InMemoryUserRepository {
 
     async fn username_exists(&self, username: &Username) -> Result<bool, AppError> {
         Ok(self.find_by_username(username).await?.is_some())
+    }
+
+    async fn search_users(&self, search_text: Option<&str>, limit: u32, offset: u32) -> Result<Vec<UserAggregate>, AppError> {
+        let users = self.users.read().unwrap();
+        let mut results: Vec<UserAggregate> = users.values()
+            .filter(|user| {
+                if let Some(text) = search_text {
+                    let t = text.to_lowercase();
+                    user.user.username.value().to_lowercase().contains(&t)
+                        || user.user.email.value().to_lowercase().contains(&t)
+                        || user.profile.display_name.clone().unwrap_or_default().to_lowercase().contains(&t)
+                } else {
+                    true
+                }
+            })
+            .cloned()
+            .collect();
+
+        // Simple pagination
+        let start = offset as usize;
+        let end = (offset + limit) as usize;
+        if start < results.len() {
+            results = results[start..end.min(results.len())].to_vec();
+        } else {
+            results = Vec::new();
+        }
+
+        Ok(results)
     }
 
     async fn find_users(&self, criteria: UserSearchCriteria) -> Result<Vec<UserSummary>, AppError> {
@@ -265,5 +300,22 @@ impl UserRepository for InMemoryUserRepository {
         }
 
         Ok(results)
+    }
+
+    async fn add_follower(&self, follower_id: &UserId, followee_id: &UserId) -> Result<(), AppError> {
+        let mut followers = self.followers.write().unwrap();
+        followers.entry(followee_id.clone()).or_insert_with(Vec::new).push(follower_id.clone());
+        Ok(())
+    }
+
+    async fn remove_follower(&self, follower_id: &UserId, followee_id: &UserId) -> Result<(), AppError> {
+        let mut followers = self.followers.write().unwrap();
+        if let Some(mut follower_list) = followers.get_mut(followee_id) {
+            follower_list.retain(|id| id != follower_id);
+            if follower_list.is_empty() {
+                followers.remove(followee_id);
+            }
+        }
+        Ok(())
     }
 } 

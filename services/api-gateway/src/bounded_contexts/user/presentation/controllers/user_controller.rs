@@ -224,7 +224,7 @@ pub async fn register_user(
         email: request.email.clone(),
         username: request.username.clone(),
         password: request.password.clone(),
-        display_name: request.display_name.clone().unwrap_or_else(|| request.username.clone()),
+        display_name: request.display_name.clone(),
         bio: request.bio.clone(),
     };
 
@@ -234,7 +234,7 @@ pub async fn register_user(
                 user_id: result.id,
                 username: result.username,
                 email: result.email,
-                display_name: Some(result.display_name),
+                display_name: result.display_name,
                 token: "mock_jwt_token".to_string(), // TODO: Generate real JWT
                 created_at: result.created_at,
             };
@@ -296,7 +296,7 @@ pub async fn get_user_profile(
                 id: user_response.id,
                 username: user_response.username,
                 email: user_response.email,
-                display_name: Some(user_response.display_name),
+                display_name: user_response.display_name,
                 bio: user_response.bio,
                 avatar_url: user_response.profile_image_url,
                 cover_url: None, // TODO: Add cover_url to UserResponse
@@ -410,10 +410,10 @@ pub async fn search_users(
     
     match user_service.handle_search_users(query).await {
         Ok(user_responses) => {
-            let users = user_responses.into_iter().map(|user_response| UserSummaryResponse {
+            let users: Vec<UserSummaryResponse> = user_responses.into_iter().map(|user_response| UserSummaryResponse {
                 id: user_response.id,
                 username: user_response.username,
-                display_name: Some(user_response.display_name),
+                display_name: user_response.display_name,
                 avatar_url: user_response.profile_image_url,
                 tier: "bronze".to_string(), // TODO: Add tier to UserResponse
                 role: "user".to_string(),   // TODO: Add role to UserResponse

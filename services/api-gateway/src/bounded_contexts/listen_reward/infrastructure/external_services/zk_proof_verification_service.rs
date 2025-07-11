@@ -354,8 +354,8 @@ mod tests {
     fn create_test_session() -> ListenSession {
         let (session, _) = ListenSession::new(
             Uuid::new_v4(),
-            SongId::new(Uuid::new_v4()),
-            ArtistId::new(Uuid::new_v4()),
+            SongId::from_uuid(Uuid::new_v4()),
+            ArtistId::from_uuid(Uuid::new_v4()),
             RewardTier::Premium,
         );
         session

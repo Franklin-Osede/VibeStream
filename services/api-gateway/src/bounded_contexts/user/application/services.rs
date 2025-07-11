@@ -17,14 +17,15 @@ use async_trait::async_trait;
 use std::sync::Arc;
 use uuid::Uuid;
 
+#[derive(Clone)]
 pub struct UserApplicationService<R: UserRepository> {
     repository: Arc<R>,
-    domain_service: Box<dyn UserDomainService>,
+    domain_service: Arc<dyn UserDomainService + Send + Sync>,
 }
 
 impl<R: UserRepository + 'static> UserApplicationService<R> {
     pub fn new(repository: Arc<R>) -> Self {
-        let domain_service = Box::new(DefaultUserDomainService::new(repository.clone()));
+        let domain_service = Arc::new(DefaultUserDomainService::new(repository.clone()));
         Self {
             repository,
             domain_service,

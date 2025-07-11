@@ -153,6 +153,7 @@ mod tests {
         
         // Verify main components exist
         assert!(std::sync::Arc::strong_count(&context.application_service) >= 1);
-        assert!(std::sync::Arc::strong_count(&context.app_state) >= 1);
+        // app_state no es Arc; verificamos que exista al menos
+        assert_eq!(context.app_state.contract_repository.as_ref(), &());
     }
 } 

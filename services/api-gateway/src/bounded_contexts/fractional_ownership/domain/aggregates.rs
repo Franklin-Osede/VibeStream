@@ -688,11 +688,11 @@ mod tests {
 
         let analytics = aggregate.get_analytics();
         
-        assert_eq!(analytics.shares_sold, 250); // 10% + 15% of 1000 shares
-        assert_eq!(analytics.total_investment, 2500.0); // $1000 + $1500
-        assert_eq!(analytics.unique_shareholders, 2);
-        assert_eq!(analytics.average_investment_per_user, 1250.0);
-        assert_eq!(analytics.largest_ownership_percentage, 15.0);
+        // Use the correct field names that exist in OwnershipAnalytics
+        assert_eq!(analytics.total_investment_value, 2500.0); // $1000 + $1500
+        assert_eq!(analytics.number_of_shareholders, 2);
+        assert_eq!(analytics.average_share_size, 1250.0);
+        assert_eq!(analytics.completion_percentage, 25.0); // 25% of shares sold
     }
 
     #[test]

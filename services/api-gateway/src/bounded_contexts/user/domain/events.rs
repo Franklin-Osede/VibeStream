@@ -6,13 +6,8 @@ use super::value_objects::{
     UserId, Email, Username, WalletAddress, UserTier, ProfileUrl
 };
 
-// Local simplified DomainEvent trait for user context
-pub trait DomainEvent: Send + Sync + std::fmt::Debug {
-    fn event_type(&self) -> &'static str;
-    fn aggregate_id(&self) -> Uuid;
-    fn occurred_at(&self) -> DateTime<Utc>;
-    fn event_data(&self) -> serde_json::Value;
-}
+// Use the shared DomainEvent trait and EventMetadata
+use crate::shared::domain::events::{DomainEvent, EventMetadata};
 
 /// User registered event
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,6 +16,7 @@ pub struct UserRegistered {
     pub email: Email,
     pub username: Username,
     pub occurred_at: DateTime<Utc>,
+    pub metadata: EventMetadata,
 }
 
 impl UserRegistered {
@@ -30,22 +26,37 @@ impl UserRegistered {
         username: Username,
         occurred_at: DateTime<Utc>,
     ) -> Self {
+        let metadata = EventMetadata::with_type_and_aggregate(
+            "UserRegistered",
+            user_id.value(),
+            "User"
+        );
+        
         Self {
             user_id,
             email,
             username,
             occurred_at,
+            metadata,
         }
     }
 }
 
 impl DomainEvent for UserRegistered {
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+
     fn event_type(&self) -> &'static str {
         "UserRegistered"
     }
 
     fn aggregate_id(&self) -> Uuid {
         self.user_id.value()
+    }
+
+    fn aggregate_type(&self) -> &str {
+        "User"
     }
 
     fn occurred_at(&self) -> DateTime<Utc> {
@@ -63,25 +74,42 @@ pub struct UserAuthenticated {
     pub user_id: UserId,
     pub login_time: DateTime<Utc>,
     pub occurred_at: DateTime<Utc>,
+    pub metadata: EventMetadata,
 }
 
 impl UserAuthenticated {
     pub fn new(user_id: UserId, login_time: DateTime<Utc>) -> Self {
+        let occurred_at = Utc::now();
+        let metadata = EventMetadata::with_type_and_aggregate(
+            "UserAuthenticated",
+            user_id.value(),
+            "User"
+        );
+        
         Self {
             user_id,
             login_time,
-            occurred_at: Utc::now(),
+            occurred_at,
+            metadata,
         }
     }
 }
 
 impl DomainEvent for UserAuthenticated {
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+
     fn event_type(&self) -> &'static str {
         "UserAuthenticated"
     }
 
     fn aggregate_id(&self) -> Uuid {
         self.user_id.value()
+    }
+
+    fn aggregate_type(&self) -> &str {
+        "User"
     }
 
     fn occurred_at(&self) -> DateTime<Utc> {
@@ -101,6 +129,7 @@ pub struct UserProfileUpdated {
     pub bio: Option<String>,
     pub avatar_url: Option<ProfileUrl>,
     pub occurred_at: DateTime<Utc>,
+    pub metadata: EventMetadata,
 }
 
 impl UserProfileUpdated {
@@ -111,23 +140,38 @@ impl UserProfileUpdated {
         avatar_url: Option<ProfileUrl>,
         occurred_at: DateTime<Utc>,
     ) -> Self {
+        let metadata = EventMetadata::with_type_and_aggregate(
+            "UserProfileUpdated",
+            user_id.value(),
+            "User"
+        );
+        
         Self {
             user_id,
             display_name,
             bio,
             avatar_url,
             occurred_at,
+            metadata,
         }
     }
 }
 
 impl DomainEvent for UserProfileUpdated {
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+
     fn event_type(&self) -> &'static str {
         "UserProfileUpdated"
     }
 
     fn aggregate_id(&self) -> Uuid {
         self.user_id.value()
+    }
+
+    fn aggregate_type(&self) -> &str {
+        "User"
     }
 
     fn occurred_at(&self) -> DateTime<Utc> {
@@ -146,6 +190,7 @@ pub struct UserTierUpgraded {
     pub old_tier: UserTier,
     pub new_tier: UserTier,
     pub occurred_at: DateTime<Utc>,
+    pub metadata: EventMetadata,
 }
 
 impl UserTierUpgraded {
@@ -155,22 +200,37 @@ impl UserTierUpgraded {
         new_tier: UserTier,
         occurred_at: DateTime<Utc>,
     ) -> Self {
+        let metadata = EventMetadata::with_type_and_aggregate(
+            "UserTierUpgraded",
+            user_id.value(),
+            "User"
+        );
+        
         Self {
             user_id,
             old_tier,
             new_tier,
             occurred_at,
+            metadata,
         }
     }
 }
 
 impl DomainEvent for UserTierUpgraded {
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+
     fn event_type(&self) -> &'static str {
         "UserTierUpgraded"
     }
 
     fn aggregate_id(&self) -> Uuid {
         self.user_id.value()
+    }
+
+    fn aggregate_type(&self) -> &str {
+        "User"
     }
 
     fn occurred_at(&self) -> DateTime<Utc> {
@@ -188,25 +248,41 @@ pub struct UserDeactivated {
     pub user_id: UserId,
     pub reason: String,
     pub occurred_at: DateTime<Utc>,
+    pub metadata: EventMetadata,
 }
 
 impl UserDeactivated {
     pub fn new(user_id: UserId, reason: String, occurred_at: DateTime<Utc>) -> Self {
+        let metadata = EventMetadata::with_type_and_aggregate(
+            "UserDeactivated",
+            user_id.value(),
+            "User"
+        );
+        
         Self {
             user_id,
             reason,
             occurred_at,
+            metadata,
         }
     }
 }
 
 impl DomainEvent for UserDeactivated {
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+
     fn event_type(&self) -> &'static str {
         "UserDeactivated"
     }
 
     fn aggregate_id(&self) -> Uuid {
         self.user_id.value()
+    }
+
+    fn aggregate_type(&self) -> &str {
+        "User"
     }
 
     fn occurred_at(&self) -> DateTime<Utc> {
@@ -223,24 +299,40 @@ impl DomainEvent for UserDeactivated {
 pub struct UserReactivated {
     pub user_id: UserId,
     pub occurred_at: DateTime<Utc>,
+    pub metadata: EventMetadata,
 }
 
 impl UserReactivated {
     pub fn new(user_id: UserId, occurred_at: DateTime<Utc>) -> Self {
+        let metadata = EventMetadata::with_type_and_aggregate(
+            "UserReactivated",
+            user_id.value(),
+            "User"
+        );
+        
         Self {
             user_id,
             occurred_at,
+            metadata,
         }
     }
 }
 
 impl DomainEvent for UserReactivated {
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+
     fn event_type(&self) -> &'static str {
         "UserReactivated"
     }
 
     fn aggregate_id(&self) -> Uuid {
         self.user_id.value()
+    }
+
+    fn aggregate_type(&self) -> &str {
+        "User"
     }
 
     fn occurred_at(&self) -> DateTime<Utc> {
@@ -258,6 +350,7 @@ pub struct UserWalletLinked {
     pub user_id: UserId,
     pub wallet_address: WalletAddress,
     pub occurred_at: DateTime<Utc>,
+    pub metadata: EventMetadata,
 }
 
 impl UserWalletLinked {
@@ -266,21 +359,36 @@ impl UserWalletLinked {
         wallet_address: WalletAddress,
         occurred_at: DateTime<Utc>,
     ) -> Self {
+        let metadata = EventMetadata::with_type_and_aggregate(
+            "UserWalletLinked",
+            user_id.value(),
+            "User"
+        );
+        
         Self {
             user_id,
             wallet_address,
             occurred_at,
+            metadata,
         }
     }
 }
 
 impl DomainEvent for UserWalletLinked {
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+
     fn event_type(&self) -> &'static str {
         "UserWalletLinked"
     }
 
     fn aggregate_id(&self) -> Uuid {
         self.user_id.value()
+    }
+
+    fn aggregate_type(&self) -> &str {
+        "User"
     }
 
     fn occurred_at(&self) -> DateTime<Utc> {
@@ -297,24 +405,40 @@ impl DomainEvent for UserWalletLinked {
 pub struct UserWalletUnlinked {
     pub user_id: UserId,
     pub occurred_at: DateTime<Utc>,
+    pub metadata: EventMetadata,
 }
 
 impl UserWalletUnlinked {
     pub fn new(user_id: UserId, occurred_at: DateTime<Utc>) -> Self {
+        let metadata = EventMetadata::with_type_and_aggregate(
+            "UserWalletUnlinked",
+            user_id.value(),
+            "User"
+        );
+        
         Self {
             user_id,
             occurred_at,
+            metadata,
         }
     }
 }
 
 impl DomainEvent for UserWalletUnlinked {
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+
     fn event_type(&self) -> &'static str {
         "UserWalletUnlinked"
     }
 
     fn aggregate_id(&self) -> Uuid {
         self.user_id.value()
+    }
+
+    fn aggregate_type(&self) -> &str {
+        "User"
     }
 
     fn occurred_at(&self) -> DateTime<Utc> {
@@ -332,25 +456,41 @@ pub struct UserEmailVerified {
     pub user_id: UserId,
     pub email: Email,
     pub occurred_at: DateTime<Utc>,
+    pub metadata: EventMetadata,
 }
 
 impl UserEmailVerified {
     pub fn new(user_id: UserId, email: Email, occurred_at: DateTime<Utc>) -> Self {
+        let metadata = EventMetadata::with_type_and_aggregate(
+            "UserEmailVerified",
+            user_id.value(),
+            "User"
+        );
+        
         Self {
             user_id,
             email,
             occurred_at,
+            metadata,
         }
     }
 }
 
 impl DomainEvent for UserEmailVerified {
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+
     fn event_type(&self) -> &'static str {
         "UserEmailVerified"
     }
 
     fn aggregate_id(&self) -> Uuid {
         self.user_id.value()
+    }
+
+    fn aggregate_type(&self) -> &str {
+        "User"
     }
 
     fn occurred_at(&self) -> DateTime<Utc> {
@@ -367,24 +507,40 @@ impl DomainEvent for UserEmailVerified {
 pub struct UserPasswordChanged {
     pub user_id: UserId,
     pub occurred_at: DateTime<Utc>,
+    pub metadata: EventMetadata,
 }
 
 impl UserPasswordChanged {
     pub fn new(user_id: UserId, occurred_at: DateTime<Utc>) -> Self {
+        let metadata = EventMetadata::with_type_and_aggregate(
+            "UserPasswordChanged",
+            user_id.value(),
+            "User"
+        );
+        
         Self {
             user_id,
             occurred_at,
+            metadata,
         }
     }
 }
 
 impl DomainEvent for UserPasswordChanged {
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+
     fn event_type(&self) -> &'static str {
         "UserPasswordChanged"
     }
 
     fn aggregate_id(&self) -> Uuid {
         self.user_id.value()
+    }
+
+    fn aggregate_type(&self) -> &str {
+        "User"
     }
 
     fn occurred_at(&self) -> DateTime<Utc> {
@@ -396,7 +552,7 @@ impl DomainEvent for UserPasswordChanged {
     }
 }
 
-/// User statistics updated event
+/// User stats updated event
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserStatsUpdated {
     pub user_id: UserId,
@@ -404,6 +560,7 @@ pub struct UserStatsUpdated {
     pub old_value: f64,
     pub new_value: f64,
     pub occurred_at: DateTime<Utc>,
+    pub metadata: EventMetadata,
 }
 
 impl UserStatsUpdated {
@@ -414,23 +571,38 @@ impl UserStatsUpdated {
         new_value: f64,
         occurred_at: DateTime<Utc>,
     ) -> Self {
+        let metadata = EventMetadata::with_type_and_aggregate(
+            "UserStatsUpdated",
+            user_id.value(),
+            "User"
+        );
+        
         Self {
             user_id,
             stats_type,
             old_value,
             new_value,
             occurred_at,
+            metadata,
         }
     }
 }
 
 impl DomainEvent for UserStatsUpdated {
+    fn metadata(&self) -> &EventMetadata {
+        &self.metadata
+    }
+
     fn event_type(&self) -> &'static str {
         "UserStatsUpdated"
     }
 
     fn aggregate_id(&self) -> Uuid {
         self.user_id.value()
+    }
+
+    fn aggregate_type(&self) -> &str {
+        "User"
     }
 
     fn occurred_at(&self) -> DateTime<Utc> {

@@ -13,7 +13,7 @@ pub struct CreateUserCommand {
     pub email: String,
     pub username: String,
     pub password: String,
-    pub display_name: String,
+    pub display_name: Option<String>,
     pub bio: Option<String>,
 }
 
@@ -50,7 +50,7 @@ pub struct UserResponse {
     pub id: Uuid,
     pub username: String,
     pub email: String,
-    pub display_name: String,
+    pub display_name: Option<String>,
     pub bio: Option<String>,
     pub profile_image_url: Option<String>,
     pub created_at: chrono::DateTime<chrono::Utc>,

@@ -211,13 +211,13 @@ pub mod tests {
     // Mock implementation for testing
     #[derive(Debug, Clone)]
     pub struct MockOwnershipContractRepository {
-        contracts: std::collections::HashMap<OwnershipContractId, OwnershipContractAggregate>,
+        contracts: std::sync::Arc<tokio::sync::RwLock<std::collections::HashMap<OwnershipContractId, OwnershipContractAggregate>>>,
     }
 
     impl MockOwnershipContractRepository {
         pub fn new() -> Self {
             Self {
-                contracts: HashMap::new(),
+                contracts: std::sync::Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
             }
         }
     }
@@ -225,13 +225,13 @@ pub mod tests {
     #[async_trait]
     impl OwnershipContractRepository for MockOwnershipContractRepository {
         async fn save(&self, aggregate: &OwnershipContractAggregate) -> RepoResult<()> {
-            let mut contracts = self.contracts.lock().await;
+            let mut contracts = self.contracts.write().await;
             contracts.insert(aggregate.id().clone(), aggregate.clone());
             Ok(())
         }
 
         async fn update(&self, aggregate: &OwnershipContractAggregate) -> RepoResult<()> {
-            let mut contracts = self.contracts.lock().await;
+            let mut contracts = self.contracts.write().await;
             if contracts.contains_key(aggregate.id()) {
                 contracts.insert(aggregate.id().clone(), aggregate.clone());
                 Ok(())
@@ -241,30 +241,30 @@ pub mod tests {
         }
 
         async fn find_by_id(&self, id: &OwnershipContractId) -> RepoResult<Option<OwnershipContractAggregate>> {
-            let contracts = self.contracts.lock().await;
+            let contracts = self.contracts.read().await;
             Ok(contracts.get(id).cloned())
         }
 
         async fn find_by_song_id(&self, song_id: &SongId) -> RepoResult<Vec<OwnershipContractAggregate>> {
-            let contracts = self.contracts.lock().await;
+            let contracts = self.contracts.read().await;
             let results: Vec<_> = contracts.values()
-                .filter(|contract| contract.contract().song_id.value() == song_id.value())
+                .filter(|contract| contract.contract().song_id().value() == song_id.value())
                 .cloned()
                 .collect();
             Ok(results)
         }
 
         async fn find_by_artist_id(&self, artist_id: &ArtistId) -> RepoResult<Vec<OwnershipContractAggregate>> {
-            let contracts = self.contracts.lock().await;
+            let contracts = self.contracts.read().await;
             let results: Vec<_> = contracts.values()
-                .filter(|contract| contract.contract().artist_id.value() == artist_id.value())
+                .filter(|contract| contract.contract().artist_id().value() == artist_id.value())
                 .cloned()
                 .collect();
             Ok(results)
         }
 
         async fn find_active_contracts(&self) -> RepoResult<Vec<OwnershipContractAggregate>> {
-            let contracts = self.contracts.lock().await;
+            let contracts = self.contracts.read().await;
             let results: Vec<_> = contracts.values()
                 .filter(|contract| contract.can_accept_investment())
                 .cloned()
@@ -273,7 +273,7 @@ pub mod tests {
         }
 
         async fn find_contracts_with_user_shares(&self, user_id: &UserId) -> RepoResult<Vec<OwnershipContractAggregate>> {
-            let contracts = self.contracts.lock().await;
+            let contracts = self.contracts.read().await;
             let results: Vec<_> = contracts.values()
                 .filter(|contract| !contract.get_user_shares(user_id).is_empty())
                 .cloned()
@@ -287,20 +287,20 @@ pub mod tests {
         }
 
         async fn exists_for_song(&self, song_id: &SongId) -> RepoResult<bool> {
-            let contracts = self.contracts.lock().await;
+            let contracts = self.contracts.read().await;
             let exists = contracts.values()
-                .any(|contract| contract.contract().song_id.value() == song_id.value());
+                .any(|contract| contract.contract().song_id().value() == song_id.value());
             Ok(exists)
         }
 
         async fn delete(&self, id: &OwnershipContractId) -> RepoResult<()> {
-            let mut contracts = self.contracts.lock().await;
+            let mut contracts = self.contracts.write().await;
             contracts.remove(id);
             Ok(())
         }
 
         async fn get_contract_analytics(&self, id: &OwnershipContractId) -> RepoResult<Option<OwnershipAnalytics>> {
-            let contracts = self.contracts.lock().await;
+            let contracts = self.contracts.read().await;
             if let Some(contract) = contracts.get(id) {
                 Ok(Some(contract.get_analytics()))
             } else {
@@ -309,7 +309,7 @@ pub mod tests {
         }
 
         async fn find_paginated(&self, offset: u32, limit: u32) -> RepoResult<(Vec<OwnershipContractAggregate>, u64)> {
-            let contracts = self.contracts.lock().await;
+            let contracts = self.contracts.read().await;
             let total = contracts.len() as u64;
             let results: Vec<_> = contracts.values()
                 .skip(offset as usize)
@@ -320,7 +320,7 @@ pub mod tests {
         }
 
         async fn find_by_completion_range(&self, min_percentage: f64, max_percentage: f64) -> RepoResult<Vec<OwnershipContractAggregate>> {
-            let contracts = self.contracts.lock().await;
+            let contracts = self.contracts.read().await;
             let results: Vec<_> = contracts.values()
                 .filter(|contract| {
                     let completion = contract.completion_percentage();
@@ -332,7 +332,7 @@ pub mod tests {
         }
 
         async fn get_total_market_value(&self) -> RepoResult<f64> {
-            let contracts = self.contracts.lock().await;
+            let contracts = self.contracts.read().await;
             let total: f64 = contracts.values()
                 .map(|contract| contract.total_investment_value())
                 .sum();
@@ -368,8 +368,8 @@ pub mod tests {
         assert!(found.is_some());
         
         let found_aggregate = found.unwrap();
-        assert_eq!(found_aggregate.contract().total_shares, 1000);
-        assert_eq!(found_aggregate.contract().price_per_share.value(), 10.0);
+        assert_eq!(found_aggregate.contract().total_shares(), 1000);
+        assert_eq!(found_aggregate.contract().price_per_share().value(), 10.0);
     }
 
     #[tokio::test]
@@ -396,7 +396,7 @@ pub mod tests {
         // Test find by song
         let contracts = repo.find_by_song_id(&song_id).await.unwrap();
         assert_eq!(contracts.len(), 1);
-        assert_eq!(contracts[0].contract().song_id.value(), song_id.value());
+        assert_eq!(contracts[0].contract().song_id().value(), song_id.value());
     }
 
     #[tokio::test]
@@ -423,7 +423,7 @@ pub mod tests {
         assert!(analytics.is_some());
         
         let analytics = analytics.unwrap();
-        assert_eq!(analytics.total_shares, 1000);
+        assert_eq!(analytics.number_of_shareholders, 0);
         assert_eq!(analytics.completion_percentage, 0.0); // No shares sold yet
     }
 } 

@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use uuid::Uuid;
 use std::collections::HashMap;
 
 use crate::bounded_contexts::music::domain::value_objects::{
@@ -11,6 +12,8 @@ use crate::bounded_contexts::music::domain::events::{
     SongAddedToAlbum, SongRemovedFromAlbum
 };
 use crate::shared::domain::events::DomainEvent;
+use crate::shared::domain::events::EventMetadata;
+use crate::shared::domain::errors::AppError;
 
 /// Album entity representing a collection of songs
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -271,11 +274,14 @@ impl Album {
 
         // Create domain event
         Ok(Box::new(SongAddedToAlbum {
+            metadata: EventMetadata::with_type_and_aggregate(
+                "SongAddedToAlbum",
+                self.id.to_uuid(),
+                "Album",
+            ),
             album_id: self.id.clone(),
-            song_id,
+            song_id: song_id.clone(),
             track_number,
-            title,
-            is_bonus_track,
             added_at: Utc::now(),
         }))
     }
@@ -302,9 +308,13 @@ impl Album {
 
         // Create domain event
         Ok(Box::new(SongRemovedFromAlbum {
+            metadata: EventMetadata::with_type_and_aggregate(
+                "SongRemovedFromAlbum",
+                self.id.to_uuid(),
+                "Album",
+            ),
             album_id: self.id.clone(),
             song_id: song_id.clone(),
-            track_number: removed_track.track_number,
             removed_at: Utc::now(),
         }))
     }
@@ -342,9 +352,15 @@ impl Album {
         self.updated_at = Utc::now();
 
         Ok(Box::new(AlbumUpdated {
+            metadata: EventMetadata::with_type_and_aggregate(
+                "AlbumUpdated",
+                self.id.to_uuid(),
+                "Album",
+            ),
             album_id: self.id.clone(),
-            changes,
-            updated_at: self.updated_at,
+            artist_id: self.artist_id.clone(),
+            updated_fields: changes,
+            updated_at: Utc::now(),
         }))
     }
 
@@ -391,12 +407,14 @@ impl Album {
         self.updated_at = Utc::now();
 
         Ok(Box::new(AlbumPublished {
+            metadata: EventMetadata::with_type_and_aggregate(
+                "AlbumPublished",
+                self.id.to_uuid(),
+                "Album",
+            ),
             album_id: self.id.clone(),
             artist_id: self.artist_id.clone(),
-            title: self.title.value().to_string(),
-            release_type: self.release_type.clone(),
-            track_count: self.tracks.len(),
-            published_at: self.updated_at,
+            published_at: Utc::now(),
         }))
     }
 
@@ -410,9 +428,14 @@ impl Album {
         self.updated_at = Utc::now();
 
         Ok(Box::new(AlbumUnpublished {
+            metadata: EventMetadata::with_type_and_aggregate(
+                "AlbumUnpublished",
+                self.id.to_uuid(),
+                "Album",
+            ),
             album_id: self.id.clone(),
-            reason: "Manual unpublish".to_string(),
-            unpublished_at: self.updated_at,
+            artist_id: self.artist_id.clone(),
+            unpublished_at: Utc::now(),
         }))
     }
 

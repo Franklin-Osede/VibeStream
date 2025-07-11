@@ -483,8 +483,7 @@ mod tests {
             total_shares: 1000,
             price_per_share: 10.0,
             shares_available_for_sale: 490,
-            occurred_at: Utc::now(),
-            version: 1,
+            occurred_on: Utc::now(),
         };
 
         publisher.publish(&event).await.unwrap();
@@ -517,8 +516,7 @@ mod tests {
             total_shares: 1000,
             price_per_share: 10.0,
             shares_available_for_sale: 490,
-            occurred_at: Utc::now(),
-            version: 1,
+            occurred_on: Utc::now(),
         };
 
         let event2 = OwnershipContractCreated {
@@ -528,8 +526,7 @@ mod tests {
             total_shares: 2000,
             price_per_share: 5.0,
             shares_available_for_sale: 980,
-            occurred_at: Utc::now(),
-            version: 1,
+            occurred_on: Utc::now(),
         };
 
         let events: Vec<&dyn DomainEvent> = vec![&event1, &event2];

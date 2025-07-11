@@ -105,7 +105,7 @@ pub struct SharesLocked {
     pub occurred_on: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ShareLockReason {
     VestingPeriod,
     LegalDispute,
@@ -159,7 +159,7 @@ pub struct OwnershipContractTerminated {
     pub occurred_on: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum TerminationReason {
     ArtistRequest,
     LegalIssues,
@@ -637,6 +637,6 @@ mod tests {
 
         // Test that it implements DomainEvent trait
         let domain_event: &dyn crate::shared::domain::events::DomainEvent = &event;
-        assert!(domain_event.occurred_on() <= Utc::now());
+        assert!(domain_event.occurred_at() <= Utc::now());
     }
 } 

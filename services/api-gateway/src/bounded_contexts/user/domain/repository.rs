@@ -15,6 +15,9 @@ pub trait UserRepository: Send + Sync {
     /// Save user aggregate (create or update)
     async fn save(&self, aggregate: &UserAggregate) -> Result<(), AppError>;
 
+    /// Update existing user aggregate
+    async fn update(&self, aggregate: &UserAggregate) -> Result<(), AppError>;
+
     /// Find user aggregate by ID
     async fn find_by_id(&self, id: &UserId) -> Result<Option<UserAggregate>, AppError>;
 
@@ -29,6 +32,15 @@ pub trait UserRepository: Send + Sync {
 
     /// Check if username exists
     async fn username_exists(&self, username: &Username) -> Result<bool, AppError>;
+
+    /// Search users by text with pagination (simple helper)
+    async fn search_users(&self, search_text: Option<&str>, limit: u32, offset: u32) -> Result<Vec<UserAggregate>, AppError>;
+
+    /// Add follower relationship
+    async fn add_follower(&self, follower_id: &UserId, followee_id: &UserId) -> Result<(), AppError>;
+
+    /// Remove follower relationship
+    async fn remove_follower(&self, follower_id: &UserId, followee_id: &UserId) -> Result<(), AppError>;
 
     /// Find users by criteria
     async fn find_users(&self, criteria: UserSearchCriteria) -> Result<Vec<UserSummary>, AppError>;
