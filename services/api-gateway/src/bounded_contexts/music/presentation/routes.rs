@@ -5,8 +5,14 @@ use axum::{
     routing::{get, post, put, delete},
     Router,
 };
+use std::sync::Arc;
 
 use super::controllers::*;
+use super::controllers::upload_controller::{
+    AudioUploadController, upload_audio, get_upload_progress, 
+    get_streaming_url, delete_audio
+};
+use crate::bounded_contexts::music::infrastructure::storage::StorageConfig;
 
 /// Create all Music Context REST routes
 /// 
@@ -16,7 +22,15 @@ use super::controllers::*;
 /// - Playlists: CRUD operations, collaborative features
 /// - Artists: Profile management, verification
 /// - Analytics: Listen tracking, metrics, insights
+/// - Audio Upload: File upload, processing, streaming
 pub fn create_music_routes() -> Router {
+    // Create upload controller with local storage for development
+    let storage_config = StorageConfig::Local {
+        base_path: "./storage/audio".to_string(),
+        max_file_size: 100 * 1024 * 1024, // 100MB
+    };
+    let upload_controller = Arc::new(AudioUploadController::new(storage_config));
+
     Router::new()
         // Song endpoints
         .route("/songs", post(create_song))
@@ -25,6 +39,12 @@ pub fn create_music_routes() -> Router {
         .route("/songs/:id", get(get_song))
         .route("/songs/:id", put(update_song))
         .route("/songs/:id", delete(delete_song))
+        
+        // Audio upload endpoints
+        .route("/songs/upload", post(upload_audio))
+        .route("/songs/upload/:upload_id/progress", get(get_upload_progress))
+        .route("/songs/:song_id/stream", get(get_streaming_url))
+        .route("/songs/:song_id/audio", delete(delete_audio))
         
         // Album endpoints  
         .route("/albums", post(create_album))
@@ -43,4 +63,7 @@ pub fn create_music_routes() -> Router {
         // Analytics endpoints
         .route("/analytics/listen", post(record_listen))
         .route("/analytics", get(get_analytics))
+        
+        // Add upload controller as state
+        .with_state(upload_controller)
 } 

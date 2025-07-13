@@ -51,7 +51,7 @@ impl UserPostgresRepository {
 
         // Create User entity
         let user = User {
-            id: user_id,
+            id: user_id.clone(),
             email,
             username,
             password_hash,
@@ -65,11 +65,19 @@ impl UserPostgresRepository {
             last_login_at,
         };
 
-        // Create UserProfile
+        // Create UserProfile with all required fields
         let profile = UserProfile {
+            user_id: user_id.clone(),
             display_name,
             bio,
             avatar_url: avatar_url.and_then(|url| ProfileUrl::new(url).ok()),
+            cover_url: None,
+            location: None,
+            website: None,
+            social_links: std::collections::HashMap::new(),
+            is_public: true,
+            created_at,
+            updated_at,
         };
 
         // Create UserPreferences (default for now)
@@ -94,14 +102,13 @@ impl UserPostgresRepository {
             updated_at: now,
         };
 
-        Ok(UserAggregate {
+        Ok(UserAggregate::load(
             user,
             profile,
             preferences,
             stats,
-            pending_events: std::collections::VecDeque::new(),
-            version: 1,
-        })
+            1, // version
+        ))
     }
 }
 
@@ -291,7 +298,7 @@ impl UserRepository for UserPostgresRepository {
                 avatar_url: row.try_get("avatar_url").ok(),
                 tier: row.try_get("tier").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 role: row.try_get("role").map_err(|e| AppError::DatabaseError(e.to_string()))?,
-                tier_points: row.try_get("tier_points").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                tier_points: row.try_get::<i32, _>("tier_points").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 total_rewards: row.try_get("total_rewards_earned").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 total_listening_time: row.try_get("total_listening_time_minutes").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 is_verified: row.try_get("is_verified").map_err(|e| AppError::DatabaseError(e.to_string()))?,
@@ -363,16 +370,16 @@ impl UserRepository for UserPostgresRepository {
 
                 let stats = crate::bounded_contexts::user::domain::entities::UserStats {
                     user_id: user_id.clone(),
-                    tier_points: row.try_get("tier_points").map_err(|e| AppError::DatabaseError(e.to_string()))?,
-                    total_listening_time_minutes: row.try_get("listen_time").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                    tier_points: row.try_get::<i32, _>("tier_points").map_err(|e| AppError::DatabaseError(e.to_string()))? as u32,
+                    total_listening_time_minutes: row.try_get::<i64, _>("listen_time").map_err(|e| AppError::DatabaseError(e.to_string()))? as u64,
                     total_songs_listened: 0, // TODO: Calculate from listen_sessions table
                     total_rewards_earned: row.try_get("total_rewards").map_err(|e| AppError::DatabaseError(e.to_string()))?,
-                    current_listening_streak: row.try_get("current_streak").map_err(|e| AppError::DatabaseError(e.to_string()))?,
-                    longest_listening_streak: row.try_get("longest_streak").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                    current_listening_streak: row.try_get::<i32, _>("current_streak").map_err(|e| AppError::DatabaseError(e.to_string()))? as u32,
+                    longest_listening_streak: row.try_get::<i32, _>("longest_streak").map_err(|e| AppError::DatabaseError(e.to_string()))? as u32,
                     total_investments: row.try_get("total_investments").map_err(|e| AppError::DatabaseError(e.to_string()))?,
-                    investment_count: row.try_get("investment_count").map_err(|e| AppError::DatabaseError(e.to_string()))?,
-                    nfts_owned: row.try_get("nfts_owned").map_err(|e| AppError::DatabaseError(e.to_string()))?,
-                    campaigns_participated: row.try_get("campaigns_participated").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                    investment_count: row.try_get::<i32, _>("investment_count").map_err(|e| AppError::DatabaseError(e.to_string()))? as u32,
+                    nfts_owned: row.try_get::<i32, _>("nfts_owned").map_err(|e| AppError::DatabaseError(e.to_string()))? as u32,
+                    campaigns_participated: row.try_get::<i32, _>("campaigns_participated").map_err(|e| AppError::DatabaseError(e.to_string()))? as u32,
                     achievements_unlocked: achievements,
                     created_at: chrono::Utc::now(),
                     updated_at: chrono::Utc::now(),
@@ -386,7 +393,7 @@ impl UserRepository for UserPostgresRepository {
     async fn find_users_registered_between(&self, start_date: chrono::DateTime<chrono::Utc>, end_date: chrono::DateTime<chrono::Utc>) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
         let rows = sqlx::query(
             r#"SELECT id, username, email, display_name, avatar_url, tier, role, tier_points, 
-                      total_rewards, is_verified, is_active, created_at 
+                      total_rewards, listen_time, is_verified, is_active, created_at 
                FROM users 
                WHERE created_at BETWEEN $1 AND $2 AND is_active = true
                ORDER BY created_at DESC"#
@@ -409,8 +416,9 @@ impl UserRepository for UserPostgresRepository {
                 avatar_url: row.try_get("avatar_url").ok(),
                 tier: row.try_get("tier").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 role: row.try_get("role").map_err(|e| AppError::DatabaseError(e.to_string()))?,
-                tier_points: row.try_get("tier_points").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                tier_points: row.try_get::<i32, _>("tier_points").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 total_rewards: row.try_get("total_rewards").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                total_listening_time: row.try_get("listen_time").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 is_verified: row.try_get("is_verified").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 is_active: row.try_get("is_active").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 created_at: row.try_get("created_at").map_err(|e| AppError::DatabaseError(e.to_string()))?,
@@ -424,7 +432,7 @@ impl UserRepository for UserPostgresRepository {
     async fn find_top_users_by_rewards(&self, limit: u32) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
         let rows = sqlx::query(
             r#"SELECT id, username, email, display_name, avatar_url, tier, role, tier_points, 
-                      total_rewards, is_verified, is_active, created_at 
+                      total_rewards, listen_time, is_verified, is_active, created_at 
                FROM users 
                WHERE is_active = true
                ORDER BY total_rewards DESC
@@ -447,8 +455,9 @@ impl UserRepository for UserPostgresRepository {
                 avatar_url: row.try_get("avatar_url").ok(),
                 tier: row.try_get("tier").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 role: row.try_get("role").map_err(|e| AppError::DatabaseError(e.to_string()))?,
-                tier_points: row.try_get("tier_points").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                tier_points: row.try_get::<i32, _>("tier_points").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 total_rewards: row.try_get("total_rewards").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                total_listening_time: row.try_get("listen_time").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 is_verified: row.try_get("is_verified").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 is_active: row.try_get("is_active").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 created_at: row.try_get("created_at").map_err(|e| AppError::DatabaseError(e.to_string()))?,
@@ -462,7 +471,7 @@ impl UserRepository for UserPostgresRepository {
     async fn find_top_users_by_listening_time(&self, limit: u32) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
         let rows = sqlx::query(
             r#"SELECT id, username, email, display_name, avatar_url, tier, role, tier_points, 
-                      total_rewards, is_verified, is_active, created_at 
+                      total_rewards, listen_time, is_verified, is_active, created_at 
                FROM users 
                WHERE is_active = true
                ORDER BY listen_time DESC
@@ -485,8 +494,9 @@ impl UserRepository for UserPostgresRepository {
                 avatar_url: row.try_get("avatar_url").ok(),
                 tier: row.try_get("tier").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 role: row.try_get("role").map_err(|e| AppError::DatabaseError(e.to_string()))?,
-                tier_points: row.try_get("tier_points").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                tier_points: row.try_get::<i32, _>("tier_points").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 total_rewards: row.try_get("total_rewards").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                total_listening_time: row.try_get("listen_time").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 is_verified: row.try_get("is_verified").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 is_active: row.try_get("is_active").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 created_at: row.try_get("created_at").map_err(|e| AppError::DatabaseError(e.to_string()))?,
@@ -501,7 +511,7 @@ impl UserRepository for UserPostgresRepository {
         let offset = page * page_size;
         let rows = sqlx::query(
             r#"SELECT id, username, email, display_name, avatar_url, tier, role, tier_points, 
-                      total_rewards, is_verified, is_active, created_at 
+                      total_rewards, listen_time, is_verified, is_active, created_at 
                FROM users 
                WHERE wallet_address IS NOT NULL AND is_active = true
                ORDER BY created_at DESC
@@ -525,8 +535,9 @@ impl UserRepository for UserPostgresRepository {
                 avatar_url: row.try_get("avatar_url").ok(),
                 tier: row.try_get("tier").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 role: row.try_get("role").map_err(|e| AppError::DatabaseError(e.to_string()))?,
-                tier_points: row.try_get("tier_points").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                tier_points: row.try_get::<i32, _>("tier_points").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 total_rewards: row.try_get("total_rewards").map_err(|e| AppError::DatabaseError(e.to_string()))?,
+                total_listening_time: row.try_get("listen_time").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 is_verified: row.try_get("is_verified").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 is_active: row.try_get("is_active").map_err(|e| AppError::DatabaseError(e.to_string()))?,
                 created_at: row.try_get("created_at").map_err(|e| AppError::DatabaseError(e.to_string()))?,

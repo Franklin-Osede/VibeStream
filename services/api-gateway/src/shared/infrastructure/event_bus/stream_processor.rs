@@ -180,7 +180,7 @@ impl StreamProcessor {
 
         // Generate market alerts
         if market_impact.volatility > self.config.market_volatility_threshold {
-            self.send_market_alert(payload.song_id, market_impact).await?;
+            self.send_market_alert(payload.song_id, market_impact.clone()).await?;
         }
 
         let processed_event = ProcessedEvent::MarketAnalytics {
@@ -712,7 +712,7 @@ impl UserBehaviorProfile {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct MarketImpact {
     pub volatility: f64,
     pub sentiment: f64,

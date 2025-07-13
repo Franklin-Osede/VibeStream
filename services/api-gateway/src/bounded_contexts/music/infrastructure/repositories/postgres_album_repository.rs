@@ -43,11 +43,11 @@ impl PostgresAlbumRepository {
     fn row_to_album(&self, row: AlbumRow) -> RepositoryResult<Album> {
         let album = Album::from_persistence(
             AlbumId::from_uuid(row.id),
-            AlbumTitle::new(row.title).map_err(|e| RepositoryError::Serialization(e))?,
+            AlbumTitle::new(row.title).map_err(|e| RepositoryError::SerializationError(e))?,
             ArtistId::from_uuid(row.artist_id),
             None, // description: Option<String>
             ReleaseType::Album, // release_type: ReleaseType - default value
-            Genre::new(row.genre).map_err(|e| RepositoryError::Serialization(e))?, // genre: Genre
+            Genre::new(row.genre).map_err(|e| RepositoryError::SerializationError(e))?, // genre: Genre
             None, // release_date: Option<DateTime<Utc>>
             None, // cover_art_ipfs: Option<IpfsHash>
             row.is_published, // is_published: bool
@@ -79,7 +79,7 @@ impl AlbumRepository for PostgresAlbumRepository {
         .bind(album.updated_at())
         .execute(&self.pool)
         .await
-        .map_err(|e| RepositoryError::Database(e.to_string()))?;
+        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
         
         Ok(())
     }
@@ -91,7 +91,7 @@ impl AlbumRepository for PostgresAlbumRepository {
         .bind(id.value())
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| RepositoryError::Database(e.to_string()))?;
+        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
         if let Some(row) = row {
             Ok(Some(self.row_to_album(row)?))
@@ -107,7 +107,7 @@ impl AlbumRepository for PostgresAlbumRepository {
         .bind(artist_id.value())
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| RepositoryError::Database(e.to_string()))?;
+        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
         let mut albums = Vec::new();
         for row in rows {
@@ -123,7 +123,7 @@ impl AlbumRepository for PostgresAlbumRepository {
         .bind(genre)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| RepositoryError::Database(e.to_string()))?;
+        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
         let mut albums = Vec::new();
         for row in rows {
@@ -143,7 +143,7 @@ impl AlbumRepository for PostgresAlbumRepository {
         .bind(limit)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| RepositoryError::Database(e.to_string()))?;
+        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
         let mut albums = Vec::new();
         for row in rows {
@@ -161,7 +161,7 @@ impl AlbumRepository for PostgresAlbumRepository {
         .bind(limit)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| RepositoryError::Database(e.to_string()))?;
+        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
         let mut albums = Vec::new();
         for row in rows {

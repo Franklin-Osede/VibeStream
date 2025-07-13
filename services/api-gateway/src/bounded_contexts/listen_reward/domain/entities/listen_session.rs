@@ -280,10 +280,8 @@ impl ListenSession {
             let event = self.calculate_reward(base_reward)?;
 
             // Guarda final_reward si el evento es RewardCalculated
-            if let Ok(json) = serde_json::to_value(&event) {
-                if let Some(tokens) = json.get("final_reward").and_then(|v| v.get("tokens")).and_then(|v| v.as_f64()) {
-                    self.final_reward = Some(RewardAmount::new(tokens).unwrap());
-                }
+            if let Ok(json) = event.to_json() {
+                println!("Event generated: {}", json);
             }
 
             Ok(event)

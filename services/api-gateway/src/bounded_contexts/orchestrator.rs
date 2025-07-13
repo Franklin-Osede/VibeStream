@@ -9,51 +9,42 @@ use tokio::sync::mpsc;
 
 use crate::shared::domain::errors::AppError;
 use crate::bounded_contexts::{
-    listen_reward::{
-        infrastructure::{
-            integration::{
-                FractionalOwnershipIntegrationHandler,
-                IntegrationConfig,
-            },
-        },
-        domain::events::ListenSessionCompleted,
-    },
     fractional_ownership::{
-        PostgresFractionalOwnershipBoundedContext,
-        quick_start as fo_quick_start,
+        FractionalOwnershipBoundedContext, PostgresFractionalOwnershipBoundedContext,
+        infrastructure::PostgresOwnershipContractRepository,
+        application::FractionalOwnershipApplicationService,
+    },
+    listen_reward::{
+        domain::events::ListenSessionCompleted,
+        infrastructure::integration::FractionalOwnershipIntegrationHandler,
+        infrastructure::IntegrationConfig,
     },
 };
 
 /// Main orchestrator for VibeStream bounded contexts
-pub struct VibeStreamOrchestrator {
+pub struct DomainOrchestrator {
     // TODO: Replace with proper listen_reward bounded context when available
     // listen_reward_context: Arc<ListenRewardBoundedContext>,
     fractional_ownership_context: Arc<PostgresFractionalOwnershipBoundedContext>,
-    integration_handler: Arc<FractionalOwnershipIntegrationHandler>,
+    integration_handler: Arc<FractionalOwnershipIntegrationHandler<PostgresOwnershipContractRepository>>,
     event_receiver: Option<mpsc::Receiver<DomainEvent>>,
 }
 
-impl VibeStreamOrchestrator {
+impl DomainOrchestrator {
     /// Initialize the complete VibeStream system with all bounded contexts
     pub async fn initialize(database_pool: PgPool) -> Result<Self, AppError> {
-        // 1. Initialize Fractional Ownership bounded context
-        let fractional_ownership_context = Arc::new(
-            fo_quick_start(database_pool.clone())
-                .await
-                .map_err(|e| AppError::InitializationError(format!("Failed to initialize Fractional Ownership: {}", e)))?
-        );
+        // 1. Initialize fractional ownership bounded context
+        let fractional_ownership_service = fo_quick_start(database_pool.clone());
 
-        // 2. TODO: Initialize Listen Reward bounded context when available
-        // let listen_reward_context = Arc::new(
-        //     ListenRewardBoundedContext::initialize(database_pool.clone())
-        //         .await
-        //         .map_err(|e| AppError::InitializationError(format!("Failed to initialize Listen Reward: {}", e)))?
-        // );
+        // Initialize the bounded context using the initialize method
+        let fractional_ownership_context = Arc::new(
+            PostgresFractionalOwnershipBoundedContext::initialize(database_pool.clone()).await?
+        );
 
         // 3. Create integration handler
         let integration_handler = Arc::new(
             FractionalOwnershipIntegrationHandler::new(
-                Arc::clone(&fractional_ownership_context)
+                fractional_ownership_context.clone()
             )
         );
 
@@ -61,7 +52,6 @@ impl VibeStreamOrchestrator {
         let (event_sender, event_receiver) = mpsc::channel::<DomainEvent>(1000);
 
         Ok(Self {
-            // listen_reward_context,
             fractional_ownership_context,
             integration_handler,
             event_receiver: Some(event_receiver),
@@ -130,7 +120,7 @@ impl VibeStreamOrchestrator {
     }
 
     /// Get application services for external access
-    pub fn get_fractional_ownership_service(&self) -> Arc<crate::bounded_contexts::fractional_ownership::FractionalOwnershipApplicationService<crate::bounded_contexts::fractional_ownership::infrastructure::PostgresOwnershipContractRepository>> {
+    pub fn get_fractional_ownership_service(&self) -> Arc<FractionalOwnershipApplicationService<PostgresOwnershipContractRepository>> {
         self.fractional_ownership_context.get_application_service()
     }
 
@@ -235,4 +225,10 @@ impl Default for OrchestratorConfig {
             health_check_interval_seconds: 30,
         }
     }
+} 
+
+// Función fo_quick_start corregida
+pub fn fo_quick_start(database_pool: PgPool) -> Arc<FractionalOwnershipApplicationService<PostgresOwnershipContractRepository>> {
+    let repository = Arc::new(PostgresOwnershipContractRepository::new(database_pool));
+    Arc::new(FractionalOwnershipApplicationService::new(repository))
 } 

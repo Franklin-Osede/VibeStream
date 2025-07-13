@@ -132,7 +132,7 @@ impl<R: UserRepository + Send + Sync> CommandHandler<UpdateUser> for UpdateUserH
     type Output = ();
 
     async fn handle(&self, command: UpdateUser) -> Result<Self::Output, AppError> {
-        let mut user_aggregate = self.repository.find_by_id(&command.user_id).await?
+        let mut user_aggregate = self.repository.find_by_id(&UserId::from_uuid(command.user_id)).await?
             .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
         
         // Update profile fields

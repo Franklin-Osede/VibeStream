@@ -203,7 +203,7 @@ impl AppError {
 impl From<crate::bounded_contexts::music::domain::repositories::song_repository::RepositoryError> for AppError {
     fn from(err: crate::bounded_contexts::music::domain::repositories::song_repository::RepositoryError) -> Self {
         match err {
-            crate::bounded_contexts::music::domain::repositories::song_repository::RepositoryError::NotFound(_) => 
+            crate::bounded_contexts::music::domain::repositories::song_repository::RepositoryError::NotFound =>
                 AppError::NotFound("Song not found".to_string()),
             // Adaptamos los errores que no existen en el enum RepositoryError
             // usando los errores disponibles en ese enum

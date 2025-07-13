@@ -100,6 +100,10 @@ impl AlbumId {
     pub fn value(&self) -> &Uuid {
         &self.0
     }
+
+    pub fn to_uuid(&self) -> Uuid {
+        self.0
+    }
 }
 
 impl fmt::Display for AlbumId {
@@ -122,6 +126,10 @@ impl PlaylistId {
 
     pub fn value(&self) -> &Uuid {
         &self.0
+    }
+
+    pub fn to_uuid(&self) -> Uuid {
+        self.0
     }
 }
 

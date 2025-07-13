@@ -359,7 +359,7 @@ impl Album {
             ),
             album_id: self.id.clone(),
             artist_id: self.artist_id.clone(),
-            updated_fields: changes,
+            updated_fields: changes.into_keys().collect(),
             updated_at: Utc::now(),
         }))
     }

@@ -22,27 +22,27 @@ impl PostgresSongRepository {
     fn row_to_song(&self, row: sqlx::postgres::PgRow) -> Result<Song, RepositoryError> {
         
         let id = SongId::from_uuid(
-            row.try_get("id").map_err(|e| RepositoryError::Serialization(e.to_string()))?
+            row.try_get("id").map_err(|e| RepositoryError::SerializationError(e.to_string()))?
         );
         
         let title = SongTitle::new(
-            row.try_get("title").map_err(|e| RepositoryError::Serialization(e.to_string()))?
-        ).map_err(|e| RepositoryError::Serialization(e))?;
+            row.try_get("title").map_err(|e| RepositoryError::SerializationError(e.to_string()))?
+        ).map_err(|e| RepositoryError::SerializationError(e.to_string()))?;
         
         let artist_id = ArtistId::from_uuid(
-            row.try_get("artist_id").map_err(|e| RepositoryError::Serialization(e.to_string()))?
+            row.try_get("artist_id").map_err(|e| RepositoryError::SerializationError(e.to_string()))?
         );
         
-        let duration_seconds: i32 = row.try_get("duration_seconds").map_err(|e| RepositoryError::Serialization(e.to_string()))?;
-        let duration = SongDuration::new(duration_seconds as u32).map_err(|e| RepositoryError::ValidationError(e))?;
+        let duration_seconds: i32 = row.try_get("duration_seconds").map_err(|e| RepositoryError::SerializationError(e.to_string()))?;
+        let duration = SongDuration::new(duration_seconds as u32).map_err(|e| RepositoryError::ValidationError(e.to_string()))?;
         
         let genre = Genre::new(
-            row.try_get("genre").map_err(|e| RepositoryError::Serialization(e.to_string()))?
-        ).map_err(|e| RepositoryError::Serialization(e))?;
+            row.try_get("genre").map_err(|e| RepositoryError::SerializationError(e.to_string()))?
+        ).map_err(|e| RepositoryError::SerializationError(e.to_string()))?;
         
         let royalty_percentage = RoyaltyPercentage::new(
-            row.try_get("royalty_percentage").map_err(|e| RepositoryError::Serialization(e.to_string()))?
-        ).map_err(|e| RepositoryError::Serialization(e))?;
+            row.try_get("royalty_percentage").map_err(|e| RepositoryError::SerializationError(e.to_string()))?
+        ).map_err(|e| RepositoryError::SerializationError(e.to_string()))?;
 
         // Create song with basic fields first
         let mut song = Song::new(title, artist_id, duration, genre, royalty_percentage);
@@ -90,7 +90,7 @@ impl SongRepository for PostgresSongRepository {
         .bind(song.updated_at())
         .execute(&self.pool)
         .await
-        .map_err(|e| RepositoryError::Database(e.to_string()))?;
+        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
         Ok(())
     }
@@ -119,10 +119,10 @@ impl SongRepository for PostgresSongRepository {
         .bind(song.updated_at())
         .execute(&self.pool)
         .await
-        .map_err(|e| RepositoryError::Database(e.to_string()))?;
+        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
         if affected_rows.rows_affected() == 0 {
-            return Err(RepositoryError::NotFound(format!("Song with id {} not found", song.id().to_uuid())));
+            return Err(RepositoryError::NotFound);
         }
 
         Ok(())
@@ -138,7 +138,7 @@ impl SongRepository for PostgresSongRepository {
         .bind(id.to_uuid())
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| RepositoryError::Database(e.to_string()))?;
+        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
         match row {
             Some(row) => Ok(Some(self.row_to_song(row)?)),
@@ -151,10 +151,10 @@ impl SongRepository for PostgresSongRepository {
             .bind(id.to_uuid())
             .execute(&self.pool)
             .await
-            .map_err(|e| RepositoryError::Database(e.to_string()))?;
+            .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
         if affected_rows.rows_affected() == 0 {
-            return Err(RepositoryError::NotFound(format!("Song with id {} not found", id.to_uuid())));
+            return Err(RepositoryError::NotFound);
         }
 
         Ok(())
@@ -171,7 +171,7 @@ impl SongRepository for PostgresSongRepository {
         .bind(artist_id.to_uuid())
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| RepositoryError::Database(e.to_string()))?;
+        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
         let mut songs = Vec::new();
         for row in rows {
@@ -192,7 +192,7 @@ impl SongRepository for PostgresSongRepository {
         .bind(genre.to_string())
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| RepositoryError::Database(e.to_string()))?;
+        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
         let mut songs = Vec::new();
         for row in rows {
@@ -217,7 +217,7 @@ impl SongRepository for PostgresSongRepository {
         .bind(limit_val)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| RepositoryError::Database(e.to_string()))?;
+        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
         let mut songs = Vec::new();
         for row in rows {
@@ -241,7 +241,7 @@ impl SongRepository for PostgresSongRepository {
         .bind(limit_val)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| RepositoryError::Database(e.to_string()))?;
+        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
         let mut songs = Vec::new();
         for row in rows {
@@ -268,7 +268,7 @@ impl SongRepository for PostgresSongRepository {
         .bind(limit_val)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| RepositoryError::Database(e.to_string()))?;
+        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
         let mut songs = Vec::new();
         for row in rows {
@@ -283,9 +283,9 @@ impl SongRepository for PostgresSongRepository {
             .bind(artist_id.to_uuid())
             .fetch_one(&self.pool)
             .await
-            .map_err(|e| RepositoryError::Database(e.to_string()))?;
+            .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
-        let count: i64 = row.try_get("count").map_err(|e| RepositoryError::Serialization(e.to_string()))?;
+        let count: i64 = row.try_get("count").map_err(|e| RepositoryError::SerializationError(e.to_string()))?;
         Ok(count as usize)
     }
 
@@ -293,7 +293,7 @@ impl SongRepository for PostgresSongRepository {
         let row = sqlx::query("SELECT SUM(listen_count) as total FROM songs")
             .fetch_one(&self.pool)
             .await
-            .map_err(|e| RepositoryError::Database(e.to_string()))?;
+            .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
         let total: Option<i64> = row.try_get("total").ok();
         Ok(total.unwrap_or(0) as u64)

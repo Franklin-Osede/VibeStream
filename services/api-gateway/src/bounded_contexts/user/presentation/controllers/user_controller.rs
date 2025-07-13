@@ -24,6 +24,9 @@ use crate::bounded_contexts::user::application::{
 use crate::shared::infrastructure::database::postgres::PostgresUserRepository;
 use crate::shared::domain::errors::AppError;
 
+// Type alias para simplificar el estado
+type UserAppService = UserApplicationService<PostgresUserRepository>;
+
 // Request/Response DTOs
 #[derive(Debug, Deserialize)]
 pub struct RegisterUserRequest {
@@ -195,9 +198,10 @@ pub struct ApiResponse<T> {
 // REST Endpoints
 
 /// POST /api/v1/users/register
-/// Register a new user
+/// Register new user account
+#[axum::debug_handler]
 pub async fn register_user(
-    State(user_service): State<UserApplicationService<PostgresUserRepository>>,
+    State(user_service): State<UserAppService>,
     Json(request): Json<RegisterUserRequest>,
 ) -> Result<Json<ApiResponse<RegisterUserResponse>>, StatusCode> {
     // Validate request
@@ -257,8 +261,9 @@ pub async fn register_user(
 
 /// POST /api/v1/users/login
 /// User login
+#[axum::debug_handler]
 pub async fn login_user(
-    State(_user_service): State<UserApplicationService<PostgresUserRepository>>,
+    State(_user_service): State<UserAppService>,
     Json(_request): Json<LoginRequest>,
 ) -> Result<Json<ApiResponse<LoginResponse>>, StatusCode> {
     // TODO: Implement authentication logic
@@ -284,8 +289,9 @@ pub async fn login_user(
 
 /// GET /api/v1/users/{user_id}
 /// Get user profile by ID
+#[axum::debug_handler]
 pub async fn get_user_profile(
-    State(user_service): State<UserApplicationService<PostgresUserRepository>>,
+    State(user_service): State<UserAppService>,
     Path(user_id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<UserProfileResponse>>, StatusCode> {
     let query = GetUserQuery { user_id };
@@ -332,8 +338,9 @@ pub async fn get_user_profile(
 
 /// PUT /api/v1/users/{user_id}
 /// Update user profile
+#[axum::debug_handler]
 pub async fn update_user_profile(
-    State(user_service): State<UserApplicationService<PostgresUserRepository>>,
+    State(user_service): State<UserAppService>,
     Path(user_id): Path<Uuid>,
     Json(request): Json<UpdateUserRequest>,
 ) -> Result<Json<ApiResponse<()>>, StatusCode> {
@@ -362,8 +369,9 @@ pub async fn update_user_profile(
 
 /// GET /api/v1/users/{user_id}/stats
 /// Get user statistics
+#[axum::debug_handler]
 pub async fn get_user_stats(
-    State(_user_service): State<UserApplicationService<PostgresUserRepository>>,
+    State(_user_service): State<UserAppService>,
     Path(user_id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<UserStatsResponse>>, StatusCode> {
     let mock_stats = UserStatsResponse {
@@ -398,8 +406,9 @@ pub async fn get_user_stats(
 
 /// GET /api/v1/users/search
 /// Search users
+#[axum::debug_handler]
 pub async fn search_users(
-    State(user_service): State<UserApplicationService<PostgresUserRepository>>,
+    State(user_service): State<UserAppService>,
     Query(search_query): Query<UserSearchQuery>,
 ) -> Result<Json<ApiResponse<UserListResponse>>, StatusCode> {
     let query = crate::bounded_contexts::user::application::handlers::SearchUsersQuery {
@@ -456,8 +465,9 @@ pub async fn search_users(
 
 /// POST /api/v1/users/{user_id}/follow
 /// Follow/unfollow user
+#[axum::debug_handler]
 pub async fn follow_user(
-    State(user_service): State<UserApplicationService<PostgresUserRepository>>,
+    State(user_service): State<UserAppService>,
     Path(followee_id): Path<Uuid>,
     Json(request): Json<FollowUserRequest>,
 ) -> Result<Json<ApiResponse<()>>, StatusCode> {
@@ -491,8 +501,9 @@ pub async fn follow_user(
 
 /// POST /api/v1/users/{user_id}/change-password
 /// Change user password
+#[axum::debug_handler]
 pub async fn change_password(
-    State(_user_service): State<UserApplicationService<PostgresUserRepository>>,
+    State(_user_service): State<UserAppService>,
     Path(_user_id): Path<Uuid>,
     Json(request): Json<ChangePasswordRequest>,
 ) -> Result<Json<ApiResponse<()>>, StatusCode> {
@@ -517,8 +528,9 @@ pub async fn change_password(
 
 /// POST /api/v1/users/{user_id}/link-wallet
 /// Link wallet to user account
+#[axum::debug_handler]
 pub async fn link_wallet(
-    State(_user_service): State<UserApplicationService<PostgresUserRepository>>,
+    State(_user_service): State<UserAppService>,
     Path(_user_id): Path<Uuid>,
     Json(_request): Json<LinkWalletRequest>,
 ) -> Result<Json<ApiResponse<()>>, StatusCode> {
@@ -533,8 +545,9 @@ pub async fn link_wallet(
 
 /// DELETE /api/v1/users/{user_id}
 /// Delete user account
+#[axum::debug_handler]
 pub async fn delete_user(
-    State(_user_service): State<UserApplicationService<PostgresUserRepository>>,
+    State(_user_service): State<UserAppService>,
     Path(_user_id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<()>>, StatusCode> {
     // TODO: Implement user deletion logic
@@ -548,8 +561,9 @@ pub async fn delete_user(
 
 /// GET /api/v1/users/{user_id}/followers
 /// Get user followers
+#[axum::debug_handler]
 pub async fn get_user_followers(
-    State(_user_service): State<UserApplicationService<PostgresUserRepository>>,
+    State(_user_service): State<UserAppService>,
     Path(_user_id): Path<Uuid>,
     Query(_query): Query<HashMap<String, String>>,
 ) -> Result<Json<ApiResponse<UserListResponse>>, StatusCode> {
@@ -593,8 +607,9 @@ pub async fn get_user_followers(
 
 /// GET /api/v1/users/{user_id}/following
 /// Get users that the user is following
+#[axum::debug_handler]
 pub async fn get_user_following(
-    State(_user_service): State<UserApplicationService<PostgresUserRepository>>,
+    State(_user_service): State<UserAppService>,
     Path(_user_id): Path<Uuid>,
     Query(_query): Query<HashMap<String, String>>,
 ) -> Result<Json<ApiResponse<UserListResponse>>, StatusCode> {
@@ -638,8 +653,9 @@ pub async fn get_user_following(
 
 /// GET /api/v1/users/analytics
 /// Get user analytics (admin only)
+#[axum::debug_handler]
 pub async fn get_user_analytics(
-    State(_user_service): State<UserApplicationService<PostgresUserRepository>>,
+    State(_user_service): State<UserAppService>,
     Query(_query): Query<HashMap<String, String>>,
 ) -> Result<Json<ApiResponse<serde_json::Value>>, StatusCode> {
     // TODO: Implement analytics logic
@@ -679,7 +695,7 @@ pub async fn get_user_analytics(
 /// Create User Context Routes
 /// 
 /// Creates a complete Router for all user-related endpoints
-pub fn create_user_routes() -> Router<UserApplicationService<PostgresUserRepository>> {
+pub fn create_user_routes() -> Router<UserAppService> {
     Router::new()
         // Authentication & Registration
         .route("/register", post(register_user))

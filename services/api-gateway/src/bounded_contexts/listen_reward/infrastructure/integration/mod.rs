@@ -24,18 +24,21 @@ use crate::bounded_contexts::{
         value_objects::RewardAmount,
     },
 };
+use crate::bounded_contexts::fractional_ownership::domain::repository::OwnershipContractRepository;
 
 /// Integration event handler that processes listen sessions
 /// and triggers revenue distribution to fractional owners
 #[derive(Debug, Clone)]
-pub struct FractionalOwnershipIntegrationHandler {
-    fractional_ownership_context: Arc<InMemoryFractionalOwnershipBoundedContext>,
+pub struct FractionalOwnershipIntegrationHandler<R: OwnershipContractRepository> {
+    fractional_ownership_context: Arc<crate::bounded_contexts::fractional_ownership::FractionalOwnershipBoundedContext<R>>,
+    config: IntegrationConfig,
 }
 
-impl FractionalOwnershipIntegrationHandler {
-    pub fn new(fractional_ownership_context: Arc<InMemoryFractionalOwnershipBoundedContext>) -> Self {
+impl<R: OwnershipContractRepository> FractionalOwnershipIntegrationHandler<R> {
+    pub fn new(fractional_ownership_context: Arc<crate::bounded_contexts::fractional_ownership::FractionalOwnershipBoundedContext<R>>) -> Self {
         Self {
             fractional_ownership_context,
+            config: IntegrationConfig::default(),
         }
     }
 
@@ -193,7 +196,7 @@ impl ListenRewardIntegrationFactory {
     /// Create fractional ownership integration handler
     pub fn create_fractional_ownership_handler(
         fractional_ownership_context: Arc<InMemoryFractionalOwnershipBoundedContext>,
-    ) -> FractionalOwnershipIntegrationHandler {
+    ) -> FractionalOwnershipIntegrationHandler<InMemoryOwnershipContractRepository> {
         FractionalOwnershipIntegrationHandler::new(fractional_ownership_context)
     }
 }

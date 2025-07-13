@@ -44,12 +44,23 @@ impl<R: OwnershipContractRepository> std::fmt::Debug for IntegrationService<R> {
 pub type PostgresFractionalOwnershipBoundedContext = FractionalOwnershipBoundedContext<PostgresOwnershipContractRepository>;
 pub type InMemoryFractionalOwnershipBoundedContext = FractionalOwnershipBoundedContext<InMemoryOwnershipContractRepository>;
 
-/// Main bounded context struct for Fractional Ownership
+// Simplificar la estructura eliminando Rep
 pub struct FractionalOwnershipBoundedContext<R: OwnershipContractRepository> {
     pub application_service: Arc<FractionalOwnershipApplicationService<R>>,
     pub app_state: AppState,
     pub event_publisher: Arc<dyn EventPublisher>,
     pub event_processor: Option<EventProcessor>,
+}
+
+impl<R: OwnershipContractRepository> std::fmt::Debug for FractionalOwnershipBoundedContext<R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FractionalOwnershipBoundedContext")
+            .field("application_service", &"FractionalOwnershipApplicationService")
+            .field("app_state", &self.app_state)
+            .field("event_publisher", &"EventPublisher")
+            .field("event_processor", &self.event_processor.is_some())
+            .finish()
+    }
 }
 
 impl PostgresFractionalOwnershipBoundedContext {
@@ -70,7 +81,7 @@ impl PostgresFractionalOwnershipBoundedContext {
         ));
 
         // 4. Initialize presentation state  
-        let concrete_service: Arc<ConcreteApplicationService> = Arc::clone(&application_service);
+        let concrete_service: Arc<FractionalOwnershipApplicationService<PostgresOwnershipContractRepository>> = Arc::clone(&application_service);
         let app_state = AppState::default();
 
         // 5. Setup event processor with handlers

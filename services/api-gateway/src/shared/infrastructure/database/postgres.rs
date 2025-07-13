@@ -11,6 +11,7 @@ use crate::bounded_contexts::user::domain::{
 use crate::shared::domain::errors::AppError;
 
 /// PostgreSQL implementation of UserRepository
+#[derive(Clone)]
 pub struct PostgresUserRepository {
     pool: Arc<PgPool>,
 }

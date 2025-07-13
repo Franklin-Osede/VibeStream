@@ -18,6 +18,13 @@ impl UserId {
         Self(uuid)
     }
 
+    pub fn from_string(s: &str) -> Result<Self, AppError> {
+        match Uuid::parse_str(s) {
+            Ok(uuid) => Ok(Self(uuid)),
+            Err(_) => Err(AppError::InvalidInput("Invalid user ID format".to_string())),
+        }
+    }
+
     pub fn value(&self) -> Uuid {
         self.0
     }

@@ -38,7 +38,7 @@ pub struct KafkaEventBus {
 impl KafkaEventBus {
     pub async fn new(config: EventBusConfig) -> Result<Self, AppError> {
         let producer_config = Self::create_producer_config(&config)?;
-        let producer = FutureProducer::from_config(&producer_config)
+        let producer: FutureProducer = producer_config.create()
             .map_err(|e| AppError::InternalError(format!("Failed to create Kafka producer: {}", e)))?;
 
         info!("✅ Kafka Event Bus initialized with {} brokers", config.brokers);
@@ -157,8 +157,10 @@ impl KafkaEventBus {
             .create()
             .map_err(|e| AppError::InternalError(format!("Failed to create consumer: {}", e)))?;
 
+        // Convert Vec<String> to Vec<&str> for subscription
+        let topic_refs: Vec<&str> = subscription.topics.iter().map(|s| s.as_str()).collect();
         consumer
-            .subscribe(&subscription.topics)
+            .subscribe(&topic_refs)
             .map_err(|e| AppError::InternalError(format!("Failed to subscribe to topics: {}", e)))?;
 
         let (shutdown_tx, mut shutdown_rx) = oneshot::channel();
@@ -317,8 +319,10 @@ impl KafkaEventBus {
         let serialized = serde_json::to_string(&dlq_event)
             .map_err(|e| AppError::InternalError(format!("Failed to serialize DLQ event: {}", e)))?;
 
-        let record = FutureRecord::to(EventTopics::DLQ)
-            .key(&dlq_event.original_event.metadata.event_id.to_string())
+        let dlq_topic = EventTopics::DLQ;
+        let event_id_string = dlq_event.original_event.metadata.event_id.to_string();
+        let record = FutureRecord::to(&dlq_topic)
+            .key(&event_id_string)
             .payload(&serialized);
 
         if let Err((kafka_error, _)) = self.producer.send(record, Timeout::Never).await {

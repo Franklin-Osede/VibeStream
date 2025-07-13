@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::bounded_contexts::music::domain::{
@@ -8,16 +9,12 @@ use crate::shared::domain::events::DomainEvent;
 
 pub type RepositoryResult<T> = Result<T, RepositoryError>;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RepositoryError {
-    #[error("Database error: {0}")]
-    Database(String),
-    #[error("Song not found: {0}")]
-    NotFound(String),
-    #[error("Serialization error: {0}")]
-    Serialization(String),
-    #[error("Connection error: {0}")]
-    Connection(String),
+    NotFound,
+    DatabaseError(String),
+    SerializationError(String),
+    ValidationError(String),
 }
 
 #[async_trait]

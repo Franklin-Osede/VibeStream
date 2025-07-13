@@ -2,14 +2,13 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::bounded_contexts::music::domain::value_objects::{
-    SongId, SongTitle, ArtistId, SongDuration, Genre, IpfsHash, 
-    RoyaltyPercentage, ListenCount, Tempo, ReleaseType, SongMood, FileFormat, AudioQuality
+use crate::bounded_contexts::music::domain::{
+    events::*,
+    value_objects::*,
 };
+use crate::shared::domain::events::EventMetadata;
 use crate::shared::domain::events::DomainEvent;
-use crate::bounded_contexts::music::domain::events::{
-    SongListened, SongAvailableForCampaign, SongAvailableForOwnership
-};
+use crate::shared::domain::errors::AppError;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Song {

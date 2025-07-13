@@ -1,5 +1,7 @@
 use chrono::{DateTime, Utc};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::fmt::Debug;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,13 +45,18 @@ impl EventMetadata {
 }
 
 /// Trait que define un evento de dominio
-pub trait DomainEvent: Debug + Send + Sync + Serialize {
+pub trait DomainEvent: Debug + Send + Sync {
     fn metadata(&self) -> &EventMetadata;
     fn event_type(&self) -> &str;
     fn aggregate_id(&self) -> Uuid;
     fn aggregate_type(&self) -> &str;
     fn occurred_at(&self) -> DateTime<Utc>;
-    fn event_data(&self) -> serde_json::Value;
+    fn event_data(&self) -> Value;
+    
+    /// Helper method to serialize the event to JSON
+    fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(&self.event_data())
+    }
 }
 
 pub trait IntegrationEvent: std::fmt::Debug + Send + Sync {

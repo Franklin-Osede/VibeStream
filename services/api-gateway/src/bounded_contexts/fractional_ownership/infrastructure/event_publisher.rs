@@ -477,12 +477,15 @@ mod tests {
         let publisher = InMemoryEventPublisher::new();
 
         let event = OwnershipContractCreated {
+            aggregate_id: Uuid::new_v4(),
             contract_id: Uuid::new_v4(),
             song_id: Uuid::new_v4(),
             artist_id: Uuid::new_v4(),
             total_shares: 1000,
             price_per_share: 10.0,
+            artist_retained_percentage: 50.0,
             shares_available_for_sale: 490,
+            created_at: Utc::now(),
             occurred_on: Utc::now(),
         };
 
@@ -510,22 +513,28 @@ mod tests {
         let publisher = InMemoryEventPublisher::new();
 
         let event1 = OwnershipContractCreated {
+            aggregate_id: Uuid::new_v4(),
             contract_id: Uuid::new_v4(),
             song_id: Uuid::new_v4(),
             artist_id: Uuid::new_v4(),
             total_shares: 1000,
             price_per_share: 10.0,
+            artist_retained_percentage: 50.0,
             shares_available_for_sale: 490,
+            created_at: Utc::now(),
             occurred_on: Utc::now(),
         };
 
         let event2 = OwnershipContractCreated {
+            aggregate_id: Uuid::new_v4(),
             contract_id: Uuid::new_v4(),
             song_id: Uuid::new_v4(),
             artist_id: Uuid::new_v4(),
-            total_shares: 2000,
-            price_per_share: 5.0,
-            shares_available_for_sale: 980,
+            total_shares: 1000,
+            price_per_share: 10.0,
+            artist_retained_percentage: 50.0,
+            shares_available_for_sale: 490,
+            created_at: Utc::now(),
             occurred_on: Utc::now(),
         };
 

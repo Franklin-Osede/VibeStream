@@ -56,7 +56,7 @@ impl PostgresPlaylistRepository {
     fn row_to_playlist(&self, row: PlaylistRow, tracks: Vec<PlaylistTrack>) -> RepositoryResult<Playlist> {
         let mut playlist = Playlist::from_persistence(
             PlaylistId::from_uuid(row.id),
-            PlaylistName::new(row.name).map_err(|e| RepositoryError::Serialization(e))?,
+            PlaylistName::new(row.name).map_err(|e| RepositoryError::SerializationError(e))?,
             row.creator_id,
             row.description,
             row.is_public,
@@ -82,7 +82,7 @@ impl PlaylistRepository for PostgresPlaylistRepository {
     async fn save(&self, playlist: &Playlist) -> RepositoryResult<()> {
         let mut tx = self.pool.begin()
             .await
-            .map_err(|e| RepositoryError::Database(e.to_string()))?;
+            .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
         // Save playlist
         sqlx::query(
@@ -107,14 +107,14 @@ impl PlaylistRepository for PostgresPlaylistRepository {
         .bind(playlist.updated_at())
         .execute(&mut *tx)
         .await
-        .map_err(|e| RepositoryError::Database(e.to_string()))?;
+        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
         // Save playlist tracks
         sqlx::query("DELETE FROM playlist_tracks WHERE playlist_id = $1")
         .bind(playlist.id().value())
         .execute(&mut *tx)
         .await
-        .map_err(|e| RepositoryError::Database(e.to_string()))?;
+        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
         for track in playlist.tracks() {
             sqlx::query(
@@ -128,12 +128,12 @@ impl PlaylistRepository for PostgresPlaylistRepository {
             .bind(track.added_by())
             .execute(&mut *tx)
             .await
-            .map_err(|e| RepositoryError::Database(e.to_string()))?;
+            .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
         }
 
         tx.commit()
             .await
-            .map_err(|e| RepositoryError::Database(e.to_string()))?;
+            .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
         Ok(())
     }
@@ -147,7 +147,7 @@ impl PlaylistRepository for PostgresPlaylistRepository {
         .bind(id.value())
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| RepositoryError::Database(e.to_string()))?;
+        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
         if let Some(row) = row {
             // Get playlist tracks
@@ -158,7 +158,7 @@ impl PlaylistRepository for PostgresPlaylistRepository {
             .bind(id.value())
             .fetch_all(&self.pool)
             .await
-            .map_err(|e| RepositoryError::Database(e.to_string()))?;
+            .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
             let tracks: Result<Vec<_>, _> = track_rows.into_iter().map(|track_row| {
                 // In a real implementation, you'd join with songs table to get title, artist_name, and duration
@@ -187,7 +187,7 @@ impl PlaylistRepository for PostgresPlaylistRepository {
         .bind(user_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| RepositoryError::Database(e.to_string()))?;
+        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
         let mut playlists = Vec::new();
         for row in rows {
@@ -208,7 +208,7 @@ impl PlaylistRepository for PostgresPlaylistRepository {
         .bind(limit)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| RepositoryError::Database(e.to_string()))?;
+        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
         let mut playlists = Vec::new();
         for row in rows {
@@ -231,7 +231,7 @@ impl PlaylistRepository for PostgresPlaylistRepository {
         .bind(limit)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| RepositoryError::Database(e.to_string()))?;
+        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
         let mut playlists = Vec::new();
         for row in rows {
@@ -252,7 +252,7 @@ impl PlaylistRepository for PostgresPlaylistRepository {
         .bind(limit)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| RepositoryError::Database(e.to_string()))?;
+        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
         let mut playlists = Vec::new();
         for row in rows {

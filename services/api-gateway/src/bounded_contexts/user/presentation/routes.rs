@@ -44,7 +44,7 @@ pub fn configure_user_routes(
         .route("/analytics", get(get_user_analytics))
         
         // Set the user service as shared state
-        .with_state(user_service)
+        .with_state((*user_service).clone())
 }
 
 /// Create User Context Routes with API version prefix

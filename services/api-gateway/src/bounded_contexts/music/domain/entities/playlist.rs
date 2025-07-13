@@ -12,6 +12,8 @@ use crate::bounded_contexts::music::domain::events::{
 };
 use crate::shared::domain::events::DomainEvent;
 use crate::bounded_contexts::music::domain::value_objects::IpfsHash;
+use crate::shared::domain::events::EventMetadata;
+use crate::shared::domain::errors::AppError;
 
 /// Playlist entity for organizing songs
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -306,12 +308,15 @@ impl Playlist {
 
         // Create domain event
         Ok(Box::new(SongAddedToPlaylist {
+            metadata: EventMetadata::with_type_and_aggregate(
+                "SongAddedToPlaylist",
+                self.id.to_uuid(),
+                "Playlist",
+            ),
             playlist_id: self.id.clone(),
-            song_id,
-            title,
-            artist_name,
-            position: final_position,
-            added_by,
+            song_id: song_id.clone(),
+            position: self.tracks.len() as u32,
+            added_by: self.creator_id,
             added_at: Utc::now(),
         }))
     }
@@ -347,10 +352,14 @@ impl Playlist {
 
         // Create domain event
         Ok(Box::new(SongRemovedFromPlaylist {
+            metadata: EventMetadata::with_type_and_aggregate(
+                "SongRemovedFromPlaylist",
+                self.id.to_uuid(),
+                "Playlist",
+            ),
             playlist_id: self.id.clone(),
             song_id: song_id.clone(),
-            position: removed_track.position,
-            removed_by,
+            removed_by: self.creator_id,
             removed_at: Utc::now(),
         }))
     }
@@ -435,10 +444,15 @@ impl Playlist {
         self.updated_at = Utc::now();
 
         Ok(Box::new(PlaylistUpdated {
+            metadata: EventMetadata::with_type_and_aggregate(
+                "PlaylistUpdated",
+                self.id.to_uuid(),
+                "Playlist",
+            ),
             playlist_id: self.id.clone(),
-            updated_by,
-            changes,
-            updated_at: self.updated_at,
+            user_id: self.creator_id,
+            updated_fields: changes.into_keys().collect(),
+            updated_at: Utc::now(),
         }))
     }
 
@@ -456,9 +470,14 @@ impl Playlist {
         self.updated_at = Utc::now();
 
         Ok(Box::new(PlaylistMadePublic {
+            metadata: EventMetadata::with_type_and_aggregate(
+                "PlaylistMadePublic",
+                self.id.to_uuid(),
+                "Playlist",
+            ),
             playlist_id: self.id.clone(),
-            creator_id: self.creator_id,
-            made_public_at: self.updated_at,
+            user_id: self.creator_id,
+            made_public_at: Utc::now(),
         }))
     }
 
@@ -477,9 +496,14 @@ impl Playlist {
         self.updated_at = Utc::now();
 
         Ok(Box::new(PlaylistMadePrivate {
+            metadata: EventMetadata::with_type_and_aggregate(
+                "PlaylistMadePrivate",
+                self.id.to_uuid(),
+                "Playlist",
+            ),
             playlist_id: self.id.clone(),
-            creator_id: self.creator_id,
-            made_private_at: self.updated_at,
+            user_id: self.creator_id,
+            made_private_at: Utc::now(),
         }))
     }
 
