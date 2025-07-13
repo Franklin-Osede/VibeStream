@@ -6,6 +6,7 @@ pub mod handlers;
 pub mod services;
 pub mod shared;
 pub mod openapi;
+pub mod complete_router;
 
 // Solo el music context sin dependencias problemáticas
 pub mod music_simple;
@@ -37,11 +38,8 @@ pub mod simple {
             message_queue,
         };
         
-        let router = Router::new()
-            .route("/health", get(health_check))
-            .route("/api/auth/login", post(login))
-            .nest("/api/music", create_music_routes())
-            .with_state(app_state);
+        // Use the complete router with P2P analytics
+        let router = crate::complete_router::create_app_router(app_state.database_pool.get_pool().clone()).await?;
             
         Ok(router)
     }

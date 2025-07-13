@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use tower_http::cors::CorsLayer;
 use vibestream_types::*;
+use tokio::net::TcpListener;
 
 mod ethereum;
 use ethereum::{EthereumClient, TransactionInfo, TokenInfo};
@@ -38,8 +39,11 @@ async fn main() -> Result<()> {
     let addr = SocketAddr::from(([127, 0, 0, 1], 3001));
     println!("Ethereum service listening on {}", addr);
 
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
+    let listener = TcpListener::bind(addr).await.map_err(|e| VibeStreamError::Network { 
+        message: format!("Failed to bind to address: {}", e) 
+    })?;
+
+    axum::serve(listener, app)
         .await
         .map_err(|e| VibeStreamError::Network { 
             message: format!("Server error: {}", e) 

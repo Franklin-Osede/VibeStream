@@ -11,7 +11,6 @@ use sqlx::PgPool;
 use crate::bounded_contexts::{
     // User Context - Updated to use new REST API
     user::presentation::routes::create_user_routes,
-    user::infrastructure::repositories::PostgresUserRepository,
     user::application::services::UserApplicationService,
     
     // Music Context - Updated to use new REST API
@@ -20,49 +19,27 @@ use crate::bounded_contexts::{
         PostgresSongRepository, PostgresAlbumRepository, PostgresPlaylistRepository,
     },
     
-    // Payment Context
-    payment::presentation::controllers::{
-        payment_controller::{create_payment_routes, create_payment_controller},
-    },
-    payment::infrastructure::repositories::{
-        PostgresPaymentRepository, PostgresRoyaltyRepository, PostgresWalletRepository,
-    },
-    
     // Campaign Context - Updated to use new routes
     campaign::presentation::routes::create_campaign_routes,
+    campaign::infrastructure::event_publisher::InMemoryEventPublisher,
     
     // Listen Reward Context
     listen_reward::presentation::controllers::{
-        listen_reward_controller::{create_listen_reward_routes},
+        listen_reward_controller::{listen_reward_routes, ListenRewardController},
+    },
+    listen_reward::application::ListenRewardApplicationService,
+    listen_reward::infrastructure::repositories::{
+        PostgresListenSessionRepository, PostgresRewardAnalyticsRepository, PostgresRewardDistributionRepository,
     },
     
     // Fractional Ownership Context
     fractional_ownership::presentation::controllers::{
-        fractional_ownership_controller::{create_fractional_ownership_routes},
-    },
-    
-    // Federation Context - P2P Integration
-    federation::presentation::FederationController,
-    federation::application::FederationApplicationService,
-    federation::infrastructure::{
-        InMemoryFederatedInstanceRepository,
-        InMemoryActivityPubActivityRepository,
-        InMemoryFederatedUserRepository,
-        InMemoryFederatedContentRepository,
-        InMemoryFederationFollowRepository,
-    },
-    
-    // Recommendation Context - P2P Music Discovery
-    recommendation::presentation::RecommendationController,
-    recommendation::application::RecommendationApplicationService,
-    recommendation::infrastructure::{
-        InMemoryUserProfileRepository,
-        InMemoryRecommendationRepository,
-        InMemoryRecommendationModelRepository,
-        InMemoryP2PRecommendationNetworkRepository,
-        InMemoryCollaborativeFilteringGroupRepository,
+        create_fractional_ownership_routes, AppState,
     },
 };
+
+// Import shared infrastructure
+use crate::shared::infrastructure::database::postgres::PostgresUserRepository;
 
 // Health check handler
 async fn health_check() -> &'static str {
@@ -74,7 +51,7 @@ async fn api_info() -> &'static str {
 }
 
 // Create the complete API router with all bounded contexts
-pub fn create_complete_router(db_pool: PgPool) -> Router {
+pub async fn create_complete_router(db_pool: PgPool) -> Result<Router, Box<dyn std::error::Error>> {
     let pool = Arc::new(db_pool);
 
     // =============================================================================
@@ -86,54 +63,15 @@ pub fn create_complete_router(db_pool: PgPool) -> Router {
     let user_service = Arc::new(UserApplicationService::new(user_repository));
     
     // Music Context Repositories
-    let song_repository = Arc::new(PostgresSongRepository::new(pool.clone()));
-    let album_repository = Arc::new(PostgresAlbumRepository::new(pool.clone()));
-    let playlist_repository = Arc::new(PostgresPlaylistRepository::new(pool.clone()));
-    
-    // Payment Context Repositories
-    let payment_repository = Arc::new(PostgresPaymentRepository::new(pool.clone()));
-    let royalty_repository = Arc::new(PostgresRoyaltyRepository::new(pool.clone()));
-    let wallet_repository = Arc::new(PostgresWalletRepository::new(pool.clone()));
-
-    // Federation Context Repositories & Services
-    let federation_instance_repository = Arc::new(InMemoryFederatedInstanceRepository::new());
-    let federation_activity_repository = Arc::new(InMemoryActivityPubActivityRepository::new());
-    let federation_user_repository = Arc::new(InMemoryFederatedUserRepository::new());
-    let federation_content_repository = Arc::new(InMemoryFederatedContentRepository::new());
-    let federation_follow_repository = Arc::new(InMemoryFederationFollowRepository::new());
-    
-    let federation_service = Arc::new(FederationApplicationService::new(
-        federation_instance_repository.clone(),
-        federation_activity_repository.clone(),
-        federation_user_repository.clone(),
-        federation_content_repository.clone(),
-        federation_follow_repository.clone(),
-    ));
-    
-    let federation_controller = Arc::new(FederationController::new(federation_service));
-
-    // Recommendation Context Repositories & Services
-    let user_profile_repository = Arc::new(InMemoryUserProfileRepository::new());
-    let recommendation_repository = Arc::new(InMemoryRecommendationRepository::new());
-    let model_repository = Arc::new(InMemoryRecommendationModelRepository::new());
-    let p2p_network_repository = Arc::new(InMemoryP2PRecommendationNetworkRepository::new());
-    let collaborative_group_repository = Arc::new(InMemoryCollaborativeFilteringGroupRepository::new());
-    
-    let recommendation_service = Arc::new(RecommendationApplicationService::new(
-        user_profile_repository.clone(),
-        recommendation_repository.clone(),
-        model_repository.clone(),
-        p2p_network_repository.clone(),
-        collaborative_group_repository.clone(),
-    ));
-    
-    let recommendation_controller = Arc::new(RecommendationController::new(recommendation_service));
+    let song_repository = Arc::new(PostgresSongRepository::new((*pool).clone()));
+    let album_repository = Arc::new(PostgresAlbumRepository::new((*pool).clone()));
+    let playlist_repository = Arc::new(PostgresPlaylistRepository::new((*pool).clone()));
 
     // =============================================================================
     // ROUTER COMPOSITION
     // =============================================================================
     
-    Router::new()
+    let router = Router::new()
         // =============================================================================
         // HEALTH & INFO ENDPOINTS
         // =============================================================================
@@ -153,15 +91,6 @@ pub fn create_complete_router(db_pool: PgPool) -> Router {
         .nest("/api/v1/music", create_music_routes())
         
         // =============================================================================
-        // PAYMENT CONTEXT - Financial Operations
-        // =============================================================================
-        .nest("/api/v1", create_payment_routes(
-            payment_repository.clone(),
-            royalty_repository.clone(),
-            wallet_repository.clone(),
-        ))
-        
-        // =============================================================================
         // CAMPAIGN CONTEXT - Marketing & NFT Operations (Updated)
         // =============================================================================
         .nest("/api/v1/campaigns", create_campaign_routes())
@@ -169,27 +98,19 @@ pub fn create_complete_router(db_pool: PgPool) -> Router {
         // =============================================================================
         // LISTEN REWARD CONTEXT - Gamification & ML
         // =============================================================================
-        .nest("/api/v1", create_listen_reward_routes(pool.clone()))
+        .nest("/api/v1", listen_reward_routes(Arc::new(ListenRewardController::new(
+            Arc::new(ListenRewardApplicationService::new_simple(
+                Arc::new(PostgresListenSessionRepository::new((*pool).clone())),
+                Arc::new(PostgresRewardDistributionRepository::new((*pool).clone())),
+                Arc::new(PostgresRewardAnalyticsRepository::new((*pool).clone())),
+                Arc::new(InMemoryEventPublisher::new()),
+            ))
+        ))))
         
         // =============================================================================
         // FRACTIONAL OWNERSHIP CONTEXT - Investment & Trading
         // =============================================================================
-        .nest("/api/v1", create_fractional_ownership_routes(pool.clone()))
-        
-        // =============================================================================
-        // P2P CONTEXT - Revolutionary Decentralized Streaming
-        // =============================================================================
-        .nest("/api/v1/p2p", create_p2p_routes(pool.clone()))
-        
-        // =============================================================================
-        // FEDERATION CONTEXT - P2P Integration with ActivityPub
-        // =============================================================================
-        .nest("/", federation_controller.routes())
-        
-        // =============================================================================
-        // RECOMMENDATION CONTEXT - P2P Music Discovery
-        // =============================================================================
-        .nest("/api/v1/recommendations", recommendation_controller.routes())
+        .nest("/api/v1", create_fractional_ownership_routes().with_state(AppState::default()))
         
         // =============================================================================
         // CROSS-CONTEXT ENDPOINTS
@@ -204,7 +125,6 @@ pub fn create_complete_router(db_pool: PgPool) -> Router {
         // Analytics endpoints that aggregate data from multiple contexts
         .nest("/api/v1/analytics", create_analytics_routes(
             song_repository.clone(),
-            payment_repository.clone(),
             user_repository.clone(),
         ))
         
@@ -212,7 +132,9 @@ pub fn create_complete_router(db_pool: PgPool) -> Router {
         .nest("/api/v1/realtime", create_realtime_routes(pool.clone()))
         
         // Admin endpoints for system management
-        .nest("/api/v1/admin", create_admin_routes(pool.clone()))
+        .nest("/api/v1/admin", create_admin_routes(pool.clone()));
+    
+    Ok(router)
 }
 
 // =============================================================================
@@ -262,7 +184,6 @@ fn create_discovery_routes(
 
 fn create_analytics_routes(
     song_repository: Arc<PostgresSongRepository>,
-    payment_repository: Arc<PostgresPaymentRepository>,
     user_repository: Arc<PostgresUserRepository>,
 ) -> Router {
     use axum::{http::StatusCode, response::Json};
@@ -368,45 +289,21 @@ fn create_admin_routes(pool: Arc<PgPool>) -> Router {
 }
 
 // =============================================================================
-// P2P CONTEXT ROUTE CREATOR
-// =============================================================================
-
-fn create_p2p_routes(pool: Arc<PgPool>) -> Router {
-    use crate::bounded_contexts::p2p::{
-        presentation::routes::create_p2p_routes,
-        presentation::controllers::P2PAnalyticsController,
-        application::services::{P2PAnalyticsService, VideoStreamingService, VideoManagementService},
-        infrastructure::repositories::InMemoryP2PAnalyticsRepository,
-    };
-    
-    // Initialize P2P repositories and services
-    let analytics_repository = Arc::new(InMemoryP2PAnalyticsRepository::new());
-    let analytics_service = Arc::new(P2PAnalyticsService::new(analytics_repository.clone()));
-    let analytics_controller = Arc::new(P2PAnalyticsController::new(analytics_service));
-    
-    let video_streaming_service = Arc::new(VideoStreamingService::new());
-    let video_management_service = Arc::new(VideoManagementService::new());
-    
-    // Create P2P routes
-    create_p2p_routes(analytics_controller, video_streaming_service, video_management_service)
-}
-
-// =============================================================================
 // CORS AND MIDDLEWARE CONFIGURATION
 // =============================================================================
 
 use tower_http::cors::{CorsLayer, Any};
 use tower_http::trace::TraceLayer;
 
-pub fn create_app_router(db_pool: PgPool) -> Router {
-    create_complete_router(db_pool)
+pub async fn create_app_router(db_pool: PgPool) -> Result<Router, Box<dyn std::error::Error>> {
+    Ok(create_complete_router(db_pool).await?
         .layer(
             CorsLayer::new()
                 .allow_origin(Any)
                 .allow_methods(Any)
                 .allow_headers(Any)
         )
-        .layer(TraceLayer::new_for_http())
+        .layer(TraceLayer::new_for_http()))
 }
 
 // =============================================================================
