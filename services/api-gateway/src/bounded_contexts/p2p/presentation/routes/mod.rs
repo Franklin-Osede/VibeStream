@@ -1,10 +1,12 @@
 pub mod analytics_routes;
-pub mod video_management_routes;
-pub mod video_routes;
+pub mod dashboard_routes;
+pub mod streaming_routes;
+pub mod webrtc_routes;
 
 pub use analytics_routes::*;
-pub use video_management_routes::*;
-pub use video_routes::*;
+pub use dashboard_routes::*;
+pub use streaming_routes::*;
+pub use webrtc_routes::*;
 
 use axum::Router;
 use std::sync::Arc;
