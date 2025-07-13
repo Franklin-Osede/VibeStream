@@ -3,31 +3,50 @@ use std::sync::Arc;
 use tokio::sync::{RwLock, Mutex};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use webrtc::api::APIBuilder;
+use webrtc::api::media_engine::MediaEngine;
+use webrtc::api::setting_engine::SettingEngine;
+use webrtc::ice_transport::ice_server::RTCIceServer;
+use webrtc::peer_connection::configuration::RTCConfiguration;
+use webrtc::peer_connection::peer_connection_state::RTCPeerConnectionState;
+use webrtc::peer_connection::RTCPeerConnection;
+use webrtc::data_channel::data_channel_message::DataChannelMessage;
+use webrtc::data_channel::RTCDataChannel;
+use webrtc::Error as WebRTCError;
 
-use super::connection::RTCPeerConnection;
+use super::connection::RTCPeerConnection as CustomRTCPeerConnection;
 use super::signaling::{SignalingMessage, SignalingEngine};
-use super::data_channel::RTCDataChannel;
+use super::data_channel::RTCDataChannel as CustomRTCDataChannel;
 use super::ice_servers::ICEServerConfig;
 use crate::shared::domain::value_objects::Id;
 
-/// WebRTC Engine - Core P2P streaming engine (Mock Implementation)
-/// This is a simplified version that can be replaced with real WebRTC later
+/// WebRTC Engine - Core P2P streaming engine (Real Implementation)
 pub struct WebRTCEngine {
-    peer_connections: Arc<RwLock<HashMap<String, RTCPeerConnection>>>,
-    data_channels: Arc<RwLock<HashMap<String, RTCDataChannel>>>,
+    peer_connections: Arc<RwLock<HashMap<String, CustomRTCPeerConnection>>>,
+    data_channels: Arc<RwLock<HashMap<String, CustomRTCDataChannel>>>,
     signaling_engine: Arc<SignalingEngine>,
     ice_servers: Vec<ICEServerConfig>,
     connection_stats: Arc<Mutex<ConnectionStats>>,
     config: WebRTCConfig,
+    api: Arc<webrtc::api::API>,
 }
 
 impl WebRTCEngine {
     pub fn new(config: WebRTCConfig) -> Self {
-        println!("🌐 Initializing WebRTC Engine for P2P Streaming (Mock Mode)");
+        println!("🌐 Initializing Real WebRTC Engine for P2P Streaming");
         println!("   📡 ICE Servers: {}", config.ice_servers.len());
         println!("   🔗 Max Connections: {}", config.max_connections);
         println!("   📊 Data Channels: {}", config.max_data_channels);
         
+        // Create WebRTC API
+        let mut m = MediaEngine::default();
+        m.register_default_codecs().expect("Failed to register codecs");
+        
+        let api = APIBuilder::new()
+            .media_engine(m)
+            .setting_engine(SettingEngine::default())
+            .build();
+
         Self {
             peer_connections: Arc::new(RwLock::new(HashMap::new())),
             data_channels: Arc::new(RwLock::new(HashMap::new())),
@@ -35,36 +54,50 @@ impl WebRTCEngine {
             ice_servers: config.ice_servers,
             connection_stats: Arc::new(Mutex::new(ConnectionStats::default())),
             config,
+            api: Arc::new(api),
         }
     }
 
-    /// Create a new peer connection (Mock implementation)
+    /// Create a new peer connection (Real implementation)
     pub async fn create_connection(
         &self,
         session_id: &str,
         remote_peer_id: &str,
         offer_data: String,
     ) -> Result<String, WebRTCError> {
-        println!("🔗 Creating WebRTC connection (Mock): {} -> {}", session_id, remote_peer_id);
+        println!("🔗 Creating Real WebRTC connection: {} -> {}", session_id, remote_peer_id);
         
         let connection_id = Uuid::new_v4().to_string();
         
-        // Create mock peer connection
-        let peer_connection = RTCPeerConnection::new(
+        // Convert ICE servers to WebRTC format
+        let ice_servers = self.convert_ice_servers();
+        
+        // Create WebRTC configuration
+        let config = RTCConfiguration {
+            ice_servers,
+            ..Default::default()
+        };
+
+        // Create real WebRTC peer connection
+        let peer_connection = self.api.new_peer_connection(config).await?;
+        
+        // Create custom wrapper
+        let custom_connection = CustomRTCPeerConnection::new_real(
             &connection_id,
             session_id,
             remote_peer_id,
+            peer_connection,
             self.ice_servers.clone(),
             self.config.clone(),
         ).await?;
 
-        // Generate mock answer
-        let answer_data = format!("mock_webrtc_answer_{}", connection_id);
+        // Process the offer
+        let answer_data = custom_connection.process_offer_real(&offer_data).await?;
         
         // Store connection
         {
             let mut connections = self.peer_connections.write().await;
-            connections.insert(connection_id.clone(), peer_connection);
+            connections.insert(connection_id.clone(), custom_connection);
         }
 
         // Update stats
@@ -74,27 +107,27 @@ impl WebRTCEngine {
             stats.total_connections += 1;
         }
 
-        println!("✅ WebRTC connection created (Mock): {}", connection_id);
+        println!("✅ Real WebRTC connection created: {}", connection_id);
         Ok(answer_data)
     }
 
-    /// Add a data channel to an existing connection (Mock implementation)
+    /// Add a data channel to an existing connection (Real implementation)
     pub async fn add_data_channel(
         &self,
         connection_id: &str,
         channel_label: &str,
     ) -> Result<String, WebRTCError> {
-        println!("📡 Adding data channel (Mock): {} to connection {}", channel_label, connection_id);
+        println!("📡 Adding real data channel: {} to connection {}", channel_label, connection_id);
         
         let channel_id = format!("{}:{}", connection_id, channel_label);
         
         // Get the peer connection
         let connections = self.peer_connections.read().await;
         let peer_connection = connections.get(connection_id)
-            .ok_or(WebRTCError::ConnectionNotFound)?;
+            .ok_or(WebRTCError::Other("Connection not found".to_string()))?;
 
-        // Create mock data channel
-        let data_channel = RTCDataChannel::new(
+        // Create real data channel
+        let data_channel = CustomRTCDataChannel::new_real(
             &channel_id,
             channel_label,
             peer_connection.get_connection_state().await,
@@ -106,11 +139,11 @@ impl WebRTCEngine {
             channels.insert(channel_id.clone(), data_channel);
         }
 
-        println!("✅ Data channel added (Mock): {}", channel_id);
+        println!("✅ Real data channel added: {}", channel_id);
         Ok(channel_id)
     }
 
-    /// Send chunk data through a data channel (Mock implementation)
+    /// Send chunk data through a data channel (Real implementation)
     pub async fn send_chunk_data(
         &self,
         channel_id: &str,
@@ -120,7 +153,7 @@ impl WebRTCEngine {
     ) -> Result<(), WebRTCError> {
         let channels = self.data_channels.read().await;
         let data_channel = channels.get(channel_id)
-            .ok_or(WebRTCError::DataChannelNotFound)?;
+            .ok_or(WebRTCError::Other("Data channel not found".to_string()))?;
 
         let chunk_message = ChunkMessage {
             chunk_index,
@@ -129,7 +162,7 @@ impl WebRTCEngine {
             timestamp: chrono::Utc::now(),
         };
 
-        data_channel.send_message(&chunk_message).await?;
+        data_channel.send_message_real(&chunk_message).await?;
         
         // Update stats
         {
@@ -141,14 +174,14 @@ impl WebRTCEngine {
         Ok(())
     }
 
-    /// Request chunk from a peer (Mock implementation)
+    /// Request chunk from a peer (Real implementation)
     pub async fn request_chunk(
         &self,
         connection_id: &str,
         chunk_index: u32,
         quality: &str,
     ) -> Result<Option<Vec<u8>>, WebRTCError> {
-        println!("📦 Requesting chunk {} at quality {} from connection {} (Mock)", chunk_index, quality, connection_id);
+        println!("📦 Requesting chunk {} at quality {} from connection {} (Real)", chunk_index, quality, connection_id);
         
         let channels = self.data_channels.read().await;
         
@@ -161,7 +194,7 @@ impl WebRTCEngine {
                     request_id: Uuid::new_v4().to_string(),
                 };
 
-                if let Ok(response) = data_channel.request_chunk(&request).await {
+                if let Ok(response) = data_channel.request_chunk_real(&request).await {
                     if let Some(chunk_data) = response.chunk_data {
                         // Update stats
                         {
@@ -176,26 +209,17 @@ impl WebRTCEngine {
             }
         }
         
-        // Mock chunk data if no real data available
-        let mock_chunk_data = vec![0x1, 0x2, 0x3, 0x4, 0x5]; // 5 bytes mock data
-        
-        // Update stats
-        {
-            let mut stats = self.connection_stats.lock().await;
-            stats.total_chunks_received += 1;
-            stats.total_data_received += mock_chunk_data.len() as u64;
-        }
-        
-        Ok(Some(mock_chunk_data))
+        // Return None if no data available
+        Ok(None)
     }
 
-    /// Handle signaling message (Mock implementation)
+    /// Handle signaling message (Real implementation)
     pub async fn handle_signaling_message(
         &self,
         session_id: &str,
         message: SignalingMessage,
     ) -> Result<Option<SignalingMessage>, WebRTCError> {
-        println!("📨 Handling signaling message (Mock) for session: {}", session_id);
+        println!("📨 Handling real signaling message for session: {}", session_id);
         
         let mut responses = Vec::new();
         
@@ -203,7 +227,7 @@ impl WebRTCEngine {
         {
             let sessions = self.signaling_engine.sessions.read().await;
             if !sessions.contains_key(session_id) {
-                return Err(WebRTCError::ConnectionNotFound);
+                return Err(WebRTCError::Other("Session not found".to_string()));
             }
         }
 
@@ -213,68 +237,49 @@ impl WebRTCEngine {
                 let answer_data = self.create_connection(session_id, &remote_peer_id, offer_data).await?;
                 responses.push(SignalingMessage::Answer { answer_data });
             }
-            SignalingMessage::Answer { answer_data: _ } => {
-                // Process answer (mock)
-                println!("📥 Processing SDP answer (Mock)");
+            SignalingMessage::Answer { answer_data } => {
+                // Process answer with real WebRTC
+                let connection_id = self.get_connection_id(session_id).await?;
+                let connections = self.peer_connections.read().await;
+                if let Some(connection) = connections.get(&connection_id) {
+                    connection.process_answer_real(&answer_data).await?;
+                }
             }
-            SignalingMessage::IceCandidate { candidate: _ } => {
-                // Process ICE candidate (mock)
-                println!("🧊 Processing ICE candidate (Mock)");
+            SignalingMessage::IceCandidate { candidate } => {
+                // Process ICE candidate with real WebRTC
+                let connection_id = self.get_connection_id(session_id).await?;
+                let connections = self.peer_connections.read().await;
+                if let Some(connection) = connections.get(&connection_id) {
+                    connection.add_ice_candidate_real(&candidate).await?;
+                }
             }
             SignalingMessage::DataChannelRequest { channel_label } => {
-                // Create data channel (mock)
+                // Create data channel with real WebRTC
                 let connection_id = self.get_connection_id(session_id).await?;
                 let channel_id = self.add_data_channel(&connection_id, &channel_label).await?;
                 responses.push(SignalingMessage::DataChannelCreated { channel_id });
             }
             SignalingMessage::DataChannelCreated { channel_id: _ } => {
-                // Handle data channel created (mock)
-                println!("✅ Data channel created (Mock)");
+                // Handle data channel created
+                println!("✅ Real data channel created");
             }
             SignalingMessage::KeepAlive => {
                 self.signaling_engine.handle_keepalive(session_id).await?;
             }
         }
 
-        // Update session activity
-        {
-            let mut sessions = self.signaling_engine.sessions.write().await;
-            if let Some(session) = sessions.get_mut(session_id) {
-                session.last_activity = chrono::Utc::now();
-            }
-        }
-
-        println!("✅ Signaling message processed (Mock), {} responses generated", responses.len());
         Ok(responses.pop())
     }
 
-    /// Get connection statistics
-    pub async fn get_connection_stats(&self) -> ConnectionStats {
-        self.connection_stats.lock().await.clone()
-    }
-
-    /// Get peer connection by session
-    pub async fn get_connection_by_session(&self, session_id: &str) -> Option<RTCPeerConnection> {
-        let connections = self.peer_connections.read().await;
-        
-        for connection in connections.values() {
-            if connection.get_session_id() == session_id {
-                return Some(connection.clone());
-            }
-        }
-        
-        None
-    }
-
-    /// Close a peer connection
+    /// Close connection (Real implementation)
     pub async fn close_connection(&self, connection_id: &str) -> Result<(), WebRTCError> {
-        println!("🔌 Closing WebRTC connection (Mock): {}", connection_id);
+        println!("🔌 Closing real WebRTC connection: {}", connection_id);
         
         // Close peer connection
         {
             let mut connections = self.peer_connections.write().await;
             if let Some(connection) = connections.remove(connection_id) {
-                connection.close().await?;
+                connection.close_real().await?;
             }
         }
 
@@ -288,7 +293,7 @@ impl WebRTCEngine {
             
             for channel_id in channels_to_remove {
                 if let Some(channel) = channels.remove(&channel_id) {
-                    channel.close().await?;
+                    channel.close_real().await?;
                 }
             }
         }
@@ -299,7 +304,7 @@ impl WebRTCEngine {
             stats.active_connections = stats.active_connections.saturating_sub(1);
         }
 
-        println!("✅ WebRTC connection closed (Mock): {}", connection_id);
+        println!("✅ Real WebRTC connection closed: {}", connection_id);
         Ok(())
     }
 
@@ -313,7 +318,7 @@ impl WebRTCEngine {
             }
         }
         
-        Err(WebRTCError::ConnectionNotFound)
+        Err(WebRTCError::Other("Connection not found".to_string()))
     }
 
     /// Get all active connections
@@ -326,6 +331,23 @@ impl WebRTCEngine {
     pub async fn get_connection_quality(&self, connection_id: &str) -> Option<ConnectionQuality> {
         let connections = self.peer_connections.read().await;
         connections.get(connection_id)?.get_quality_metrics().await
+    }
+
+    /// Get connection statistics
+    pub async fn get_connection_stats(&self) -> ConnectionStats {
+        self.connection_stats.lock().await.clone()
+    }
+
+    /// Convert ICE servers to WebRTC format
+    fn convert_ice_servers(&self) -> Vec<RTCIceServer> {
+        self.ice_servers.iter().map(|server| {
+            RTCIceServer {
+                urls: vec![server.url.clone()],
+                username: server.username.clone(),
+                credential: server.credential.clone(),
+                ..Default::default()
+            }
+        }).collect()
     }
 }
 
@@ -425,4 +447,12 @@ pub enum WebRTCError {
     InvalidOfferAnswer,
     #[error("Maximum connections reached")]
     MaxConnectionsReached,
+    #[error("WebRTC error: {0}")]
+    Other(String),
+}
+
+impl From<webrtc::Error> for WebRTCError {
+    fn from(err: webrtc::Error) -> Self {
+        WebRTCError::Other(err.to_string())
+    }
 } 

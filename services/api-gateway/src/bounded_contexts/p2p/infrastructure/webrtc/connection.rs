@@ -2,6 +2,11 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use webrtc::peer_connection::RTCPeerConnection as WebRTCPeerConnection;
+use webrtc::peer_connection::peer_connection_state::RTCPeerConnectionState;
+use webrtc::peer_connection::ice_connection_state::RTCIceConnectionState;
+use webrtc::sdp::session_description::SessionDescription;
+use webrtc::Error as WebRTCError;
 
 use super::ice_servers::ICEServerConfig;
 use super::engine::WebRTCConfig;
@@ -20,6 +25,8 @@ pub struct RTCPeerConnection {
     remote_description: Arc<RwLock<Option<String>>>,
     ice_candidates: Arc<RwLock<Vec<String>>>,
     quality_metrics: Arc<RwLock<ConnectionQuality>>,
+    // Real WebRTC connection (optional)
+    real_connection: Option<Arc<WebRTCPeerConnection>>,
 }
 
 impl RTCPeerConnection {
@@ -44,6 +51,7 @@ impl RTCPeerConnection {
             remote_description: Arc::new(RwLock::new(None)),
             ice_candidates: Arc::new(RwLock::new(Vec::new())),
             quality_metrics: Arc::new(RwLock::new(ConnectionQuality::default())),
+            real_connection: None,
         };
 
         // Initialize ICE agent
@@ -53,7 +61,142 @@ impl RTCPeerConnection {
         Ok(connection)
     }
 
-    /// Process SDP offer and generate answer
+    /// Create new RTCPeerConnection with real WebRTC connection
+    pub async fn new_real(
+        connection_id: &str,
+        session_id: &str,
+        remote_peer_id: &str,
+        real_connection: WebRTCPeerConnection,
+        ice_servers: Vec<ICEServerConfig>,
+        config: WebRTCConfig,
+    ) -> Result<Self, WebRTCError> {
+        println!("🔗 Creating Real RTCPeerConnection: {} -> {}", session_id, remote_peer_id);
+        
+        let connection = Self {
+            connection_id: connection_id.to_string(),
+            session_id: session_id.to_string(),
+            remote_peer_id: remote_peer_id.to_string(),
+            ice_servers,
+            config,
+            connection_state: Arc::new(RwLock::new(ConnectionState::New)),
+            ice_connection_state: Arc::new(RwLock::new(ICEConnectionState::New)),
+            local_description: Arc::new(RwLock::new(None)),
+            remote_description: Arc::new(RwLock::new(None)),
+            ice_candidates: Arc::new(RwLock::new(Vec::new())),
+            quality_metrics: Arc::new(RwLock::new(ConnectionQuality::default())),
+            real_connection: Some(Arc::new(real_connection)),
+        };
+
+        // Initialize ICE agent
+        connection.initialize_ice_agent().await?;
+        
+        println!("✅ Real RTCPeerConnection created: {}", connection_id);
+        Ok(connection)
+    }
+
+    /// Process SDP offer and generate answer (Real implementation)
+    pub async fn process_offer_real(&self, offer_data: &str) -> Result<String, WebRTCError> {
+        println!("📨 Processing real SDP offer for connection: {}", self.connection_id);
+        
+        if let Some(ref real_conn) = self.real_connection {
+            // Parse the offer
+            let offer = SessionDescription::from_str(offer_data)?;
+            
+            // Set remote description
+            real_conn.set_remote_description(offer).await?;
+
+            // Update connection state
+            {
+                let mut state = self.connection_state.write().await;
+                *state = ConnectionState::HaveRemoteOffer;
+            }
+
+            // Create answer
+            let answer = real_conn.create_answer(None).await?;
+            
+            // Set local description
+            real_conn.set_local_description(answer.clone()).await?;
+
+            // Update connection state
+            {
+                let mut state = self.connection_state.write().await;
+                *state = ConnectionState::Stable;
+            }
+
+            // Store descriptions
+            {
+                let mut remote_desc = self.remote_description.write().await;
+                *remote_desc = Some(offer_data.to_string());
+                
+                let mut local_desc = self.local_description.write().await;
+                *local_desc = Some(answer.sdp);
+            }
+
+            println!("✅ Real SDP answer generated for connection: {}", self.connection_id);
+            Ok(answer.sdp)
+        } else {
+            Err(WebRTCError::Other("No real WebRTC connection available".to_string()))
+        }
+    }
+
+    /// Process SDP answer (Real implementation)
+    pub async fn process_answer_real(&self, answer_data: &str) -> Result<(), WebRTCError> {
+        println!("📨 Processing real SDP answer for connection: {}", self.connection_id);
+        
+        if let Some(ref real_conn) = self.real_connection {
+            // Parse the answer
+            let answer = SessionDescription::from_str(answer_data)?;
+            
+            // Set remote description
+            real_conn.set_remote_description(answer).await?;
+
+            // Update connection state
+            {
+                let mut state = self.connection_state.write().await;
+                *state = ConnectionState::Stable;
+            }
+
+            // Store remote description
+            {
+                let mut remote_desc = self.remote_description.write().await;
+                *remote_desc = Some(answer_data.to_string());
+            }
+
+            // Start ICE gathering
+            self.start_ice_gathering().await?;
+
+            println!("✅ Real SDP answer processed for connection: {}", self.connection_id);
+            Ok(())
+        } else {
+            Err(WebRTCError::Other("No real WebRTC connection available".to_string()))
+        }
+    }
+
+    /// Add ICE candidate (Real implementation)
+    pub async fn add_ice_candidate_real(&self, candidate: &str) -> Result<(), WebRTCError> {
+        println!("🧊 Adding real ICE candidate for connection: {}", self.connection_id);
+        
+        if let Some(ref real_conn) = self.real_connection {
+            // Parse ICE candidate
+            let ice_candidate = webrtc::ice_transport::ice_candidate::RTCIceCandidate::from_str(candidate)?;
+            
+            // Add to peer connection
+            real_conn.add_ice_candidate(ice_candidate).await?;
+
+            // Add to candidates list
+            {
+                let mut candidates = self.ice_candidates.write().await;
+                candidates.push(candidate.to_string());
+            }
+
+            println!("✅ Real ICE candidate added for connection: {}", self.connection_id);
+            Ok(())
+        } else {
+            Err(WebRTCError::Other("No real WebRTC connection available".to_string()))
+        }
+    }
+
+    /// Process SDP offer and generate answer (Mock implementation)
     pub async fn process_offer(&self, offer_data: &str) -> Result<String, WebRTCError> {
         println!("📨 Processing SDP offer for connection: {}", self.connection_id);
         
@@ -93,7 +236,7 @@ impl RTCPeerConnection {
         Ok(answer_data)
     }
 
-    /// Process SDP answer
+    /// Process SDP answer (Mock implementation)
     pub async fn process_answer(&self, answer_data: &str) -> Result<(), WebRTCError> {
         println!("📨 Processing SDP answer for connection: {}", self.connection_id);
         
@@ -121,7 +264,7 @@ impl RTCPeerConnection {
         Ok(())
     }
 
-    /// Add ICE candidate
+    /// Add ICE candidate (Mock implementation)
     pub async fn add_ice_candidate(&self, candidate: &str) -> Result<(), WebRTCError> {
         println!("🧊 Adding ICE candidate for connection: {}", self.connection_id);
         
@@ -168,7 +311,34 @@ impl RTCPeerConnection {
         Some(self.quality_metrics.read().await.clone())
     }
 
-    /// Close the connection
+    /// Close the connection (Real implementation)
+    pub async fn close_real(&self) -> Result<(), WebRTCError> {
+        println!("🔌 Closing real RTCPeerConnection: {}", self.connection_id);
+        
+        if let Some(ref real_conn) = self.real_connection {
+            real_conn.close().await?;
+        }
+
+        // Update connection state
+        {
+            let mut state = self.connection_state.write().await;
+            *state = ConnectionState::Closed;
+        }
+
+        // Update ICE connection state
+        {
+            let mut ice_state = self.ice_connection_state.write().await;
+            *ice_state = ICEConnectionState::Closed;
+        }
+
+        // Cleanup resources
+        self.cleanup_resources().await?;
+
+        println!("✅ Real RTCPeerConnection closed: {}", self.connection_id);
+        Ok(())
+    }
+
+    /// Close the connection (Mock implementation)
     pub async fn close(&self) -> Result<(), WebRTCError> {
         println!("🔌 Closing RTCPeerConnection: {}", self.connection_id);
         
@@ -209,7 +379,7 @@ impl RTCPeerConnection {
         Ok(())
     }
 
-    /// Generate SDP answer
+    /// Generate SDP answer (Mock implementation)
     async fn generate_answer(&self) -> Result<String, WebRTCError> {
         // Mock SDP answer generation
         // In a real implementation, this would use a WebRTC library
@@ -331,12 +501,28 @@ pub struct ConnectionQuality {
 /// WebRTC Error
 #[derive(Debug, thiserror::Error)]
 pub enum WebRTCError {
-    #[error("Invalid offer/answer")]
-    InvalidOfferAnswer,
+    #[error("Connection not found")]
+    ConnectionNotFound,
+    #[error("Data channel not found")]
+    DataChannelNotFound,
+    #[error("Signaling error: {0}")]
+    SignalingError(String),
     #[error("ICE error: {0}")]
     ICEError(String),
-    #[error("Connection error: {0}")]
-    ConnectionError(String),
-    #[error("SDP error: {0}")]
-    SDPError(String),
+    #[error("Data channel error: {0}")]
+    DataChannelError(String),
+    #[error("Connection timeout")]
+    ConnectionTimeout,
+    #[error("Invalid offer/answer")]
+    InvalidOfferAnswer,
+    #[error("Maximum connections reached")]
+    MaxConnectionsReached,
+    #[error("WebRTC error: {0}")]
+    Other(String),
+}
+
+impl From<webrtc::Error> for WebRTCError {
+    fn from(err: webrtc::Error) -> Self {
+        WebRTCError::Other(err.to_string())
+    }
 } 

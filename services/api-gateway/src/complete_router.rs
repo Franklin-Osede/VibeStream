@@ -1,6 +1,6 @@
 // Complete Unified Router for VibeStream API Gateway
 // 
-// This module consolidates all bounded context routes into a single, coherent API
+// This module consolidates all bounded contexts routes into a single, coherent API
 // with proper middleware, authentication, rate limiting, and documentation.
 
 use axum::{routing::get, Router};
@@ -51,6 +51,17 @@ use crate::bounded_contexts::{
         InMemoryFederatedContentRepository,
         InMemoryFederationFollowRepository,
     },
+    
+    // Recommendation Context - P2P Music Discovery
+    recommendation::presentation::RecommendationController,
+    recommendation::application::RecommendationApplicationService,
+    recommendation::infrastructure::{
+        InMemoryUserProfileRepository,
+        InMemoryRecommendationRepository,
+        InMemoryRecommendationModelRepository,
+        InMemoryP2PRecommendationNetworkRepository,
+        InMemoryCollaborativeFilteringGroupRepository,
+    },
 };
 
 // Health check handler
@@ -100,6 +111,23 @@ pub fn create_complete_router(db_pool: PgPool) -> Router {
     ));
     
     let federation_controller = Arc::new(FederationController::new(federation_service));
+
+    // Recommendation Context Repositories & Services
+    let user_profile_repository = Arc::new(InMemoryUserProfileRepository::new());
+    let recommendation_repository = Arc::new(InMemoryRecommendationRepository::new());
+    let model_repository = Arc::new(InMemoryRecommendationModelRepository::new());
+    let p2p_network_repository = Arc::new(InMemoryP2PRecommendationNetworkRepository::new());
+    let collaborative_group_repository = Arc::new(InMemoryCollaborativeFilteringGroupRepository::new());
+    
+    let recommendation_service = Arc::new(RecommendationApplicationService::new(
+        user_profile_repository.clone(),
+        recommendation_repository.clone(),
+        model_repository.clone(),
+        p2p_network_repository.clone(),
+        collaborative_group_repository.clone(),
+    ));
+    
+    let recommendation_controller = Arc::new(RecommendationController::new(recommendation_service));
 
     // =============================================================================
     // ROUTER COMPOSITION
@@ -152,6 +180,16 @@ pub fn create_complete_router(db_pool: PgPool) -> Router {
         // P2P CONTEXT - Revolutionary Decentralized Streaming
         // =============================================================================
         .nest("/api/v1/p2p", create_p2p_routes(pool.clone()))
+        
+        // =============================================================================
+        // FEDERATION CONTEXT - P2P Integration with ActivityPub
+        // =============================================================================
+        .nest("/", federation_controller.routes())
+        
+        // =============================================================================
+        // RECOMMENDATION CONTEXT - P2P Music Discovery
+        // =============================================================================
+        .nest("/api/v1/recommendations", recommendation_controller.routes())
         
         // =============================================================================
         // CROSS-CONTEXT ENDPOINTS

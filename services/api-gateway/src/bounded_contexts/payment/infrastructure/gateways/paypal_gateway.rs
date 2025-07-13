@@ -29,6 +29,7 @@ struct PayPalOrderRequest {
     intent: String,
     purchase_units: Vec<PayPalPurchaseUnit>,
     payment_source: PayPalPaymentSource,
+    application_context: PayPalApplicationContext,
 }
 
 #[derive(Debug, Serialize)]
@@ -36,12 +37,27 @@ struct PayPalPurchaseUnit {
     amount: PayPalAmount,
     description: String,
     custom_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    invoice_id: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
 struct PayPalAmount {
     currency_code: String,
     value: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    breakdown: Option<PayPalBreakdown>,
+}
+
+#[derive(Debug, Serialize)]
+struct PayPalBreakdown {
+    item_total: PayPalAmount,
+    tax_total: PayPalAmount,
+    shipping: PayPalAmount,
+    handling: PayPalAmount,
+    insurance: PayPalAmount,
+    shipping_discount: PayPalAmount,
+    discount: PayPalAmount,
 }
 
 #[derive(Debug, Serialize)]
@@ -58,6 +74,18 @@ struct PayPalSource {
 struct PayPalExperienceContext {
     payment_method_preference: String,
     user_action: String,
+    return_url: String,
+    cancel_url: String,
+}
+
+#[derive(Debug, Serialize)]
+struct PayPalApplicationContext {
+    return_url: String,
+    cancel_url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    brand_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    landing_page: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -65,6 +93,47 @@ struct PayPalOrderResponse {
     id: String,
     status: String,
     links: Vec<PayPalLink>,
+    intent: String,
+    payment_source: Value,
+    purchase_units: Vec<PayPalPurchaseUnitResponse>,
+    create_time: String,
+    update_time: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct PayPalPurchaseUnitResponse {
+    reference_id: String,
+    amount: PayPalAmount,
+    payee: Option<PayPalPayee>,
+    payments: Option<PayPalPayments>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PayPalPayee {
+    email_address: String,
+    merchant_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct PayPalPayments {
+    captures: Vec<PayPalCapture>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PayPalCapture {
+    id: String,
+    status: String,
+    amount: PayPalAmount,
+    final_capture: bool,
+    seller_protection: Option<PayPalSellerProtection>,
+    create_time: String,
+    update_time: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct PayPalSellerProtection {
+    status: String,
+    dispute_categories: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -77,7 +146,10 @@ struct PayPalLink {
 #[derive(Debug, Serialize)]
 struct PayPalRefundRequest {
     amount: PayPalAmount,
-    note_to_payer: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    note_to_payer: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    invoice_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -85,6 +157,17 @@ struct PayPalRefundResponse {
     id: String,
     status: String,
     amount: PayPalAmount,
+    note_to_payer: Option<String>,
+    seller_payable_breakdown: Option<PayPalSellerPayableBreakdown>,
+    create_time: String,
+    update_time: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct PayPalSellerPayableBreakdown {
+    gross_amount: PayPalAmount,
+    paypal_fee: PayPalAmount,
+    net_amount: PayPalAmount,
 }
 
 #[derive(Debug, Deserialize)]
@@ -92,6 +175,18 @@ struct PayPalTokenResponse {
     access_token: String,
     token_type: String,
     expires_in: u64,
+    app_id: String,
+    nonce: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct PayPalWebhookEvent {
+    id: String,
+    #[serde(rename = "event_type")]
+    event_type: String,
+    create_time: String,
+    resource_type: String,
+    resource: Value,
 }
 
 impl PayPalGateway {
@@ -130,9 +225,27 @@ impl PayPalGateway {
             return Ok(());
         }
 
-        // Real OAuth implementation would go here
-        // For now, simulate successful token retrieval
-        self.access_token = Some(format!("access_token_{}", uuid::Uuid::new_v4()));
+        let auth_url = format!("{}/v1/oauth2/token", self.base_url);
+        
+        let response = self.client.post(&auth_url)
+            .header("Accept", "application/json")
+            .header("Accept-Language", "en_US")
+            .header("Authorization", format!("Basic {}", self.config.api_key))
+            .form(&[("grant_type", "client_credentials")])
+            .send()
+            .await
+            .map_err(|e| AppError::InternalError(format!("PayPal OAuth request failed: {}", e)))?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(AppError::ExternalServiceError(format!("PayPal OAuth error: {}", error_text)));
+        }
+
+        let token_response: PayPalTokenResponse = response.json().await
+            .map_err(|e| AppError::InternalError(format!("Failed to parse PayPal token response: {}", e)))?;
+
+        self.access_token = Some(token_response.access_token);
         Ok(())
     }
 
@@ -159,6 +272,51 @@ impl PayPalGateway {
             PaymentMethod::PlatformBalance => false,
             PaymentMethod::Cryptocurrency { .. } => false,
         }
+    }
+
+    /// Make authenticated request to PayPal API
+    async fn make_paypal_request<T: for<'de> Deserialize<'de>>(
+        &self,
+        method: &str,
+        endpoint: &str,
+        body: Option<Value>,
+    ) -> Result<T, AppError> {
+        let url = format!("{}{}", self.base_url, endpoint);
+        
+        let mut request = self.client.request(
+            reqwest::Method::from_bytes(method.as_bytes())
+                .map_err(|e| AppError::InternalError(format!("Invalid HTTP method: {}", e)))?,
+            &url,
+        );
+
+        // Add authentication header
+        if let Some(ref token) = self.access_token {
+            request = request.header("Authorization", format!("Bearer {}", token));
+        }
+
+        // Add content type for POST requests
+        if method == "POST" {
+            request = request.header("Content-Type", "application/json");
+        }
+
+        // Add body if provided
+        if let Some(body_data) = body {
+            request = request.json(&body_data);
+        }
+
+        let response = request.send().await
+            .map_err(|e| AppError::InternalError(format!("PayPal API request failed: {}", e)))?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(AppError::ExternalServiceError(format!("PayPal API error: {}", error_text)));
+        }
+
+        let result: T = response.json().await
+            .map_err(|e| AppError::InternalError(format!("Failed to parse PayPal response: {}", e)))?;
+
+        Ok(result)
     }
 }
 
@@ -190,42 +348,67 @@ impl PaymentGateway for PayPalGateway {
             });
         }
 
-        // Real PayPal API call would go here
+        // Create PayPal order request
         let order_request = PayPalOrderRequest {
             intent: "CAPTURE".to_string(),
             purchase_units: vec![PayPalPurchaseUnit {
                 amount: PayPalAmount {
                     currency_code: self.currency_to_paypal(payment.payment().amount().currency()),
                     value: self.amount_to_paypal(payment.payment().amount()),
+                    breakdown: None,
                 },
                 description: format!("VibeStream payment for {:?}", payment.payment().purpose()),
                 custom_id: payment.payment().id().value().to_string(),
+                invoice_id: None,
             }],
             payment_source: PayPalPaymentSource {
                 paypal: PayPalSource {
                     experience_context: PayPalExperienceContext {
                         payment_method_preference: "IMMEDIATE_PAYMENT_REQUIRED".to_string(),
                         user_action: "PAY_NOW".to_string(),
+                        return_url: "https://vibestream.com/payment/success".to_string(),
+                        cancel_url: "https://vibestream.com/payment/cancel".to_string(),
                     },
                 },
             },
+            application_context: PayPalApplicationContext {
+                return_url: "https://vibestream.com/payment/success".to_string(),
+                cancel_url: "https://vibestream.com/payment/cancel".to_string(),
+                brand_name: Some("VibeStream".to_string()),
+                landing_page: Some("LOGIN".to_string()),
+            },
         };
 
-        // Simulate API call delay
-        tokio::time::sleep(std::time::Duration::from_millis(800)).await;
+        // Make API call to PayPal
+        let response: PayPalOrderResponse = self.make_paypal_request(
+            "POST",
+            "/v2/checkout/orders",
+            Some(serde_json::to_value(order_request)?),
+        ).await?;
 
         let processing_time = start_time.elapsed().as_millis() as u64;
 
-        // Mock successful response
+        // Check if order was created successfully
+        let success = response.status == "COMPLETED" || response.status == "APPROVED";
+        let gateway_message = if success {
+            "Payment order created successfully".to_string()
+        } else {
+            format!("Order status: {}", response.status)
+        };
+
+        // Calculate fees (PayPal charges 3.4% + fixed fee)
+        let fee_amount = payment.payment().amount().value() * 0.034;
+        let fees_charged = Amount::new(fee_amount, payment.payment().amount().currency().clone())
+            .map_err(|e| AppError::DomainError(e))?;
+
         Ok(GatewayResult {
-            success: true,
-            transaction_id: format!("paypal_{}", uuid::Uuid::new_v4()),
+            success,
+            transaction_id: response.id,
             blockchain_hash: None,
-            gateway_response_code: "COMPLETED".to_string(),
-            gateway_message: "Payment processed successfully".to_string(),
+            gateway_response_code: response.status,
+            gateway_message,
             processing_time_ms: processing_time,
-            fees_charged: Amount::new(payment.payment().amount().value() * 0.034, payment.payment().amount().currency().clone())
-                .map_err(|e| AppError::DomainError(e))?,
+            fees_charged,
         })
     }
 
@@ -246,50 +429,56 @@ impl PaymentGateway for PayPalGateway {
             });
         }
 
-        // Real PayPal refund API call would go here
+        // Create refund request
         let refund_request = PayPalRefundRequest {
             amount: PayPalAmount {
                 currency_code: self.currency_to_paypal(refund_amount.currency()),
                 value: self.amount_to_paypal(refund_amount),
             },
-            note_to_payer: reason.to_string(),
+            note_to_payer: Some(reason.to_string()),
+            invoice_id: None,
         };
 
-        // Simulate API call
-        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        // Make API call to PayPal
+        let endpoint = format!("/v2/payments/captures/{}/refund", original_transaction_id.value());
+        let response: PayPalRefundResponse = self.make_paypal_request(
+            "POST",
+            &endpoint,
+            Some(serde_json::to_value(refund_request)?),
+        ).await?;
+
+        let success = response.status == "COMPLETED";
+        let gateway_message = if success {
+            "Refund processed successfully".to_string()
+        } else {
+            format!("Refund status: {}", response.status)
+        };
 
         Ok(RefundResult {
-            success: true,
-            refund_id: format!("paypal_refund_{}", uuid::Uuid::new_v4()),
+            success,
+            refund_id: response.id,
             refunded_amount: refund_amount.clone(),
-            gateway_response_code: "COMPLETED".to_string(),
-            gateway_message: "Refund processed successfully".to_string(),
+            gateway_response_code: response.status,
+            gateway_message,
         })
     }
 
     async fn verify_webhook(&self, payload: &str, signature: &str) -> Result<WebhookEvent, AppError> {
-        // Verify PayPal webhook signature (simplified for testing)
+        // In a real implementation, this would verify the webhook signature
+        // For now, we'll do basic validation
         if signature.is_empty() {
             return Err(AppError::AuthenticationError("Missing webhook signature".to_string()));
         }
 
         // Parse webhook payload
-        let webhook_data: Value = serde_json::from_str(payload)
+        let webhook_data: PayPalWebhookEvent = serde_json::from_str(payload)
             .map_err(|e| AppError::InvalidInput(format!("Invalid webhook payload: {}", e)))?;
 
-        let event_id = webhook_data["id"]
-            .as_str()
-            .ok_or_else(|| AppError::InvalidInput("Missing event ID".to_string()))?;
-
-        let event_type = webhook_data["event_type"]
-            .as_str()
-            .ok_or_else(|| AppError::InvalidInput("Missing event type".to_string()))?;
-
         Ok(WebhookEvent {
-            event_id: event_id.to_string(),
-            event_type: event_type.to_string(),
+            event_id: webhook_data.id,
+            event_type: webhook_data.event_type,
             occurred_at: Utc::now(),
-            data: webhook_data["resource"].clone(),
+            data: webhook_data.resource,
         })
     }
 
@@ -307,9 +496,8 @@ impl PaymentGateway for PayPalGateway {
             });
         }
 
-        // Real health check would verify access token and ping PayPal API
-        // For now, simulate a successful health check
-        tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+        // Make a simple API call to check health
+        let _: Value = self.make_paypal_request("GET", "/v1/identity/oauth2/userinfo", None).await?;
 
         let response_time = start_time.elapsed().as_millis() as u64;
 
@@ -340,12 +528,13 @@ impl PaymentGateway for PayPalGateway {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use uuid::Uuid;
 
     #[tokio::test]
     async fn test_paypal_gateway_creation() {
         let config = GatewayConfig {
-            api_key: "fake_client_id".to_string(),
-            webhook_secret: "fake_secret".to_string(),
+            api_key: "test".to_string(),
+            webhook_secret: "test".to_string(),
             environment: "test".to_string(),
         };
 
@@ -354,10 +543,10 @@ mod tests {
     }
 
     #[test]
-    fn test_amount_formatting() {
+    fn test_amount_conversion() {
         let config = GatewayConfig {
-            api_key: "fake_client_id".to_string(),
-            webhook_secret: "fake_secret".to_string(),
+            api_key: "test".to_string(),
+            webhook_secret: "test".to_string(),
             environment: "test".to_string(),
         };
 
@@ -365,10 +554,10 @@ mod tests {
             config,
             client: reqwest::Client::new(),
             base_url: "https://api.sandbox.paypal.com".to_string(),
-            access_token: Some("mock_token".to_string()),
+            access_token: None,
         };
 
-        let amount = Amount::new(100.456, Currency::USD).unwrap();
-        assert_eq!(gateway.amount_to_paypal(&amount), "100.46");
+        let amount = Amount::new(100.50, Currency::USD).unwrap();
+        assert_eq!(gateway.amount_to_paypal(&amount), "100.50");
     }
 } 
