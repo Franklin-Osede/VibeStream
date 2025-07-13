@@ -40,6 +40,17 @@ use crate::bounded_contexts::{
     fractional_ownership::presentation::controllers::{
         fractional_ownership_controller::{create_fractional_ownership_routes},
     },
+    
+    // Federation Context - P2P Integration
+    federation::presentation::FederationController,
+    federation::application::FederationApplicationService,
+    federation::infrastructure::{
+        InMemoryFederatedInstanceRepository,
+        InMemoryActivityPubActivityRepository,
+        InMemoryFederatedUserRepository,
+        InMemoryFederatedContentRepository,
+        InMemoryFederationFollowRepository,
+    },
 };
 
 // Health check handler
@@ -72,6 +83,23 @@ pub fn create_complete_router(db_pool: PgPool) -> Router {
     let payment_repository = Arc::new(PostgresPaymentRepository::new(pool.clone()));
     let royalty_repository = Arc::new(PostgresRoyaltyRepository::new(pool.clone()));
     let wallet_repository = Arc::new(PostgresWalletRepository::new(pool.clone()));
+
+    // Federation Context Repositories & Services
+    let federation_instance_repository = Arc::new(InMemoryFederatedInstanceRepository::new());
+    let federation_activity_repository = Arc::new(InMemoryActivityPubActivityRepository::new());
+    let federation_user_repository = Arc::new(InMemoryFederatedUserRepository::new());
+    let federation_content_repository = Arc::new(InMemoryFederatedContentRepository::new());
+    let federation_follow_repository = Arc::new(InMemoryFederationFollowRepository::new());
+    
+    let federation_service = Arc::new(FederationApplicationService::new(
+        federation_instance_repository.clone(),
+        federation_activity_repository.clone(),
+        federation_user_repository.clone(),
+        federation_content_repository.clone(),
+        federation_follow_repository.clone(),
+    ));
+    
+    let federation_controller = Arc::new(FederationController::new(federation_service));
 
     // =============================================================================
     // ROUTER COMPOSITION
@@ -119,6 +147,11 @@ pub fn create_complete_router(db_pool: PgPool) -> Router {
         // FRACTIONAL OWNERSHIP CONTEXT - Investment & Trading
         // =============================================================================
         .nest("/api/v1", create_fractional_ownership_routes(pool.clone()))
+        
+        // =============================================================================
+        // P2P CONTEXT - Revolutionary Decentralized Streaming
+        // =============================================================================
+        .nest("/api/v1/p2p", create_p2p_routes(pool.clone()))
         
         // =============================================================================
         // CROSS-CONTEXT ENDPOINTS
@@ -294,6 +327,30 @@ fn create_admin_routes(pool: Arc<PgPool>) -> Router {
         .route("/health", get(get_system_health))
         .route("/metrics", get(get_system_health))
         .route("/logs", get(get_system_health))
+}
+
+// =============================================================================
+// P2P CONTEXT ROUTE CREATOR
+// =============================================================================
+
+fn create_p2p_routes(pool: Arc<PgPool>) -> Router {
+    use crate::bounded_contexts::p2p::{
+        presentation::routes::create_p2p_routes,
+        presentation::controllers::P2PAnalyticsController,
+        application::services::{P2PAnalyticsService, VideoStreamingService, VideoManagementService},
+        infrastructure::repositories::InMemoryP2PAnalyticsRepository,
+    };
+    
+    // Initialize P2P repositories and services
+    let analytics_repository = Arc::new(InMemoryP2PAnalyticsRepository::new());
+    let analytics_service = Arc::new(P2PAnalyticsService::new(analytics_repository.clone()));
+    let analytics_controller = Arc::new(P2PAnalyticsController::new(analytics_service));
+    
+    let video_streaming_service = Arc::new(VideoStreamingService::new());
+    let video_management_service = Arc::new(VideoManagementService::new());
+    
+    // Create P2P routes
+    create_p2p_routes(analytics_controller, video_streaming_service, video_management_service)
 }
 
 // =============================================================================

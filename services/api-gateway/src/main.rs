@@ -33,7 +33,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(
             Redoc::with_url("/redoc", openapi_spec.clone())
         )
-        .route("/api-docs/openapi.json", get(serve_openapi_json))
         .route("/api-docs/openapi.yaml", get(serve_openapi_yaml))
         .route("/api-docs/health", get(docs_health_check));
 
@@ -64,15 +63,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     axum::serve(listener, app_with_docs).await?;
 
     Ok(())
-}
-
-/// Endpoint para servir la especificación OpenAPI en formato JSON
-async fn serve_openapi_json() -> Result<Json<serde_json::Value>, StatusCode> {
-    let spec = generate_openapi_spec();
-    match serde_json::to_value(&spec) {
-        Ok(json) => Ok(Json(json)),
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
-    }
 }
 
 /// Endpoint para servir la especificación OpenAPI en formato YAML

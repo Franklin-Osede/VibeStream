@@ -119,11 +119,10 @@ aws-smithy-types = "1.0.0"
 
 # WebRTC dependencies
 webrtc = "0.9"
-webrtc-rs = "0.1"
 
-# Video processing
-ffmpeg-next = "6.1"
-image = "0.24"
+# Video processing (commented out due to FFmpeg compatibility issues)
+# ffmpeg-next = "6.1"
+# image = "0.24"
 
 [dev-dependencies]
 # Testing framework
