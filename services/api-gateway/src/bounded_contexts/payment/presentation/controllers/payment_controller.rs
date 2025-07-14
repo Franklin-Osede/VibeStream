@@ -31,6 +31,12 @@ use crate::bounded_contexts::payment::application::{
 use crate::bounded_contexts::payment::infrastructure::repositories::{
     PostgresPaymentRepository, PostgresRoyaltyRepository, PostgresWalletRepository,
 };
+use crate::bounded_contexts::payment::infrastructure::webhooks::{
+    WebhookRouter, StripeWebhookHandler, PayPalWebhookHandler, CoinbaseWebhookHandler,
+};
+use crate::bounded_contexts::payment::infrastructure::gateways::{
+    StripeGateway, PayPalGateway, CoinbaseGateway,
+};
 
 use crate::shared::domain::errors::AppError;
 
@@ -259,6 +265,7 @@ pub struct PaymentController {
     payment_repository: Arc<PostgresPaymentRepository>,
     royalty_repository: Arc<PostgresRoyaltyRepository>,
     wallet_repository: Arc<PostgresWalletRepository>,
+    webhook_router: Arc<WebhookRouter>,
 }
 
 impl PaymentController {
@@ -266,11 +273,13 @@ impl PaymentController {
         payment_repository: Arc<PostgresPaymentRepository>,
         royalty_repository: Arc<PostgresRoyaltyRepository>,
         wallet_repository: Arc<PostgresWalletRepository>,
+        webhook_router: Arc<WebhookRouter>,
     ) -> Self {
         Self {
             payment_repository,
             royalty_repository,
             wallet_repository,
+            webhook_router,
         }
     }
 
@@ -310,6 +319,12 @@ impl PaymentController {
             // Payment gateway operations
             .route("/gateways", get(Self::list_payment_gateways))
             .route("/gateways/:gateway_id/process", post(Self::process_gateway_payment))
+            
+            // Webhook endpoints
+            .route("/webhooks/stripe", post(Self::stripe_webhook))
+            .route("/webhooks/paypal", post(Self::paypal_webhook))
+            .route("/webhooks/coinbase", post(Self::coinbase_webhook))
+            .route("/webhooks/:gateway", post(Self::generic_webhook))
             
             .with_state(controller)
     }
@@ -768,6 +783,114 @@ impl PaymentController {
         // Process payment through specific gateway
         Ok(Json(ApiResponse::success(())))
     }
+
+    // =============================================================================
+    // WEBHOOK HANDLERS
+    // =============================================================================
+
+    async fn stripe_webhook(
+        State(controller): State<Arc<Self>>,
+        headers: axum::http::HeaderMap,
+        body: String,
+    ) -> Result<Json<ApiResponse<()>>, StatusCode> {
+        let signature = headers
+            .get("stripe-signature")
+            .and_then(|h| h.to_str().ok())
+            .ok_or(StatusCode::BAD_REQUEST)?;
+
+        match controller.webhook_router.route_webhook("stripe", &body, signature).await {
+            Ok(result) => {
+                if result.success {
+                    Ok(Json(ApiResponse::success(())))
+                } else {
+                    Ok(Json(ApiResponse::error(result.error_message.unwrap_or_else(|| "Webhook processing failed".to_string()))))
+                }
+            }
+            Err(e) => {
+                tracing::error!("Stripe webhook error: {:?}", e);
+                Err(StatusCode::BAD_REQUEST)
+            }
+        }
+    }
+
+    async fn paypal_webhook(
+        State(controller): State<Arc<Self>>,
+        headers: axum::http::HeaderMap,
+        body: String,
+    ) -> Result<Json<ApiResponse<()>>, StatusCode> {
+        let signature = headers
+            .get("paypal-transmission-sig")
+            .and_then(|h| h.to_str().ok())
+            .ok_or(StatusCode::BAD_REQUEST)?;
+
+        match controller.webhook_router.route_webhook("paypal", &body, signature).await {
+            Ok(result) => {
+                if result.success {
+                    Ok(Json(ApiResponse::success(())))
+                } else {
+                    Ok(Json(ApiResponse::error(result.error_message.unwrap_or_else(|| "Webhook processing failed".to_string()))))
+                }
+            }
+            Err(e) => {
+                tracing::error!("PayPal webhook error: {:?}", e);
+                Err(StatusCode::BAD_REQUEST)
+            }
+        }
+    }
+
+    async fn coinbase_webhook(
+        State(controller): State<Arc<Self>>,
+        headers: axum::http::HeaderMap,
+        body: String,
+    ) -> Result<Json<ApiResponse<()>>, StatusCode> {
+        let signature = headers
+            .get("x-cc-webhook-signature")
+            .and_then(|h| h.to_str().ok())
+            .ok_or(StatusCode::BAD_REQUEST)?;
+
+        match controller.webhook_router.route_webhook("coinbase", &body, signature).await {
+            Ok(result) => {
+                if result.success {
+                    Ok(Json(ApiResponse::success(())))
+                } else {
+                    Ok(Json(ApiResponse::error(result.error_message.unwrap_or_else(|| "Webhook processing failed".to_string()))))
+                }
+            }
+            Err(e) => {
+                tracing::error!("Coinbase webhook error: {:?}", e);
+                Err(StatusCode::BAD_REQUEST)
+            }
+        }
+    }
+
+    async fn generic_webhook(
+        State(controller): State<Arc<Self>>,
+        Path(gateway): Path<String>,
+        headers: axum::http::HeaderMap,
+        body: String,
+    ) -> Result<Json<ApiResponse<()>>, StatusCode> {
+        // Try to find signature in common header names
+        let signature = headers
+            .get("x-webhook-signature")
+            .or_else(|| headers.get("signature"))
+            .or_else(|| headers.get("x-signature"))
+            .and_then(|h| h.to_str().ok())
+            .ok_or(StatusCode::BAD_REQUEST)?;
+
+        match controller.webhook_router.route_webhook(&gateway, &body, signature).await {
+            Ok(result) => {
+                if result.success {
+                    Ok(Json(ApiResponse::success(())))
+                } else {
+                    Ok(Json(ApiResponse::error(result.error_message.unwrap_or_else(|| "Webhook processing failed".to_string()))))
+                }
+            }
+            Err(e) => {
+                tracing::error!("Generic webhook error for gateway {}: {:?}", gateway, e);
+                Err(StatusCode::BAD_REQUEST)
+            }
+        }
+    }
 }
 
 // Factory functions
@@ -775,11 +898,13 @@ pub fn create_payment_controller(
     payment_repository: Arc<PostgresPaymentRepository>,
     royalty_repository: Arc<PostgresRoyaltyRepository>,
     wallet_repository: Arc<PostgresWalletRepository>,
+    webhook_router: Arc<WebhookRouter>,
 ) -> Arc<PaymentController> {
     Arc::new(PaymentController::new(
         payment_repository,
         royalty_repository,
         wallet_repository,
+        webhook_router,
     ))
 }
 
@@ -787,11 +912,13 @@ pub fn create_payment_routes(
     payment_repository: Arc<PostgresPaymentRepository>,
     royalty_repository: Arc<PostgresRoyaltyRepository>,
     wallet_repository: Arc<PostgresWalletRepository>,
+    webhook_router: Arc<WebhookRouter>,
 ) -> Router {
     let controller = create_payment_controller(
         payment_repository,
         royalty_repository,
         wallet_repository,
+        webhook_router,
     );
     
     PaymentController::routes(controller)

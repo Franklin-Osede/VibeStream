@@ -45,6 +45,10 @@ uuid = { version = "1.0", features = ["v4", "serde"] }
 jsonwebtoken = "9.2"
 bcrypt = "0.15"
 
+# Payment Gateway Dependencies
+hmac-sha256 = "1.1"
+base64 = "0.21"
+
 # Environment variables
 dotenvy = "0.15"
 
@@ -86,8 +90,8 @@ bytes = "1.5"
 tokio-util = { version = "0.7", features = ["codec"] }
 mime = "0.3"
 
-# Audio metadata extraction (for future implementation)
-# symphonia = "0.5" # TODO: Add when implementing real metadata extraction
+# Audio metadata extraction
+symphonia = { version = "0.5", features = ["all"] }
 
 # Storage backends (for future implementation)  
 aws-config = "1.1.0"

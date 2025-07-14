@@ -1,10 +1,16 @@
 pub mod file_storage;
 pub mod ipfs_storage;
 pub mod local_storage;
+pub mod ipfs_video_storage;
+pub mod audio_metadata_extractor;
+pub mod audio_transcoder;
 
 pub use file_storage::*;
 pub use ipfs_storage::*;
 pub use local_storage::*;
+pub use ipfs_video_storage::*;
+pub use audio_metadata_extractor::{AudioMetadataExtractor, AudioMetadata};
+pub use audio_transcoder::{AudioTranscoder, TranscodeConfig};
 
 use async_trait::async_trait;
 use std::io::Result as IoResult;

@@ -7,7 +7,66 @@ use tokio::sync::RwLock;
 use uuid::Uuid;
 use serde::{Deserialize, Serialize};
 
-use super::{VideoFileStorage, VideoFileMetadata, VideoQuality, VideoChunk};
+// Note: AudioFileStorage and AudioFileMetadata are not used in this file
+// but are imported for trait compatibility
+
+// Video-specific types (temporary definitions for compilation)
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum VideoQuality {
+    Low,
+    Medium,
+    High,
+    Ultra,
+}
+
+impl VideoQuality {
+    pub fn minimum_bandwidth(&self) -> u64 {
+        match self {
+            VideoQuality::Low => 1_000_000,    // 1 Mbps
+            VideoQuality::Medium => 2_500_000,  // 2.5 Mbps
+            VideoQuality::High => 5_000_000,    // 5 Mbps
+            VideoQuality::Ultra => 10_000_000,  // 10 Mbps
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct VideoFileMetadata {
+    pub file_size: u64,
+    pub content_type: String,
+    pub duration_seconds: Option<u32>,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    pub frame_rate: Option<f32>,
+    pub bitrate: Option<u32>,
+    pub available_qualities: Vec<VideoQuality>,
+    pub chunk_count: u32,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub peer_count: Option<u32>,
+    pub availability_score: Option<f32>,
+}
+
+#[derive(Debug, Clone)]
+pub struct VideoChunk {
+    pub chunk_index: u32,
+    pub data: bytes::Bytes,
+    pub quality: VideoQuality,
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+}
+
+#[async_trait::async_trait]
+pub trait VideoFileStorage: Send + Sync {
+    async fn upload_video(&self, file_data: bytes::Bytes, file_name: &str, content_type: &str) -> std::io::Result<String>;
+    async fn download_video(&self, url: &str) -> std::io::Result<bytes::Bytes>;
+    async fn delete_video(&self, url: &str) -> std::io::Result<()>;
+    async fn get_streaming_url(&self, url: &str, quality: &VideoQuality) -> std::io::Result<String>;
+    async fn get_video_chunk(&self, url: &str, chunk_index: u32, quality: &VideoQuality) -> std::io::Result<VideoChunk>;
+    async fn get_metadata(&self, url: &str) -> std::io::Result<VideoFileMetadata>;
+    async fn get_peers(&self, url: &str) -> std::io::Result<Vec<String>>;
+    async fn announce_to_network(&self, url: &str) -> std::io::Result<()>;
+    async fn get_available_qualities(&self, url: &str) -> std::io::Result<Vec<VideoQuality>>;
+    async fn transcode_video(&self, url: &str, target_quality: VideoQuality) -> std::io::Result<uuid::Uuid>;
+}
 
 /// Revolutionary Distributed IPFS Video Storage
 /// The future of decentralized video streaming
@@ -44,7 +103,7 @@ struct CachedVideoContent {
     ipfs_hash: String,
     file_size: u64,
     content_type: String,
-    duration_seconds: u32,
+    duration_seconds: Option<u32>,
     qualities: Vec<VideoQuality>,
     chunk_count: u32,
     peer_count: u32,
@@ -336,10 +395,8 @@ impl IPFSVideoStorage {
             let chunk_data = file_data.slice(offset..end);
             
             let chunk = VideoChunk {
-                index: chunk_index,
-                offset: offset as u64,
-                size: chunk_data.len() as u64,
-                data: chunk_data,
+                chunk_index,
+                data: Bytes::from(chunk_data),
                 quality: quality.clone(),
                 timestamp: chrono::Utc::now(),
             };
@@ -358,7 +415,7 @@ impl IPFSVideoStorage {
         let job = TranscodingJob {
             job_id,
             input_hash: input_hash.to_string(),
-            target_quality,
+            target_quality: target_quality.clone(),
             status: TranscodingStatus::Pending,
             created_at: chrono::Utc::now(),
             completed_at: None,
@@ -388,11 +445,11 @@ impl VideoFileStorage for IPFSVideoStorage {
         let metadata = VideoFileMetadata {
             file_size: file_data.len() as u64,
             content_type: content_type.to_string(),
-            duration_seconds: 0, // Would be extracted in real implementation
-            width: 1920, // Would be extracted
-            height: 1080, // Would be extracted
-            frame_rate: 30.0, // Would be extracted
-            bitrate: 5000, // Would be extracted (kbps)
+            duration_seconds: Some(0), // Would be extracted in real implementation
+            width: Some(1920), // Would be extracted
+            height: Some(1080), // Would be extracted
+            frame_rate: Some(30.0), // Would be extracted
+            bitrate: Some(5000), // Would be extracted (kbps)
             available_qualities: vec![VideoQuality::High], // Original quality
             chunk_count: 0, // Will be calculated
             created_at: chrono::Utc::now(),
@@ -504,10 +561,10 @@ impl VideoFileStorage for IPFSVideoStorage {
                 file_size: cached.file_size,
                 content_type: cached.content_type.clone(),
                 duration_seconds: cached.duration_seconds,
-                width: 1920, // Would be extracted from actual file
-                height: 1080,
-                frame_rate: 30.0,
-                bitrate: 5000,
+                width: Some(1920), // Would be extracted from actual file
+                height: Some(1080),
+                frame_rate: Some(30.0),
+                bitrate: Some(5000),
                 available_qualities: cached.qualities.clone(),
                 chunk_count: cached.chunk_count,
                 created_at: cached.last_accessed,
@@ -522,11 +579,11 @@ impl VideoFileStorage for IPFSVideoStorage {
         Ok(VideoFileMetadata {
             file_size: 0,
             content_type: "video/mp4".to_string(),
-            duration_seconds: 0,
-            width: 1920,
-            height: 1080,
-            frame_rate: 30.0,
-            bitrate: 5000,
+            duration_seconds: Some(0),
+            width: Some(1920),
+            height: Some(1080),
+            frame_rate: Some(30.0),
+            bitrate: Some(5000),
             available_qualities: vec![VideoQuality::High],
             chunk_count: 0,
             created_at: chrono::Utc::now(),

@@ -90,7 +90,7 @@ pub struct ApiResponse<T> {
 
 /// Upload audio file
 pub async fn upload_audio(
-    State(controller): State<Arc<AudioUploadController>>,
+    State((controller, _)): State<(Arc<AudioUploadController>, Arc<VideoUploadController>)>,
     mut multipart: Multipart,
 ) -> Result<Json<ApiResponse<UploadAudioResponse>>, StatusCode> {
     
@@ -168,7 +168,7 @@ pub async fn upload_audio(
 
 /// Get upload progress
 pub async fn get_upload_progress(
-    State(_controller): State<Arc<AudioUploadController>>,
+    State((_controller, _)): State<(Arc<AudioUploadController>, Arc<VideoUploadController>)>,
     Path(upload_id): Path<String>,
 ) -> Result<Json<ApiResponse<UploadProgressResponse>>, StatusCode> {
     // TODO: Implement actual progress tracking
@@ -190,7 +190,7 @@ pub async fn get_upload_progress(
 
 /// Get streaming URL for uploaded audio
 pub async fn get_streaming_url(
-    State(controller): State<Arc<AudioUploadController>>,
+    State((controller, _)): State<(Arc<AudioUploadController>, Arc<VideoUploadController>)>,
     Path(song_id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<String>>, StatusCode> {
     // TODO: Get storage URL from database using song_id
@@ -218,7 +218,7 @@ pub async fn get_streaming_url(
 
 /// Delete uploaded audio
 pub async fn delete_audio(
-    State(controller): State<Arc<AudioUploadController>>,
+    State((controller, _)): State<(Arc<AudioUploadController>, Arc<VideoUploadController>)>,
     Path(song_id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<()>>, StatusCode> {
     // TODO: Get storage URL from database using song_id

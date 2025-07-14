@@ -8,13 +8,9 @@ use std::sync::Arc;
 use crate::shared::application::command::{Command, CommandHandler};
 use crate::shared::domain::errors::AppError;
 use crate::bounded_contexts::music::domain::{
-    entities::{Song, Album, Playlist},
+    entities::Song,
     value_objects::*,
-    repositories::{
-        SongRepository,
-        MusicCatalogRepository
-    },
-    aggregates::music_catalog_aggregate::MusicCatalogAggregate,
+    repositories::SongRepository,
 };
 use serde::{Deserialize, Serialize};
 

@@ -4,6 +4,8 @@ use reqwest;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::time::Instant;
+use hmac_sha256::HMAC;
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
 use crate::shared::domain::errors::AppError;
 use crate::bounded_contexts::payment::domain::{
@@ -152,11 +154,33 @@ impl StripeGateway {
         }
     }
 
-    /// Verify Stripe webhook signature
+    /// Verify Stripe webhook signature using HMAC-SHA256
     fn verify_webhook_signature(&self, payload: &str, signature: &str) -> Result<bool, AppError> {
-        // In a real implementation, this would use HMAC-SHA256 verification
-        // For now, we'll do basic validation
-        if signature.starts_with("t=") && signature.contains("v1=") {
+        // Parse the signature header: "t=timestamp,v1=signature"
+        let parts: Vec<&str> = signature.split(',').collect();
+        if parts.len() != 2 {
+            return Err(AppError::AuthenticationError("Invalid signature format".to_string()));
+        }
+
+        let timestamp_part = parts[0];
+        let signature_part = parts[1];
+
+        if !timestamp_part.starts_with("t=") || !signature_part.starts_with("v1=") {
+            return Err(AppError::AuthenticationError("Invalid signature format".to_string()));
+        }
+
+        let timestamp = &timestamp_part[2..];
+        let signature = &signature_part[3..];
+
+        // Create the signed payload
+        let signed_payload = format!("{}.{}", timestamp, payload);
+
+        // Calculate HMAC-SHA256
+        let hmac = HMAC::mac(signed_payload.as_bytes(), self.config.webhook_secret.as_bytes());
+        let expected_signature = BASE64.encode(hmac);
+
+        // Compare signatures
+        if signature == expected_signature {
             Ok(true)
         } else {
             Err(AppError::AuthenticationError("Invalid webhook signature".to_string()))
@@ -222,6 +246,9 @@ impl PaymentGateway for StripeGateway {
                     .map_err(|e| AppError::DomainError(e))?,
             });
         }
+
+        // Real Stripe API implementation
+        tracing::info!("Processing payment through Stripe: {}", payment.payment().id().value());
 
         // Get payment method ID
         let payment_method_id = self.get_payment_method_id(payment)?;

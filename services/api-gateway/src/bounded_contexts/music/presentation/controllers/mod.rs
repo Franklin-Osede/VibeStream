@@ -1,4 +1,9 @@
 pub mod upload_controller;
+pub mod video_upload_controller;
+
+// Re-export controllers for easy access
+pub use upload_controller::*;
+pub use video_upload_controller::*;
 
 // Import required dependencies
 use axum::{
