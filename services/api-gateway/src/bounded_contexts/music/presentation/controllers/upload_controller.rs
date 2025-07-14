@@ -14,6 +14,7 @@ use crate::bounded_contexts::music::infrastructure::storage::{
     AudioFileService, AudioUploadResult, StorageConfig, create_storage
 };
 use crate::bounded_contexts::music::domain::value_objects::{FileFormat, AudioQuality};
+use super::video_upload_controller::VideoUploadController;
 
 /// Audio upload controller
 pub struct AudioUploadController {

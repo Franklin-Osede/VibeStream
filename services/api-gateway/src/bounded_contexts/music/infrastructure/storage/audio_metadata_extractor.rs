@@ -80,7 +80,7 @@ impl AudioMetadataExtractor {
 
         // Extract basic audio information
         let duration = if let Some(n_frames) = codec_params.n_frames {
-            let time_base = codec_params.time_base.unwrap_or(symphonia::core::probe::TimeBase::new(1, 1));
+            let time_base = codec_params.time_base.unwrap_or(symphonia::core::units::TimeBase::new(1, 1));
             let duration_ts = n_frames * time_base.numer as u64 / time_base.denom as u64;
             SongDuration::new(duration_ts as u32)
                 .map_err(|e| AppError::DomainError(e))?
@@ -122,13 +122,9 @@ impl AudioMetadataExtractor {
         };
 
         // Read metadata - metadata() returns Metadata directly
-        let metadata_rev = format_reader.metadata();
+        // Note: We're not using metadata for now to avoid borrow checker issues
+        // In a real implementation, you would process the metadata here
         
-        // Process metadata tags if available
-        // Note: symphonia's Metadata doesn't have a tags() method
-        // We'll skip tag processing for now and focus on basic metadata extraction
-        // In a real implementation, you would need to use format-specific metadata readers
-
         // Analyze audio for mood and tempo if not found in tags
         if metadata.mood.is_none() || metadata.tempo.is_none() {
             Self::analyze_audio_characteristics(&mut metadata, codec_params);

@@ -11,8 +11,7 @@ use std::sync::Arc;
 
 use crate::shared::domain::errors::AppError;
 use crate::bounded_contexts::music::infrastructure::storage::{
-    ipfs_video_storage::{IPFSVideoStorage, VideoQuality, VideoFileStorage},
-    StorageConfig
+    IPFSVideoStorage, VideoQuality, VideoFileStorage, StorageConfig
 };
 use super::upload_controller::AudioUploadController;
 
