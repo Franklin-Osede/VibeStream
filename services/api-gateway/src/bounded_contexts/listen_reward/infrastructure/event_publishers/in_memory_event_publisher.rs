@@ -1,7 +1,7 @@
 // In-Memory Event Publisher (for testing)
 use async_trait::async_trait;
 use std::sync::{Arc, Mutex};
-use crate::bounded_contexts::listen_reward::domain::events::DomainEvent;
+use crate::shared::domain::DomainEvent;
 use super::{EventPublisher, EventPublishResult, EventMetadata};
 
 pub struct InMemoryEventPublisher {

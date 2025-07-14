@@ -7,61 +7,141 @@ use crate::bounded_contexts::p2p::domain::entities::video_stream::{
     VideoStream, VideoStreamId, VideoChunk, VideoChunkId, VideoQuality, VideoViewer, ConnectionQuality
 };
 use crate::bounded_contexts::p2p::infrastructure::webrtc::WebRTCEngine;
+use crate::bounded_contexts::p2p::infrastructure::storage::{
+    VideoFileStorage, VideoFileMetadata, P2PInfrastructureFactory, P2PInfrastructureConfig
+};
 use crate::bounded_contexts::p2p::domain::repositories::VideoStreamRepository;
 
-/// Video streaming service for P2P video delivery
+/// Video streaming service for P2P video delivery with IPFS storage
 pub struct VideoStreamingService {
     webrtc_engine: Arc<WebRTCEngine>,
     stream_repository: Arc<dyn VideoStreamRepository>,
+    video_storage: Arc<dyn VideoFileStorage>,
     active_streams: Arc<RwLock<std::collections::HashMap<VideoStreamId, VideoStream>>>,
     active_viewers: Arc<RwLock<std::collections::HashMap<VideoStreamId, Vec<VideoViewer>>>>,
     chunk_cache: Arc<RwLock<std::collections::HashMap<VideoChunkId, VideoChunk>>>,
+    streaming_stats: Arc<RwLock<StreamingStats>>,
+}
+
+#[derive(Debug, Clone)]
+struct StreamingStats {
+    total_streams: u64,
+    active_streams: u32,
+    total_viewers: u32,
+    total_data_transferred: u64,
+    average_quality: VideoQuality,
+    last_updated: DateTime<Utc>,
+}
+
+impl Default for StreamingStats {
+    fn default() -> Self {
+        Self {
+            total_streams: 0,
+            active_streams: 0,
+            total_viewers: 0,
+            total_data_transferred: 0,
+            average_quality: VideoQuality::Medium,
+            last_updated: Utc::now(),
+        }
+    }
 }
 
 impl VideoStreamingService {
     pub fn new(
         webrtc_engine: Arc<WebRTCEngine>,
         stream_repository: Arc<dyn VideoStreamRepository>,
+        p2p_config: P2PInfrastructureConfig,
     ) -> Self {
+        let video_storage = Arc::new(P2PInfrastructureFactory::create_ipfs_storage(&p2p_config));
+        
         Self {
             webrtc_engine,
             stream_repository,
+            video_storage,
             active_streams: Arc::new(RwLock::new(std::collections::HashMap::new())),
             active_viewers: Arc::new(RwLock::new(std::collections::HashMap::new())),
             chunk_cache: Arc::new(RwLock::new(std::collections::HashMap::new())),
+            streaming_stats: Arc::new(RwLock::new(StreamingStats::default())),
         }
     }
-
-    /// Start a new video stream
-    pub async fn start_stream(
-        &self,
-        title: String,
-        artist_id: Uuid,
-        video_url: String,
-        duration_seconds: u32,
-        is_live: bool,
-    ) -> Result<VideoStreamId, String> {
-        let mut stream = VideoStream::new(title, artist_id, video_url, duration_seconds, is_live);
+    
+    pub async fn new_async(
+        webrtc_engine: Arc<WebRTCEngine>,
+        stream_repository: Arc<dyn VideoStreamRepository>,
+        p2p_config: P2PInfrastructureConfig,
+    ) -> std::io::Result<Self> {
+        let video_storage = Arc::new(P2PInfrastructureFactory::create_ipfs_storage_async(&p2p_config).await?);
         
-        // Initialize stream
-        stream.status = crate::bounded_contexts::p2p::domain::entities::video_stream::VideoStreamStatus::Initializing;
-        
-        // Save to repository
-        self.stream_repository.save(&stream).await
-            .map_err(|e| format!("Failed to save stream: {}", e))?;
-        
-        // Add to active streams
-        let stream_id = stream.id.clone();
-        self.active_streams.write().await.insert(stream_id.clone(), stream);
-        
-        // Initialize viewer list
-        self.active_viewers.write().await.insert(stream_id.clone(), Vec::new());
-        
-        println!("🎥 Started video stream: {}", stream_id.to_string());
-        Ok(stream_id)
+        Ok(Self {
+            webrtc_engine,
+            stream_repository,
+            video_storage,
+            active_streams: Arc::new(RwLock::new(std::collections::HashMap::new())),
+            active_viewers: Arc::new(RwLock::new(std::collections::HashMap::new())),
+            chunk_cache: Arc::new(RwLock::new(std::collections::HashMap::new())),
+            streaming_stats: Arc::new(RwLock::new(StreamingStats::default())),
+        })
     }
 
-    /// Join a video stream as viewer
+    /// Upload video to IPFS and create stream
+    pub async fn upload_video_stream(
+        &self,
+        file_data: bytes::Bytes,
+        file_name: &str,
+        content_type: &str,
+        stream_config: StreamConfig,
+    ) -> Result<VideoStream, String> {
+        println!("🎬 Uploading video stream to IPFS: {}", file_name);
+        
+        // Upload to IPFS storage
+        let storage_url = self.video_storage.upload_video(file_data, file_name, content_type).await
+            .map_err(|e| format!("Failed to upload video: {}", e))?;
+        
+        // Get metadata from storage
+        let metadata = self.video_storage.get_metadata(&storage_url).await
+            .map_err(|e| format!("Failed to get metadata: {}", e))?;
+        
+        // Create video stream
+        let stream = VideoStream::new(
+            storage_url.clone(),
+            stream_config.stream_type,
+            stream_config.quality,
+            stream_config.format,
+            stream_config.bitrate,
+            stream_config.resolution,
+            stream_config.fps,
+            metadata.file_size,
+        );
+        
+        // Store stream
+        {
+            let mut streams = self.active_streams.write().await;
+            streams.insert(stream.id.clone(), stream.clone());
+        }
+        
+        // Update stats
+        {
+            let mut stats = self.streaming_stats.write().await;
+            stats.total_streams += 1;
+            stats.active_streams += 1;
+            stats.last_updated = Utc::now();
+        }
+        
+        // Announce to P2P network
+        self.video_storage.announce_to_network(&storage_url).await
+            .map_err(|e| format!("Failed to announce to network: {}", e))?;
+        
+        println!("✅ Video stream uploaded and announced: {}", stream.id.to_string());
+        Ok(stream)
+    }
+
+    /// Get video stream by ID
+    pub async fn get_stream(&self, stream_id: &VideoStreamId) -> Option<VideoStream> {
+        let streams = self.active_streams.read().await;
+        streams.get(stream_id).cloned()
+    }
+
+    /// Join a video stream
     pub async fn join_stream(
         &self,
         stream_id: &VideoStreamId,
@@ -77,13 +157,20 @@ impl VideoStreamingService {
             return Err("Stream is not available".to_string());
         }
         
+        // Get available qualities from storage
+        let available_qualities = self.video_storage.get_available_qualities(&stream.video_id).await
+            .map_err(|e| format!("Failed to get available qualities: {}", e))?;
+        
+        // Select optimal quality based on connection
+        let optimal_quality = self.select_optimal_quality(&available_qualities, &connection_quality);
+        
         // Create viewer
         let viewer = VideoViewer {
             id: Uuid::new_v4(),
             stream_id: stream_id.clone(),
             user_id,
             peer_id: peer_id.clone(),
-            quality: stream.get_optimal_quality(connection_quality.bandwidth_mbps),
+            quality: optimal_quality,
             buffer_level: 0.0,
             connection_quality,
             joined_at: Utc::now(),
@@ -94,6 +181,8 @@ impl VideoStreamingService {
         let mut viewers = self.active_viewers.write().await;
         if let Some(stream_viewers) = viewers.get_mut(stream_id) {
             stream_viewers.push(viewer.clone());
+        } else {
+            viewers.insert(stream_id.clone(), vec![viewer.clone()]);
         }
         
         // Update stream viewer count
@@ -105,7 +194,14 @@ impl VideoStreamingService {
         self.webrtc_engine.connect_peer(&peer_id).await
             .map_err(|e| format!("Failed to connect peer: {}", e))?;
         
-        println!("👤 User {} joined stream {}", user_id, stream_id.to_string());
+        // Update stats
+        {
+            let mut stats = self.streaming_stats.write().await;
+            stats.total_viewers += 1;
+            stats.last_updated = Utc::now();
+        }
+        
+        println!("👤 User {} joined stream {} at {:?} quality", user_id, stream_id.to_string(), optimal_quality);
         Ok(viewer)
     }
 
@@ -126,8 +222,90 @@ impl VideoStreamingService {
             stream.remove_viewer();
         }
         
+        // Update stats
+        {
+            let mut stats = self.streaming_stats.write().await;
+            stats.total_viewers = stats.total_viewers.saturating_sub(1);
+            stats.last_updated = Utc::now();
+        }
+        
         println!("👤 User {} left stream {}", user_id, stream_id.to_string());
         Ok(())
+    }
+
+    /// Get video chunk for streaming
+    pub async fn get_video_chunk(
+        &self,
+        stream_id: &VideoStreamId,
+        chunk_index: u32,
+        quality: &VideoQuality,
+        requester_peer_id: &str,
+    ) -> Result<Option<VideoChunk>, String> {
+        // Get stream
+        let stream = self.get_stream(stream_id).await
+            .ok_or("Stream not found")?;
+        
+        // Check cache first
+        let chunk_id = VideoChunkId::new();
+        if let Some(chunk) = self.chunk_cache.read().await.get(&chunk_id) {
+            return Ok(Some(chunk.clone()));
+        }
+        
+        // Get chunk from IPFS storage
+        match self.video_storage.get_video_chunk(&stream.video_id, chunk_index, quality).await {
+            Ok(chunk) => {
+                // Cache the chunk
+                self.chunk_cache.write().await.insert(chunk_id, chunk.clone());
+                
+                // Update stats
+                {
+                    let mut stats = self.streaming_stats.write().await;
+                    stats.total_data_transferred += chunk.size;
+                    stats.last_updated = Utc::now();
+                }
+                
+                Ok(Some(chunk))
+            }
+            Err(_) => {
+                // Try to get from peers via WebRTC
+                self.request_chunk_from_peers(stream_id, chunk_index, quality, requester_peer_id).await
+            }
+        }
+    }
+
+    /// Request chunk from P2P peers
+    async fn request_chunk_from_peers(
+        &self,
+        stream_id: &VideoStreamId,
+        chunk_index: u32,
+        quality: &VideoQuality,
+        requester_peer_id: &str,
+    ) -> Result<Option<VideoChunk>, String> {
+        let viewers = self.active_viewers.read().await;
+        if let Some(stream_viewers) = viewers.get(stream_id) {
+            for viewer in stream_viewers {
+                if viewer.peer_id != requester_peer_id {
+                    // Send chunk request via WebRTC
+                    let request = serde_json::json!({
+                        "type": "chunk_request",
+                        "stream_id": stream_id.to_string(),
+                        "chunk_index": chunk_index,
+                        "quality": format!("{:?}", quality),
+                        "requester": requester_peer_id,
+                    });
+                    
+                    let request_data = serde_json::to_vec(&request)
+                        .map_err(|e| format!("Failed to serialize request: {}", e))?;
+                    
+                    if let Ok(_) = self.webrtc_engine.send_data(&viewer.peer_id, request_data).await {
+                        // Chunk will be sent asynchronously
+                        return Ok(None);
+                    }
+                }
+            }
+        }
+        
+        Ok(None)
     }
 
     /// Send video chunk to viewer
@@ -147,43 +325,14 @@ impl VideoStreamingService {
         self.webrtc_engine.send_data(target_peer_id, chunk_data).await
             .map_err(|e| format!("Failed to send chunk: {}", e))?;
         
+        // Update stats
+        {
+            let mut stats = self.streaming_stats.write().await;
+            stats.total_data_transferred += chunk.size;
+            stats.last_updated = Utc::now();
+        }
+        
         Ok(())
-    }
-
-    /// Get video chunk from cache or peers
-    pub async fn get_chunk(
-        &self,
-        stream_id: &VideoStreamId,
-        chunk_id: &VideoChunkId,
-        requester_peer_id: &str,
-    ) -> Result<Option<VideoChunk>, String> {
-        // Check cache first
-        if let Some(chunk) = self.chunk_cache.read().await.get(chunk_id) {
-            return Ok(Some(chunk.clone()));
-        }
-        
-        // Request from peers
-        let request = serde_json::json!({
-            "type": "chunk_request",
-            "stream_id": stream_id.to_string(),
-            "chunk_id": chunk_id.0.to_string(),
-            "requester": requester_peer_id,
-        });
-        
-        let request_data = serde_json::to_vec(&request)
-            .map_err(|e| format!("Failed to serialize request: {}", e))?;
-        
-        // Broadcast request to all peers
-        let viewers = self.active_viewers.read().await;
-        if let Some(stream_viewers) = viewers.get(stream_id) {
-            for viewer in stream_viewers {
-                if viewer.peer_id != requester_peer_id {
-                    let _ = self.webrtc_engine.send_data(&viewer.peer_id, request_data.clone()).await;
-                }
-            }
-        }
-        
-        Ok(None) // Chunk will be sent asynchronously
     }
 
     /// Update viewer connection quality
@@ -191,133 +340,72 @@ impl VideoStreamingService {
         &self,
         stream_id: &VideoStreamId,
         user_id: Uuid,
-        connection_quality: ConnectionQuality,
+        new_quality: VideoQuality,
     ) -> Result<(), String> {
         let mut viewers = self.active_viewers.write().await;
         if let Some(stream_viewers) = viewers.get_mut(stream_id) {
             if let Some(viewer) = stream_viewers.iter_mut().find(|v| v.user_id == user_id) {
-                viewer.connection_quality = connection_quality;
+                viewer.quality = new_quality;
                 viewer.last_seen = Utc::now();
-                
-                // Update quality based on bandwidth
-                let stream = self.get_stream(stream_id).await
-                    .ok_or("Stream not found")?;
-                viewer.quality = stream.get_optimal_quality(connection_quality.bandwidth_mbps);
+                return Ok(());
             }
         }
         
-        Ok(())
+        Err("Viewer not found".to_string())
     }
 
-    /// Get stream statistics
-    pub async fn get_stream_stats(&self, stream_id: &VideoStreamId) -> Result<StreamStats, String> {
+    /// Get streaming statistics
+    pub async fn get_streaming_stats(&self) -> StreamingStats {
+        self.streaming_stats.read().await.clone()
+    }
+
+    /// Get available qualities for a stream
+    pub async fn get_available_qualities(&self, stream_id: &VideoStreamId) -> Result<Vec<VideoQuality>, String> {
         let stream = self.get_stream(stream_id).await
             .ok_or("Stream not found")?;
         
-        let viewers = self.active_viewers.read().await;
-        let stream_viewers = viewers.get(stream_id).unwrap_or(&Vec::new());
-        
-        let quality_distribution = stream_viewers.iter()
-            .fold(std::collections::HashMap::new(), |mut acc, viewer| {
-                *acc.entry(viewer.quality.clone()).or_insert(0) += 1;
-                acc
-            });
-        
-        let avg_latency = stream_viewers.iter()
-            .map(|v| v.connection_quality.latency_ms as f32)
-            .sum::<f32>() / stream_viewers.len().max(1) as f32;
-        
-        let avg_bandwidth = stream_viewers.iter()
-            .map(|v| v.connection_quality.bandwidth_mbps)
-            .sum::<f32>() / stream_viewers.len().max(1) as f32;
-        
-        Ok(StreamStats {
-            stream_id: stream_id.clone(),
-            total_viewers: stream_viewers.len() as u32,
-            quality_distribution,
-            average_latency_ms: avg_latency as u32,
-            average_bandwidth_mbps: avg_bandwidth,
-            stream_duration: stream.duration_seconds,
-            is_live: stream.is_live,
-            status: stream.status.clone(),
-        })
+        self.video_storage.get_available_qualities(&stream.video_id).await
+            .map_err(|e| format!("Failed to get available qualities: {}", e))
     }
 
-    /// Get active stream
-    async fn get_stream(&self, stream_id: &VideoStreamId) -> Option<VideoStream> {
-        self.active_streams.read().await.get(stream_id).cloned()
+    /// Transcode video to new quality
+    pub async fn transcode_video(&self, stream_id: &VideoStreamId, target_quality: VideoQuality) -> Result<Uuid, String> {
+        let stream = self.get_stream(stream_id).await
+            .ok_or("Stream not found")?;
+        
+        self.video_storage.transcode_video(&stream.video_id, target_quality).await
+            .map_err(|e| format!("Failed to transcode video: {}", e))
     }
 
-    /// Clean up expired chunks
-    pub async fn cleanup_expired_chunks(&self) {
-        let mut cache = self.chunk_cache.write().await;
-        let now = Utc::now();
-        let expiration_threshold = chrono::Duration::minutes(10);
+    /// Select optimal quality based on connection
+    fn select_optimal_quality(&self, available_qualities: &[VideoQuality], connection: &ConnectionQuality) -> VideoQuality {
+        let bandwidth_mbps = connection.bandwidth_mbps;
         
-        cache.retain(|_, chunk| {
-            now.signed_duration_since(chunk.created_at) < expiration_threshold
+        // Sort qualities by bandwidth requirement (highest first)
+        let mut sorted_qualities = available_qualities.to_vec();
+        sorted_qualities.sort_by(|a, b| {
+            b.minimum_bandwidth().partial_cmp(&a.minimum_bandwidth()).unwrap()
         });
-    }
-
-    /// Stop stream and cleanup
-    pub async fn stop_stream(&self, stream_id: &VideoStreamId) -> Result<(), String> {
-        // Update stream status
-        if let Some(mut stream) = self.active_streams.write().await.get_mut(stream_id) {
-            stream.stop_streaming();
+        
+        // Find the highest quality that fits the bandwidth
+        for quality in sorted_qualities {
+            if quality.minimum_bandwidth() <= bandwidth_mbps {
+                return quality;
+            }
         }
         
-        // Remove from active streams
-        self.active_streams.write().await.remove(stream_id);
-        
-        // Clear viewers
-        self.active_viewers.write().await.remove(stream_id);
-        
-        // Clean up chunks
-        let mut cache = self.chunk_cache.write().await;
-        cache.retain(|_, chunk| chunk.stream_id != *stream_id);
-        
-        println!("🛑 Stopped video stream: {}", stream_id.to_string());
-        Ok(())
+        // Fallback to lowest quality
+        available_qualities.first().cloned().unwrap_or(VideoQuality::Low)
     }
 }
 
-/// Stream statistics
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct StreamStats {
-    pub stream_id: VideoStreamId,
-    pub total_viewers: u32,
-    pub quality_distribution: std::collections::HashMap<VideoQuality, u32>,
-    pub average_latency_ms: u32,
-    pub average_bandwidth_mbps: f32,
-    pub stream_duration: u32,
-    pub is_live: bool,
-    pub status: crate::bounded_contexts::p2p::domain::entities::video_stream::VideoStreamStatus,
-}
-
-/// Video streaming configuration
+/// Stream configuration
 #[derive(Debug, Clone)]
-pub struct VideoStreamingConfig {
-    pub max_streams: u32,
-    pub max_viewers_per_stream: u32,
-    pub chunk_cache_size: usize,
-    pub chunk_expiration_minutes: u64,
-    pub enable_adaptive_quality: bool,
-    pub enable_peer_discovery: bool,
-    pub buffer_target_seconds: u32,
-    pub max_latency_ms: u32,
-}
-
-impl Default for VideoStreamingConfig {
-    fn default() -> Self {
-        Self {
-            max_streams: 100,
-            max_viewers_per_stream: 1000,
-            chunk_cache_size: 10000,
-            chunk_expiration_minutes: 10,
-            enable_adaptive_quality: true,
-            enable_peer_discovery: true,
-            buffer_target_seconds: 10,
-            max_latency_ms: 200,
-        }
-    }
+pub struct StreamConfig {
+    pub stream_type: String,
+    pub quality: VideoQuality,
+    pub format: String,
+    pub bitrate: u32,
+    pub resolution: String,
+    pub fps: u32,
 } 

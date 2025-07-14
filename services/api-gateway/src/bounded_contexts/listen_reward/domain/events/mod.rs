@@ -497,3 +497,5 @@ impl DomainEvent for RewardPoolDepleted {
         serde_json::to_value(self).unwrap_or(serde_json::Value::Null)
     }
 } 
+
+ 

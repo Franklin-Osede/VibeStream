@@ -21,7 +21,6 @@ use crate::bounded_contexts::{
     
     // Campaign Context - Updated to use new routes
     campaign::presentation::routes::create_campaign_routes,
-    campaign::infrastructure::event_publisher::InMemoryEventPublisher,
     
     // Listen Reward Context
     listen_reward::presentation::controllers::{
@@ -31,6 +30,7 @@ use crate::bounded_contexts::{
     listen_reward::infrastructure::repositories::{
         PostgresListenSessionRepository, PostgresRewardAnalyticsRepository, PostgresRewardDistributionRepository,
     },
+    listen_reward::infrastructure::event_publishers::InMemoryEventPublisher,
     
     // Fractional Ownership Context
     fractional_ownership::presentation::controllers::{
@@ -60,7 +60,7 @@ pub async fn create_complete_router(db_pool: PgPool) -> Result<Router, Box<dyn s
     
     // User Context Repositories & Services
     let user_repository = Arc::new(PostgresUserRepository::new(pool.clone()));
-    let user_service = Arc::new(UserApplicationService::new(user_repository));
+    let user_service = Arc::new(UserApplicationService::new(user_repository.clone()));
     
     // Music Context Repositories
     let song_repository = Arc::new(PostgresSongRepository::new((*pool).clone()));

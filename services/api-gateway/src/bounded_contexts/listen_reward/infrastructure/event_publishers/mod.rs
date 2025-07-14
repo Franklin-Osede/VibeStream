@@ -20,9 +20,11 @@ mod postgres_event_publisher;
 mod redis_stream_event_publisher;
 mod event_publisher_trait;
 mod event_processor;
+mod in_memory_event_publisher;
 
 pub use postgres_event_publisher::PostgresEventPublisher;
 pub use redis_stream_event_publisher::RedisStreamEventPublisher;
+pub use in_memory_event_publisher::InMemoryEventPublisher;
 
 /// Resultado de la publicación de un evento
 #[derive(Debug, Clone)]

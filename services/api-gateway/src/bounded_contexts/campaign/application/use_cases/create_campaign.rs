@@ -3,7 +3,8 @@
 
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
-use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
+use uuid::Uuid;
+use crate::bounded_contexts::music::domain::value_objects;
 use crate::bounded_contexts::campaign::domain::aggregates::CampaignAggregate;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -59,10 +60,10 @@ impl CreateCampaignUseCase {
         self.validate_command(&command)?;
 
         // Parse UUIDs
-        let song_id = SongId::from_string(&command.song_id)
+        let song_id = value_objects::SongId::from_string(&command.song_id)
             .map_err(|e| format!("Invalid song ID: {}", e))?;
         
-        let artist_id = ArtistId::from_string(&command.artist_id)
+        let artist_id = value_objects::ArtistId::from_string(&command.artist_id)
             .map_err(|e| format!("Invalid artist ID: {}", e))?;
 
         // Business rules validation

@@ -2,4 +2,6 @@
 
 pub mod events;
 pub mod errors;
-pub mod repositories; 
+pub mod repositories;
+
+pub use events::{DomainEvent, EventMetadata}; 

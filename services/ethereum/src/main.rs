@@ -7,7 +7,6 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
-use tower_http::cors::CorsLayer;
 use vibestream_types::*;
 use tokio::net::TcpListener;
 
@@ -33,8 +32,7 @@ async fn main() -> Result<()> {
         .route("/transfer", post(transfer))
         .route("/token/:address/info", get(get_token_info))
         .route("/token/:address/balance/:owner", get(get_token_balance))
-        .route("/token/:address/transfer", post(transfer_token))
-        .layer(CorsLayer::permissive());
+        .route("/token/:address/transfer", post(transfer_token));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3001));
     println!("Ethereum service listening on {}", addr);
