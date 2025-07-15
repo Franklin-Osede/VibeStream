@@ -742,6 +742,6 @@ mod tests {
         assert!(!FileFormat::Mp3.is_lossless());
         assert!(FileFormat::Flac.is_lossless());
     }
-}
+} 
 
 // All value objects are already available directly in this module 

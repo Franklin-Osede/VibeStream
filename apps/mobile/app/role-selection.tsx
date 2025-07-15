@@ -23,18 +23,11 @@ export default function RoleSelectionScreen({ navigation, route }: any) {
       // Aquí podrías actualizar el rol del usuario en la base de datos
       // await userRepository.updateRole(user.id, role);
       
-      // Navegar a la pantalla correspondiente
-      if (role === 'artist') {
-        navigation.navigate('ArtistDashboard', { 
-          user: user,
-          token: token
-        });
-      } else {
-        navigation.navigate('FanDashboard', { 
-          user: user,
-          token: token
-        });
-      }
+      // Navegar a la aplicación principal con pestañas
+      navigation.navigate('MainApp', { 
+        user: user,
+        token: token
+      });
     } catch (error) {
       Alert.alert('Error', 'No se pudo establecer tu rol. Inténtalo de nuevo.');
     } finally {

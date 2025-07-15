@@ -8,6 +8,8 @@ import RoleSelectionScreen from '../../app/role-selection';
 import ArtistDashboardScreen from '../presentation/screens/ArtistDashboardScreen';
 import FanDashboardScreen from '../presentation/screens/FanDashboardScreen';
 import MusicExploreScreen from '../presentation/screens/MusicExploreScreen';
+import TabNavigator from './TabNavigator';
+import { UserProvider } from '../contexts/UserContext';
 
 // Tipos para TypeScript
 export type RootStackParamList = {
@@ -16,41 +18,48 @@ export type RootStackParamList = {
   ArtistDashboard: { user: any; token: string };
   FanDashboard: { user: any; token: string };
   MusicExplore: { user: any; token: string };
+  MainApp: { user: any; token: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function AppNavigator() {
   return (
-    <NavigationContainer>
-      <Stack.Navigator 
-        initialRouteName="Login"
-        screenOptions={{
-          headerShown: false, // Sin headers por defecto
-          animation: 'slide_from_right', // Animación suave
-        }}
-      >
-        <Stack.Screen 
-          name="Login" 
-          component={LoginScreen} 
-        />
-        <Stack.Screen 
-          name="RoleSelection" 
-          component={RoleSelectionScreen} 
-        />
-        <Stack.Screen 
-          name="ArtistDashboard" 
-          component={ArtistDashboardScreen} 
-        />
-        <Stack.Screen 
-          name="FanDashboard" 
-          component={FanDashboardScreen} 
-        />
-        <Stack.Screen 
-          name="MusicExplore" 
-          component={MusicExploreScreen} 
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <UserProvider>
+      <NavigationContainer>
+        <Stack.Navigator 
+          initialRouteName="Login"
+          screenOptions={{
+            headerShown: false, // Sin headers por defecto
+            animation: 'slide_from_right', // Animación suave
+          }}
+        >
+          <Stack.Screen 
+            name="Login" 
+            component={LoginScreen} 
+          />
+          <Stack.Screen 
+            name="RoleSelection" 
+            component={RoleSelectionScreen} 
+          />
+          <Stack.Screen 
+            name="MainApp" 
+            component={TabNavigator} 
+          />
+          <Stack.Screen 
+            name="ArtistDashboard" 
+            component={ArtistDashboardScreen} 
+          />
+          <Stack.Screen 
+            name="FanDashboard" 
+            component={FanDashboardScreen} 
+          />
+          <Stack.Screen 
+            name="MusicExplore" 
+            component={MusicExploreScreen} 
+          />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </UserProvider>
   );
 } 

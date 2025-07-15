@@ -1,100 +1,244 @@
-export interface SongProps {
-  id: string;
+// Domain Entity: Song
+// Siguiendo principios DDD - Rich Domain Model
+
+export interface SongId {
+  value: string;
+}
+
+export interface ArtistId {
+  value: string;
+}
+
+export interface BlockchainData {
+  tokenId?: string;
+  contractAddress?: string;
+  royalties: number;
+  fractionalOwnership: boolean;
+  
+  isValid(): boolean;
+  canBeTraded(): boolean;
+  getRoyaltyAmount(price: number): number;
+}
+
+export interface SongMetadata {
   title: string;
-  artistId: string;
-  artistName: string;
-  duration: number; // in seconds
+  artist: string;
+  artistId: ArtistId;
+  duration: number;
   genre: string;
-  ipfsHash?: string;
-  nftContractAddress?: string;
-  nftTokenId?: string;
-  royaltyPercentage: number;
-  price: number; // in ETH
-  isMinted: boolean;
-  createdAt: Date;
+  mood: string;
+  releaseDate: string;
+  
+  isValid(): boolean;
+  getDurationInMinutes(): number;
+  getFormattedDuration(): string;
+}
+
+export interface SongStats {
+  plays: number;
+  likes: number;
+  reposts: number;
+  
+  incrementPlays(): void;
+  incrementLikes(): void;
+  decrementLikes(): void;
+  incrementReposts(): void;
+  decrementReposts(): void;
+  getEngagementRate(): number;
+}
+
+export interface SongState {
+  isLiked: boolean;
+  isReposted: boolean;
+  isDownloaded: boolean;
+  
+  toggleLike(): void;
+  toggleRepost(): void;
+  toggleDownload(): void;
 }
 
 export class Song {
-  private constructor(private props: SongProps) {}
+  private readonly _id: SongId;
+  private _metadata: SongMetadata;
+  private _stats: SongStats;
+  private _state: SongState;
+  private _blockchainData?: BlockchainData;
+  private _imageUrl: string;
+  private _audioUrl: string;
 
-  static create(props: SongProps): Song {
-    // Domain validations
-    if (props.title.length < 1) {
-      throw new Error('Song title cannot be empty');
+  constructor(
+    id: SongId,
+    metadata: SongMetadata,
+    stats: SongStats,
+    state: SongState,
+    imageUrl: string,
+    audioUrl: string,
+    blockchainData?: BlockchainData
+  ) {
+    this._id = id;
+    this._metadata = metadata;
+    this._stats = stats;
+    this._state = state;
+    this._imageUrl = imageUrl;
+    this._audioUrl = audioUrl;
+    this._blockchainData = blockchainData;
+  }
+
+  // Identity
+  get id(): SongId {
+    return this._id;
+  }
+
+  // Metadata
+  get metadata(): SongMetadata {
+    return this._metadata;
+  }
+
+  // Stats
+  get stats(): SongStats {
+    return this._stats;
+  }
+
+  // State
+  get state(): SongState {
+    return this._state;
+  }
+
+  // URLs
+  get imageUrl(): string {
+    return this._imageUrl;
+  }
+
+  get audioUrl(): string {
+    return this._audioUrl;
+  }
+
+  // Blockchain
+  get blockchainData(): BlockchainData | undefined {
+    return this._blockchainData;
+  }
+
+  // Business Logic
+  play(): void {
+    this._stats.incrementPlays();
+  }
+
+  like(): void {
+    if (!this._state.isLiked) {
+      this._stats.incrementLikes();
+      this._state.toggleLike();
     }
+  }
 
-    if (props.duration <= 0) {
-      throw new Error('Song duration must be positive');
+  unlike(): void {
+    if (this._state.isLiked) {
+      this._stats.decrementLikes();
+      this._state.toggleLike();
     }
+  }
 
-    if (props.royaltyPercentage < 0 || props.royaltyPercentage > 100) {
-      throw new Error('Royalty percentage must be between 0 and 100');
+  repost(): void {
+    if (!this._state.isReposted) {
+      this._stats.incrementReposts();
+      this._state.toggleRepost();
     }
+  }
 
-    if (props.price < 0) {
-      throw new Error('Price cannot be negative');
+  unRepost(): void {
+    if (this._state.isReposted) {
+      this._stats.decrementReposts();
+      this._state.toggleRepost();
     }
-
-    return new Song(props);
   }
 
-  // Getters
-  get id(): string { return this.props.id; }
-  get title(): string { return this.props.title; }
-  get artistId(): string { return this.props.artistId; }
-  get artistName(): string { return this.props.artistName; }
-  get duration(): number { return this.props.duration; }
-  get genre(): string { return this.props.genre; }
-  get ipfsHash(): string | undefined { return this.props.ipfsHash; }
-  get nftContractAddress(): string | undefined { return this.props.nftContractAddress; }
-  get nftTokenId(): string | undefined { return this.props.nftTokenId; }
-  get royaltyPercentage(): number { return this.props.royaltyPercentage; }
-  get price(): number { return this.props.price; }
-  get isMinted(): boolean { return this.props.isMinted; }
-  get createdAt(): Date { return this.props.createdAt; }
-
-  // Domain methods
-  isAvailableForPurchase(): boolean {
-    return this.props.price > 0 && !this.props.isMinted;
+  download(): void {
+    this._state.toggleDownload();
   }
 
-  canBeMinted(): boolean {
-    return !!this.props.ipfsHash && !this.props.isMinted;
+  // Blockchain Logic
+  canBeTraded(): boolean {
+    return this._blockchainData?.canBeTraded() ?? false;
   }
 
-  calculateArtistRoyalty(purchaseAmount: number): number {
-    return (purchaseAmount * this.props.royaltyPercentage) / 100;
+  hasFractionalOwnership(): boolean {
+    return this._blockchainData?.fractionalOwnership ?? false;
   }
 
-  calculatePlatformFee(purchaseAmount: number): number {
-    const royalty = this.calculateArtistRoyalty(purchaseAmount);
-    return purchaseAmount - royalty;
+  getRoyaltyAmount(price: number): number {
+    return this._blockchainData?.getRoyaltyAmount(price) ?? 0;
   }
 
-  formatDuration(): string {
-    const minutes = Math.floor(this.props.duration / 60);
-    const seconds = this.props.duration % 60;
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  // Validation
+  isValid(): boolean {
+    return (
+      this._id.value.length > 0 &&
+      this._metadata.isValid() &&
+      this._stats.plays >= 0 &&
+      this._stats.likes >= 0 &&
+      this._stats.reposts >= 0 &&
+      this._imageUrl.length > 0 &&
+      this._audioUrl.length > 0
+    );
   }
 
-  mint(contractAddress: string, tokenId: string): Song {
-    if (this.props.isMinted) {
-      throw new Error('Song is already minted');
-    }
+  // Factory Method
+  static create(
+    id: string,
+    title: string,
+    artist: string,
+    artistId: string,
+    duration: number,
+    genre: string,
+    mood: string,
+    imageUrl: string,
+    audioUrl: string,
+    blockchainData?: BlockchainData
+  ): Song {
+    const songId: SongId = { value: id };
+    const artistIdObj: ArtistId = { value: artistId };
+    
+    const metadata: SongMetadata = {
+      title,
+      artist,
+      artistId: artistIdObj,
+      duration,
+      genre,
+      mood,
+      releaseDate: new Date().toISOString(),
+      isValid: function() { 
+        return this.title.length > 0 && this.artist.length > 0 && this.duration > 0; 
+      },
+      getDurationInMinutes: function() { return this.duration / 60; },
+      getFormattedDuration: function() {
+        const mins = Math.floor(this.duration / 60);
+        const secs = this.duration % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+      }
+    };
 
-    if (!this.props.ipfsHash) {
-      throw new Error('Cannot mint song without IPFS hash');
-    }
+    const stats: SongStats = {
+      plays: 0,
+      likes: 0,
+      reposts: 0,
+      incrementPlays: function() { this.plays++; },
+      incrementLikes: function() { this.likes++; },
+      decrementLikes: function() { this.likes = Math.max(0, this.likes - 1); },
+      incrementReposts: function() { this.reposts++; },
+      decrementReposts: function() { this.reposts = Math.max(0, this.reposts - 1); },
+      getEngagementRate: function() {
+        return this.plays > 0 ? ((this.likes + this.reposts) / this.plays) * 100 : 0;
+      }
+    };
 
-    return new Song({
-      ...this.props,
-      nftContractAddress: contractAddress,
-      nftTokenId: tokenId,
-      isMinted: true
-    });
-  }
+    const state: SongState = {
+      isLiked: false,
+      isReposted: false,
+      isDownloaded: false,
+      toggleLike: function() { this.isLiked = !this.isLiked; },
+      toggleRepost: function() { this.isReposted = !this.isReposted; },
+      toggleDownload: function() { this.isDownloaded = !this.isDownloaded; }
+    };
 
-  toJSON(): SongProps {
-    return { ...this.props };
+    return new Song(songId, metadata, stats, state, imageUrl, audioUrl, blockchainData);
   }
 } 

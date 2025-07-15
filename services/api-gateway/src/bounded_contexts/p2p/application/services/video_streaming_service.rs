@@ -64,7 +64,7 @@ impl VideoStreamingService {
             streaming_stats: Arc::new(RwLock::new(StreamingStats::default())),
         }
     }
-    
+
     pub async fn new_async(
         webrtc_engine: Arc<WebRTCEngine>,
         stream_repository: Arc<dyn VideoStreamRepository>,
