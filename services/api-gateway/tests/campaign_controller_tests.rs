@@ -892,7 +892,7 @@ async fn test_concurrent_campaign_participation() {
     
     // Simulate concurrent participation from multiple users
     for i in 0..3 {
-        let client = &client;
+        let client = client.clone();
         let campaign_id = test_campaign.id;
         let user_id = if i == 0 { test_data.get_fan().id } else { test_data.get_artist().id };
         

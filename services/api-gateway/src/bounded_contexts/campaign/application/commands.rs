@@ -90,12 +90,26 @@ mod tests {
     impl CampaignRepository for InMemoryRepo {
         async fn find_by_id(&self, id: Uuid) -> RepoResult<Option<Campaign>> {
             let data = self.data.lock().unwrap();
-            Ok(data.iter().cloned().find(|c| c.id == id))
+            Ok(data.iter().cloned().find(|c| c.id() == id))
         }
 
         async fn save(&self, campaign: &Campaign) -> RepoResult<()> {
             let mut data = self.data.lock().unwrap();
             data.push(campaign.clone());
+            Ok(())
+        }
+
+        async fn find_by_artist_id(&self, _artist_id: Uuid) -> RepoResult<Vec<Campaign>> {
+            let data = self.data.lock().unwrap();
+            Ok(data.clone())
+        }
+
+        async fn find_active_campaigns(&self) -> RepoResult<Vec<Campaign>> {
+            let data = self.data.lock().unwrap();
+            Ok(data.clone())
+        }
+
+        async fn delete(&self, _id: Uuid) -> RepoResult<()> {
             Ok(())
         }
     }

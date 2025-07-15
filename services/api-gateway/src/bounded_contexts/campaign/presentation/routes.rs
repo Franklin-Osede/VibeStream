@@ -46,7 +46,7 @@ mod tests {
     use super::*;
     use axum::http::StatusCode;
     use serde_json::json;
-    use tower::ServiceExt;
+    use axum::ServiceExt;
 
     #[tokio::test]
     async fn test_campaign_routes_creation() {

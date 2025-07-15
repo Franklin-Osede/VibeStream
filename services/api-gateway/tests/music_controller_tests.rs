@@ -442,7 +442,7 @@ async fn test_concurrent_requests() {
     
     // Spawn 5 concurrent requests
     for _ in 0..5 {
-        let client = &client;
+        let client = client.clone();
         let handle = tokio::spawn(async move {
             client.get("/api/v1/songs/trending").await
         });

@@ -730,7 +730,7 @@ async fn test_bulk_user_operations() {
     let mut handles = vec![];
     
     for i in 0..5 {
-        let client = &client;
+        let client = client.clone();
         let handle = tokio::spawn(async move {
             let user_data = json!({
                 "email": format!("bulkuser{}@test.com", i),
@@ -764,7 +764,7 @@ async fn test_concurrent_user_searches() {
     
     // Spawn multiple concurrent search requests
     for i in 0..3 {
-        let client = &client;
+        let client = client.clone();
         let handle = tokio::spawn(async move {
             client.get(&format!("/api/v1/users?limit=10&offset={}", i * 10)).await
         });

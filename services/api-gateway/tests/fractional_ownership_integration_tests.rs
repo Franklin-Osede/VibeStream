@@ -220,7 +220,7 @@ mod integration_tests {
             .await
             .unwrap();
         
-        assert_eq!(db_trade.trade_price, 1600.0.into());
+        assert_eq!(db_trade.trade_price, bigdecimal::BigDecimal::from(1600));
         assert_eq!(db_trade.from_user_id, fan1_id);
         assert_eq!(db_trade.to_user_id, fan2_id);
 
@@ -249,7 +249,7 @@ mod integration_tests {
             .await
             .unwrap();
         
-        assert_eq!(db_distribution.total_revenue, 1000.0.into());
+        assert_eq!(db_distribution.total_revenue, bigdecimal::BigDecimal::from(1000));
 
         // 9. CONTRACT ANALYTICS
         println!("=== Testing Contract Analytics ===");
@@ -257,9 +257,9 @@ mod integration_tests {
         let analytics_query = GetContractAnalytics { contract_id };
         let analytics = app_service.get_contract_analytics(analytics_query).await.unwrap();
 
-        assert_eq!(analytics.analytics.total_shares, 1000);
-        assert_eq!(analytics.analytics.shares_sold, 250);
-        assert_eq!(analytics.analytics.unique_shareholders, 2);
+        assert_eq!(analytics.analytics.total_investment_value, bigdecimal::BigDecimal::from(2500));
+        assert_eq!(analytics.analytics.completion_percentage, 25.0);
+        assert_eq!(analytics.analytics.number_of_shareholders, 2);
         assert_eq!(analytics.shareholder_breakdown.len(), 2);
 
         // 10. CONTRACT TERMINATION
@@ -431,7 +431,7 @@ mod integration_tests {
         let results: Vec<_> = futures::future::join_all(purchase_tasks).await;
 
         // Check results - some should succeed, some might fail due to insufficient shares
-        let successful_purchases = results.iter().filter(|r| r.as_ref().unwrap().is_ok()).count();
+        let successful_purchases = results.iter().filter(|r: &&Result<_, _>| r.as_ref().unwrap().is_ok()).count();
         assert!(successful_purchases > 0);
 
         // Verify database consistency
@@ -447,7 +447,7 @@ mod integration_tests {
             .unwrap();
 
         // Database should be consistent
-        assert_eq!(total_shares_sold, individual_shares.total.unwrap_or(0.0) as i32);
+        assert_eq!(total_shares_sold, individual_shares.total.unwrap_or(bigdecimal::BigDecimal::from(0)).to_string().parse::<i32>().unwrap_or(0));
 
         println!("Concurrent operations test passed!");
         cleanup_test_data(&pool).await;
