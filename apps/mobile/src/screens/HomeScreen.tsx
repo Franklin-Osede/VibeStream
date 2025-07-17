@@ -15,156 +15,199 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width, height } = Dimensions.get('window');
 
-// Mock data - después conectaremos con el backend
+// Mock data mejorado basado en Audius
 const mockFeedData = [
   {
     id: '1',
     title: 'U Should Know (danse)',
     artist: 'molly mcphaul',
+    artistVerified: true,
     duration: '3:15',
     plays: '46',
     reposts: 25,
     likes: 32,
     comments: 9,
     imageUrl: 'https://via.placeholder.com/80',
-    isVerified: true,
+    isLiked: false,
+    isReposted: false,
   },
   {
     id: '2',
     title: 'mellodaze - in retrospect',
     artist: 'Arden Records',
+    artistVerified: false,
     duration: '1:20',
     plays: '6.87K',
     reposts: 48,
     likes: 78,
     comments: 12,
     imageUrl: 'https://via.placeholder.com/80',
-    isVerified: true,
+    isLiked: false,
+    isReposted: false,
   },
   {
     id: '3',
     title: 'hi july - instrumental',
     artist: 'molly mcphaul',
+    artistVerified: true,
     duration: '1:52',
     plays: '6.88K',
     reposts: 88,
     likes: 154,
     comments: 28,
     imageUrl: 'https://via.placeholder.com/80',
-    isVerified: true,
+    isLiked: false,
+    isReposted: false,
+  },
+  {
+    id: '4',
+    title: 'Karina Rosee & Stevie Rain',
+    artist: 'Karina Rosee',
+    artistVerified: true,
+    duration: '3:21',
+    plays: '3.7K',
+    reposts: 76,
+    likes: 108,
+    comments: 30,
+    imageUrl: 'https://via.placeholder.com/80',
+    isLiked: false,
+    isReposted: false,
   },
 ];
 
-const mockVREvents = [
-  {
-    id: '1',
-    title: 'Live VR Concert',
-    artist: 'Skrillex',
-    date: 'Tonight 8PM',
-    attendees: '1.2K',
-    maxAttendees: '5K',
-    price: '0.1 ETH',
-    imageUrl: 'https://via.placeholder.com/120',
-  },
-  {
-    id: '2',
-    title: 'Virtual Festival',
-    artist: 'Deadmau5',
-    date: 'Tomorrow 9PM',
-    attendees: '856',
-    maxAttendees: '3K',
-    price: '0.05 ETH',
-    imageUrl: 'https://via.placeholder.com/120',
-  },
-];
-
-const mockFeaturedNFTs = [
-  {
-    id: '1',
-    title: 'Exclusive Track NFT',
-    artist: 'Daft Punk',
-    price: '2.5 ETH',
-    rarity: 'Legendary',
-    imageUrl: 'https://via.placeholder.com/100',
-  },
-  {
-    id: '2',
-    title: 'Album Cover NFT',
-    artist: 'The Weeknd',
-    price: '1.8 ETH',
-    rarity: 'Epic',
-    imageUrl: 'https://via.placeholder.com/100',
-  },
-];
-
-const mockTradingHighlights = [
-  {
-    id: '1',
-    songTitle: 'Blinding Lights',
-    artist: 'The Weeknd',
-    priceChange: '+15.2%',
-    volume: '2.4K ETH',
-    isPositive: true,
-  },
-  {
-    id: '2',
-    songTitle: 'Dance Monkey',
-    artist: 'Tones and I',
-    priceChange: '-3.1%',
-    volume: '1.8K ETH',
-    isPositive: false,
-  },
-];
-
-export const HomeScreen = () => {
+export const HomeScreen = ({ navigation }: any) => {
   const [currentSong, setCurrentSong] = useState(mockFeedData[0]);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState('All Posts');
 
-  const handlePlayPause = () => {
+  const handlePlayPause = (song: any) => {
+    setCurrentSong(song);
     setIsPlaying(!isPlaying);
-    // Aquí conectaremos con el backend
+    // Navegar al reproductor
+    navigation.navigate('MusicPlayer', { song, user: { id: '1', name: 'User' } });
   };
 
   const handleLike = (songId: string) => {
-    // Conectar con backend
+    // Actualizar estado local
+    const updatedData = mockFeedData.map(song => 
+      song.id === songId ? { ...song, isLiked: !song.isLiked } : song
+    );
+    // Aquí conectarías con el backend
     console.log('Liked song:', songId);
   };
 
   const handleRepost = (songId: string) => {
-    // Conectar con backend
+    // Actualizar estado local
+    const updatedData = mockFeedData.map(song => 
+      song.id === songId ? { ...song, isReposted: !song.isReposted } : song
+    );
+    // Aquí conectarías con el backend
     console.log('Reposted song:', songId);
   };
 
   const handleShare = (songId: string) => {
-    // Conectar con backend
+    // Aquí conectarías con el backend
     console.log('Shared song:', songId);
   };
 
-  const handleJoinVREvent = (eventId: string) => {
-    // Conectar con VR backend
-    console.log('Joining VR event:', eventId);
-  };
+  const renderFeedItem = (song: any) => (
+    <View key={song.id} style={styles.feedItem}>
+      {/* Song Thumbnail */}
+      <TouchableOpacity 
+        style={styles.thumbnailContainer}
+        onPress={() => handlePlayPause(song)}
+      >
+        <Image source={{ uri: song.imageUrl }} style={styles.thumbnail} />
+        <View style={styles.playOverlay}>
+          <Ionicons name="play" size={20} color="#FFFFFF" />
+        </View>
+      </TouchableOpacity>
 
-  const handleBuyNFT = (nftId: string) => {
-    // Conectar con NFT marketplace
-    console.log('Buying NFT:', nftId);
-  };
+      {/* Song Info */}
+      <View style={styles.songInfo}>
+        <View style={styles.songHeader}>
+          <View style={styles.songTitleContainer}>
+            <Text style={styles.songTitle} numberOfLines={1}>
+              {song.title}
+            </Text>
+            <View style={styles.artistContainer}>
+              <Text style={styles.artistName} numberOfLines={1}>
+                {song.artist}
+              </Text>
+              {song.artistVerified && (
+                <Ionicons name="checkmark-circle" size={16} color="#FFD93D" />
+              )}
+            </View>
+          </View>
+          <Text style={styles.duration}>{song.duration}</Text>
+        </View>
 
-  const handleTrade = (songId: string) => {
-    // Conectar con trading backend
-    console.log('Trading song:', songId);
-  };
+        {/* Interaction Stats */}
+        <View style={styles.interactionStats}>
+          <View style={styles.statItem}>
+            <Ionicons name="repeat" size={14} color="#94A3B8" />
+            <Text style={styles.statText}>{song.reposts}</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Ionicons name="heart" size={14} color="#94A3B8" />
+            <Text style={styles.statText}>{song.likes}</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Ionicons name="chatbubble" size={14} color="#94A3B8" />
+            <Text style={styles.statText}>{song.comments}</Text>
+          </View>
+          <Text style={styles.playsText}>{song.plays} Plays</Text>
+        </View>
+
+        {/* Action Buttons */}
+        <View style={styles.actionButtons}>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => handleRepost(song.id)}
+          >
+            <Ionicons 
+              name="repeat" 
+              size={20} 
+              color={song.isReposted ? "#6C5CE7" : "#94A3B8"} 
+            />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => handleLike(song.id)}
+          >
+            <Ionicons 
+              name={song.isLiked ? "heart" : "heart-outline"} 
+              size={20} 
+              color={song.isLiked ? "#FF6B6B" : "#94A3B8"} 
+            />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => handleShare(song.id)}
+          >
+            <Ionicons name="share-outline" size={20} color="#94A3B8" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.actionButton}>
+            <Ionicons name="ellipsis-horizontal" size={20} color="#94A3B8" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <StatusBar barStyle="light-content" backgroundColor="#0F0F1E" />
       
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Image
-            source={{ uri: 'https://via.placeholder.com/40' }}
-            style={styles.profileImage}
+          <Image 
+            source={{ uri: 'https://via.placeholder.com/40' }} 
+            style={styles.profileImage} 
           />
         </View>
         
@@ -172,216 +215,36 @@ export const HomeScreen = () => {
           <Text style={styles.logo}>VIBESTREAM</Text>
         </View>
         
-        <TouchableOpacity style={styles.headerRight}>
-          <Ionicons name="search" size={24} color="#333" />
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.searchButton}>
+            <Ionicons name="search" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Feed Header */}
+      <View style={styles.feedHeader}>
+        <View style={styles.feedTitleContainer}>
+          <Ionicons name="people" size={20} color="#6C5CE7" />
+          <Text style={styles.feedTitle}>Your Feed</Text>
+        </View>
+        
+        <TouchableOpacity style={styles.filterButton}>
+          <Text style={styles.filterText}>{selectedFilter}</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        
-        {/* Your Feed Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleContainer}>
-              <Ionicons name="people" size={20} color="#667eea" />
-              <Text style={styles.sectionTitle}>Your Feed</Text>
-            </View>
-            <TouchableOpacity style={styles.allPostsButton}>
-              <Text style={styles.allPostsText}>All Posts</Text>
-            </TouchableOpacity>
-          </View>
-
-          {mockFeedData.map((song) => (
-            <View key={song.id} style={styles.songCard}>
-              <View style={styles.songCardHeader}>
-                <Image source={{ uri: song.imageUrl }} style={styles.songImage} />
-                <View style={styles.songInfo}>
-                  <Text style={styles.songTitle} numberOfLines={1}>
-                    {song.title}
-                  </Text>
-                  <View style={styles.artistContainer}>
-                    <Text style={styles.artistName}>{song.artist}</Text>
-                    {song.isVerified && (
-                      <Ionicons name="checkmark-circle" size={16} color="#667eea" />
-                    )}
-                  </View>
-                </View>
-                <Text style={styles.duration}>{song.duration}</Text>
-              </View>
-
-              <View style={styles.songMetrics}>
-                <View style={styles.metricItem}>
-                  <Ionicons name="repeat" size={16} color="#666" />
-                  <Text style={styles.metricText}>{song.reposts}</Text>
-                </View>
-                <View style={styles.metricItem}>
-                  <Ionicons name="heart" size={16} color="#666" />
-                  <Text style={styles.metricText}>{song.likes}</Text>
-                </View>
-                <View style={styles.metricItem}>
-                  <Ionicons name="chatbubble" size={16} color="#666" />
-                  <Text style={styles.metricText}>{song.comments}</Text>
-                </View>
-                <Text style={styles.playsText}>{song.plays} Plays</Text>
-              </View>
-
-              <View style={styles.songActions}>
-                <TouchableOpacity onPress={() => handleRepost(song.id)}>
-                  <Ionicons name="repeat" size={20} color="#666" />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleLike(song.id)}>
-                  <Ionicons name="heart-outline" size={20} color="#666" />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleShare(song.id)}>
-                  <Ionicons name="share-outline" size={20} color="#666" />
-                </TouchableOpacity>
-                <TouchableOpacity>
-                  <Ionicons name="ellipsis-horizontal" size={20} color="#666" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))}
-        </View>
-
-        {/* Live VR Events Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>🎪 Live VR Events</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAllText}>See All</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {mockVREvents.map((event) => (
-              <TouchableOpacity
-                key={event.id}
-                style={styles.vrEventCard}
-                onPress={() => handleJoinVREvent(event.id)}
-              >
-                <LinearGradient
-                  colors={['#667eea', '#764ba2']}
-                  style={styles.vrEventGradient}
-                >
-                  <Image source={{ uri: event.imageUrl }} style={styles.vrEventImage} />
-                  <View style={styles.vrEventInfo}>
-                    <Text style={styles.vrEventTitle}>{event.title}</Text>
-                    <Text style={styles.vrEventArtist}>{event.artist}</Text>
-                    <Text style={styles.vrEventDate}>{event.date}</Text>
-                    <View style={styles.vrEventStats}>
-                      <Text style={styles.vrEventAttendees}>
-                        {event.attendees}/{event.maxAttendees}
-                      </Text>
-                      <Text style={styles.vrEventPrice}>{event.price}</Text>
-                    </View>
-                  </View>
-                </LinearGradient>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Featured NFTs Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>🖼️ Featured NFTs</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAllText}>See All</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {mockFeaturedNFTs.map((nft) => (
-              <TouchableOpacity
-                key={nft.id}
-                style={styles.nftCard}
-                onPress={() => handleBuyNFT(nft.id)}
-              >
-                <Image source={{ uri: nft.imageUrl }} style={styles.nftImage} />
-                <View style={styles.nftInfo}>
-                  <Text style={styles.nftTitle}>{nft.title}</Text>
-                  <Text style={styles.nftArtist}>{nft.artist}</Text>
-                  <View style={styles.nftPriceContainer}>
-                    <Text style={styles.nftPrice}>{nft.price}</Text>
-                    <View style={styles.nftRarityBadge}>
-                      <Text style={styles.nftRarityText}>{nft.rarity}</Text>
-                    </View>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Trading Highlights Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>💰 Trading Highlights</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAllText}>See All</Text>
-            </TouchableOpacity>
-          </View>
-          
-          {mockTradingHighlights.map((trade) => (
-            <TouchableOpacity
-              key={trade.id}
-              style={styles.tradingCard}
-              onPress={() => handleTrade(trade.id)}
-            >
-              <View style={styles.tradingInfo}>
-                <Text style={styles.tradingSongTitle}>{trade.songTitle}</Text>
-                <Text style={styles.tradingArtist}>{trade.artist}</Text>
-              </View>
-              <View style={styles.tradingStats}>
-                <Text style={[
-                  styles.tradingPriceChange,
-                  { color: trade.isPositive ? '#4CAF50' : '#F44336' }
-                ]}>
-                  {trade.priceChange}
-                </Text>
-                <Text style={styles.tradingVolume}>{trade.volume}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Your Analytics Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>📊 Your Analytics</Text>
-          </View>
-          
-          <View style={styles.analyticsGrid}>
-            <View style={styles.analyticsCard}>
-              <Ionicons name="play" size={24} color="#667eea" />
-              <Text style={styles.analyticsValue}>1,247</Text>
-              <Text style={styles.analyticsLabel}>Total Listens</Text>
-            </View>
-            <View style={styles.analyticsCard}>
-              <Ionicons name="trending-up" size={24} color="#4CAF50" />
-              <Text style={styles.analyticsValue}>2.4 ETH</Text>
-              <Text style={styles.analyticsLabel}>Portfolio Value</Text>
-            </View>
-            <View style={styles.analyticsCard}>
-              <Ionicons name="people" size={24} color="#FF9800" />
-              <Text style={styles.analyticsValue}>156</Text>
-              <Text style={styles.analyticsLabel}>Followers</Text>
-            </View>
-            <View style={styles.analyticsCard}>
-              <Ionicons name="trophy" size={24} color="#9C27B0" />
-              <Text style={styles.analyticsValue}>8</Text>
-              <Text style={styles.analyticsLabel}>VR Events</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Bottom spacing for mini player */}
-        <View style={{ height: 80 }} />
+      {/* Feed Content */}
+      <ScrollView style={styles.feedContainer} showsVerticalScrollIndicator={false}>
+        {mockFeedData.map(renderFeedItem)}
       </ScrollView>
 
       {/* Mini Player */}
       {currentSong && (
-        <View style={styles.miniPlayer}>
+        <TouchableOpacity 
+          style={styles.miniPlayer}
+          onPress={() => navigation.navigate('MusicPlayer', { song: currentSong, user: { id: '1', name: 'User' } })}
+        >
           <Image source={{ uri: currentSong.imageUrl }} style={styles.miniPlayerImage} />
           <View style={styles.miniPlayerInfo}>
             <Text style={styles.miniPlayerTitle} numberOfLines={1}>
@@ -391,14 +254,17 @@ export const HomeScreen = () => {
               {currentSong.artist}
             </Text>
           </View>
-          <TouchableOpacity onPress={handlePlayPause} style={styles.miniPlayerButton}>
-            <Ionicons
-              name={isPlaying ? "pause" : "play"}
-              size={24}
-              color="#667eea"
+          <TouchableOpacity 
+            style={styles.miniPlayerButton}
+            onPress={() => setIsPlaying(!isPlaying)}
+          >
+            <Ionicons 
+              name={isPlaying ? "pause" : "play"} 
+              size={24} 
+              color="#FFFFFF" 
             />
           </TouchableOpacity>
-        </View>
+        </TouchableOpacity>
       )}
     </SafeAreaView>
   );
@@ -407,24 +273,25 @@ export const HomeScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 15,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: '#E5E7EB',
   },
   headerLeft: {
     flex: 1,
   },
   profileImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
   headerCenter: {
     flex: 2,
@@ -433,76 +300,92 @@ const styles = StyleSheet.create({
   logo: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#667eea',
+    color: '#6C5CE7',
   },
   headerRight: {
     flex: 1,
     alignItems: 'flex-end',
   },
-  scrollView: {
-    flex: 1,
+  searchButton: {
+    padding: 5,
   },
-  section: {
-    marginBottom: 30,
-  },
-  sectionHeader: {
+  feedHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    marginBottom: 15,
+    paddingVertical: 15,
+    backgroundColor: '#FFFFFF',
   },
-  sectionTitleContainer: {
+  feedTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  sectionTitle: {
-    fontSize: 18,
+  feedTitle: {
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#6C5CE7',
     marginLeft: 8,
   },
-  allPostsButton: {
-    backgroundColor: '#667eea',
-    paddingHorizontal: 15,
+  filterButton: {
+    backgroundColor: '#6C5CE7',
+    paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
   },
-  allPostsText: {
-    color: 'white',
+  filterText: {
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
   },
-  seeAllText: {
-    color: '#667eea',
-    fontSize: 14,
-    fontWeight: '600',
+  feedContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
   },
-  songCard: {
-    backgroundColor: '#f8f9fa',
-    marginHorizontal: 20,
-    marginBottom: 15,
-    borderRadius: 12,
-    padding: 15,
-  },
-  songCardHeader: {
+  feedItem: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    backgroundColor: '#FFFFFF',
   },
-  songImage: {
+  thumbnailContainer: {
+    position: 'relative',
+    marginRight: 15,
+  },
+  thumbnail: {
     width: 60,
     height: 60,
     borderRadius: 8,
-    marginRight: 12,
+  },
+  playOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   songInfo: {
     flex: 1,
   },
+  songHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  songTitleContainer: {
+    flex: 1,
+    marginRight: 10,
+  },
   songTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: '#1F2937',
     marginBottom: 4,
   },
   artistContainer: {
@@ -511,229 +394,71 @@ const styles = StyleSheet.create({
   },
   artistName: {
     fontSize: 14,
-    color: '#666',
-    marginRight: 5,
+    color: '#6B7280',
+    marginRight: 4,
   },
   duration: {
-    fontSize: 14,
-    color: '#999',
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
-  songMetrics: {
+  interactionStats: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
-  metricItem: {
+  statItem: {
     flexDirection: 'row',
     alignItems: 'center',
     marginRight: 15,
   },
-  metricText: {
+  statText: {
     fontSize: 12,
-    color: '#666',
+    color: '#6B7280',
     marginLeft: 4,
   },
   playsText: {
     fontSize: 12,
-    color: '#999',
+    color: '#9CA3AF',
     marginLeft: 'auto',
   },
-  songActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    paddingTop: 10,
-  },
-  vrEventCard: {
-    width: 200,
-    marginLeft: 20,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  vrEventGradient: {
-    padding: 15,
-  },
-  vrEventImage: {
-    width: '100%',
-    height: 100,
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  vrEventInfo: {
-    flex: 1,
-  },
-  vrEventTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 4,
-  },
-  vrEventArtist: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-    marginBottom: 4,
-  },
-  vrEventDate: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.7)',
-    marginBottom: 8,
-  },
-  vrEventStats: {
+  actionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingRight: 20,
   },
-  vrEventAttendees: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
-  },
-  vrEventPrice: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
-    fontWeight: '600',
-  },
-  nftCard: {
-    width: 150,
-    marginLeft: 20,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    padding: 12,
-  },
-  nftImage: {
-    width: '100%',
-    height: 100,
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  nftInfo: {
-    flex: 1,
-  },
-  nftTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-  },
-  nftArtist: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 8,
-  },
-  nftPriceContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  nftPrice: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#667eea',
-  },
-  nftRarityBadge: {
-    backgroundColor: '#FFD700',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  nftRarityText: {
-    fontSize: 10,
-    color: '#333',
-    fontWeight: '600',
-  },
-  tradingCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    marginHorizontal: 20,
-    marginBottom: 10,
-    padding: 15,
-    borderRadius: 12,
-  },
-  tradingInfo: {
-    flex: 1,
-  },
-  tradingSongTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-  },
-  tradingArtist: {
-    fontSize: 14,
-    color: '#666',
-  },
-  tradingStats: {
-    alignItems: 'flex-end',
-  },
-  tradingPriceChange: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  tradingVolume: {
-    fontSize: 12,
-    color: '#666',
-  },
-  analyticsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 20,
-  },
-  analyticsCard: {
-    width: (width - 60) / 2,
-    backgroundColor: '#f8f9fa',
-    padding: 15,
-    marginBottom: 10,
-    marginHorizontal: 5,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  analyticsValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  analyticsLabel: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
+  actionButton: {
+    padding: 8,
   },
   miniPlayer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'white',
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#6C5CE7',
     paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: '#E5E7EB',
   },
   miniPlayerImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 8,
-    marginRight: 15,
+    width: 40,
+    height: 40,
+    borderRadius: 6,
+    marginRight: 12,
   },
   miniPlayerInfo: {
     flex: 1,
   },
   miniPlayerTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
+    color: '#FFFFFF',
+    marginBottom: 2,
   },
   miniPlayerArtist: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 12,
+    color: '#E2E8F0',
   },
   miniPlayerButton: {
-    padding: 10,
+    padding: 8,
   },
 }); 
