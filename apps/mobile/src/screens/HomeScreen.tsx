@@ -205,9 +205,9 @@ export const HomeScreen = ({ navigation }: any) => {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Image 
-            source={{ uri: 'https://via.placeholder.com/40' }} 
-            style={styles.profileImage} 
+          <Image
+            source={{ uri: 'https://via.placeholder.com/40' }}
+            style={styles.profileImage}
           />
         </View>
         
@@ -218,22 +218,22 @@ export const HomeScreen = ({ navigation }: any) => {
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.searchButton}>
             <Ionicons name="search" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
+                </TouchableOpacity>
+              </View>
+          </View>
+          
       {/* Feed Header */}
       <View style={styles.feedHeader}>
         <View style={styles.feedTitleContainer}>
           <Ionicons name="people" size={20} color="#6C5CE7" />
           <Text style={styles.feedTitle}>Your Feed</Text>
         </View>
-        
+
         <TouchableOpacity style={styles.filterButton}>
           <Text style={styles.filterText}>{selectedFilter}</Text>
-        </TouchableOpacity>
-      </View>
-
+            </TouchableOpacity>
+          </View>
+          
       {/* Feed Content */}
       <ScrollView style={styles.feedContainer} showsVerticalScrollIndicator={false}>
         {mockFeedData.map(renderFeedItem)}
@@ -258,9 +258,9 @@ export const HomeScreen = ({ navigation }: any) => {
             style={styles.miniPlayerButton}
             onPress={() => setIsPlaying(!isPlaying)}
           >
-            <Ionicons 
-              name={isPlaying ? "pause" : "play"} 
-              size={24} 
+            <Ionicons
+              name={isPlaying ? "pause" : "play"}
+              size={24}
               color="#FFFFFF" 
             />
           </TouchableOpacity>
