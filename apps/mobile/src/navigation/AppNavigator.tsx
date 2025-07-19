@@ -9,7 +9,7 @@ import ArtistDashboardScreen from '../presentation/screens/ArtistDashboardScreen
 import FanDashboardScreen from '../presentation/screens/FanDashboardScreen';
 import MusicExploreScreen from '../presentation/screens/MusicExploreScreen';
 import TabNavigator from './TabNavigator';
-import { UserProvider } from '../contexts/UserContext';
+// import { UserProvider } from '../contexts/UserContext'; // TEMPORALMENTE COMENTADO
 
 // Tipos para TypeScript
 export type RootStackParamList = {
@@ -25,7 +25,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function AppNavigator() {
   return (
-    <UserProvider>
+    // <UserProvider> // TEMPORALMENTE COMENTADO
       <NavigationContainer>
         <Stack.Navigator 
           initialRouteName="Login"
@@ -60,6 +60,6 @@ export default function AppNavigator() {
           />
         </Stack.Navigator>
       </NavigationContainer>
-    </UserProvider>
+    // </UserProvider> // TEMPORALMENTE COMENTADO
   );
 } 

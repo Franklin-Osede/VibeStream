@@ -1,0 +1,19 @@
+{
+  "ignore_dirs": [
+    "../backend",
+    "../services", 
+    "../contracts",
+    "../circuits",
+    "../docs",
+    "../infra",
+    "../migrations",
+    "../scripts",
+    "../shared",
+    "../target",
+    "../logs",
+    "../dashboard",
+    "../config",
+    "../apps/web",
+    "../node_modules"
+  ]
+} 

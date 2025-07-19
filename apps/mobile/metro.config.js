@@ -1,31 +1,47 @@
 const { getDefaultConfig } = require('expo/metro-config');
+const path = require('path');
 
 const config = getDefaultConfig(__dirname);
 
-// Configuración específica para expo-router
-config.resolver.unstable_enableSymlinks = true;
+// Deshabilitar completamente el watcher
+config.watchFolders = [];
+config.resolver.nodeModulesPaths = [path.resolve(__dirname, 'node_modules')];
 
-// Habilitamos Fast Refresh para mejor experiencia de desarrollo
+// Configuración del servidor sin watch
 config.server = {
-  ...config.server,
-  reloadOnChange: true,
+  port: 8081,
   enhanceMiddleware: (middleware) => {
-    return (req, res, next) => {
-      // Agregamos headers para desarrollo
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      return middleware(req, res, next);
-    };
+    return (middleware);
   },
 };
 
-// Optimizamos la resolución de módulos
+// Resolución de módulos muy restrictiva
 config.resolver = {
   ...config.resolver,
-  unstable_enableSymlinks: true,
+  platforms: ['ios', 'android', 'native'],
   assetExts: [...config.resolver.assetExts, 'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'],
+  // Bloquear TODOS los directorios externos
+  blockList: [
+    /.*\/\.\.\/.*/, // Excluir cualquier directorio padre
+    /.*\/backend\/.*/,
+    /.*\/services\/.*/,
+    /.*\/contracts\/.*/,
+    /.*\/circuits\/.*/,
+    /.*\/docs\/.*/,
+    /.*\/infra\/.*/,
+    /.*\/migrations\/.*/,
+    /.*\/scripts\/.*/,
+    /.*\/shared\/.*/,
+    /.*\/target\/.*/,
+    /.*\/logs\/.*/,
+    /.*\/dashboard\/.*/,
+    /.*\/config\/.*/,
+    /.*\/apps\/web\/.*/,
+    /.*\/node_modules\/.*\/node_modules\/.*/,
+  ],
 };
 
-// Configuramos transformaciones para mejor performance
+// Configuración mínima de transformaciones
 config.transformer = {
   ...config.transformer,
   minifierConfig: {
@@ -34,5 +50,9 @@ config.transformer = {
     },
   },
 };
+
+// Configuración para evitar problemas de archivos
+config.maxWorkers = 1;
+config.resetCache = true;
 
 module.exports = config; 
