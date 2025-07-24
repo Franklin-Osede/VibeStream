@@ -4,7 +4,7 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use crate::bounded_contexts::music::domain::value_objects::{
-    SongId, AlbumId, ArtistId, SongTitle, Genre, ListenCount, PlaylistId
+    SongId, AlbumId, ArtistId, SongTitle, Genre, PlaylistId
 };
 use crate::shared::domain::events::{DomainEvent, EventMetadata};
 

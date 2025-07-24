@@ -2,7 +2,6 @@
 // This module contains command structures and handlers for music operations
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use uuid::Uuid;
 use std::sync::Arc;
 use crate::shared::application::command::{Command, CommandHandler};
@@ -12,7 +11,7 @@ use crate::bounded_contexts::music::domain::{
     value_objects::*,
     repositories::SongRepository,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 // Command definitions
 #[derive(Debug, Deserialize)]

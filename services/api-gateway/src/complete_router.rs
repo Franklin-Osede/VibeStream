@@ -9,37 +9,45 @@ use sqlx::PgPool;
 
 // Import all controllers
 use crate::bounded_contexts::{
-    // User Context - Updated to use new REST API
-    user::presentation::routes::create_user_routes,
-    user::application::services::UserApplicationService,
-    
-    // Music Context - Updated to use new REST API
-    music::presentation::routes::create_music_routes,
-    music::infrastructure::repositories::{
-        PostgresSongRepository, PostgresAlbumRepository, PostgresPlaylistRepository,
+    user::{
+        application::UserApplicationService,
+        presentation::routes::create_user_routes,
     },
-    
-    // Campaign Context - Updated to use new routes
-    campaign::presentation::routes::create_campaign_routes,
-    
-    // Listen Reward Context
-    listen_reward::presentation::controllers::{
-        listen_reward_controller::{listen_reward_routes, ListenRewardController},
+    music::{
+        infrastructure::repositories::{
+            PostgresSongRepository,
+            PostgresAlbumRepository,
+            PostgresPlaylistRepository,
+        },
+        presentation::routes::create_music_routes,
     },
-    listen_reward::application::ListenRewardApplicationService,
-    listen_reward::infrastructure::repositories::{
-        PostgresListenSessionRepository, PostgresRewardAnalyticsRepository, PostgresRewardDistributionRepository,
+    campaign::{
+        presentation::routes::create_campaign_routes,
     },
-    listen_reward::infrastructure::event_publishers::InMemoryEventPublisher,
-    
-    // Fractional Ownership Context
-    fractional_ownership::presentation::controllers::{
-        create_fractional_ownership_routes, AppState,
+    listen_reward::{
+        application::ListenRewardApplicationService,
+        infrastructure::repositories::{
+            PostgresListenSessionRepository,
+            PostgresRewardDistributionRepository,
+            PostgresRewardAnalyticsRepository,
+        },
+        infrastructure::event_publishers::InMemoryEventPublisher,
+        presentation::controllers::{ListenRewardController, listen_reward_routes},
+    },
+    fractional_ownership::{
+        presentation::controllers::AppState,
+        presentation::controllers::create_fractional_ownership_routes,
     },
 };
 
 // Import shared infrastructure
-use crate::shared::infrastructure::database::postgres::PostgresUserRepository;
+use crate::shared::infrastructure::{
+    cdn::{CloudCDNService, CDNConfig, controllers as cdn_controllers},
+    websocket::{service::WebSocketService, handlers as websocket_handlers},
+    event_bus::hybrid_event_bus::HybridEventBus,
+    discovery::{service::DiscoveryService, controllers as discovery_controllers, service::DiscoveryConfig},
+    database::postgres::PostgresUserRepository,
+};
 
 // Health check handler
 async fn health_check() -> &'static str {
@@ -55,7 +63,7 @@ pub async fn create_complete_router(db_pool: PgPool) -> Result<Router, Box<dyn s
     let pool = Arc::new(db_pool);
 
     // =============================================================================
-    // REPOSITORY INITIALIZATION
+    // REPOSITORY & SERVICE INITIALIZATION
     // =============================================================================
     
     // User Context Repositories & Services
@@ -64,8 +72,24 @@ pub async fn create_complete_router(db_pool: PgPool) -> Result<Router, Box<dyn s
     
     // Music Context Repositories
     let song_repository = Arc::new(PostgresSongRepository::new((*pool).clone()));
-    let album_repository = Arc::new(PostgresAlbumRepository::new((*pool).clone()));
-    let playlist_repository = Arc::new(PostgresPlaylistRepository::new((*pool).clone()));
+    let _album_repository = Arc::new(PostgresAlbumRepository::new((*pool).clone()));
+    let _playlist_repository = Arc::new(PostgresPlaylistRepository::new((*pool).clone()));
+
+    // =============================================================================
+    // NEW INFRASTRUCTURE SERVICES (Replacing P2P, Federation, Monitoring)
+    // =============================================================================
+    
+    // WebSocket Service for Real-time Features
+    let websocket_service = Arc::new(WebSocketService::new());
+    let websocket_sender = websocket_service.get_sender();
+    
+    // CDN Service for Content Distribution
+    let cdn_config = CDNConfig::default();
+    let cdn_service = Arc::new(CloudCDNService::new_with_default_config());
+    
+    // Discovery Service for Content Discovery
+    let discovery_config = DiscoveryConfig::default();
+    let discovery_service = Arc::new(DiscoveryService::new(discovery_config));
 
     // =============================================================================
     // ROUTER COMPOSITION
@@ -131,8 +155,24 @@ pub async fn create_complete_router(db_pool: PgPool) -> Result<Router, Box<dyn s
         // Real-time endpoints for live features
         .nest("/api/v1/realtime", create_realtime_routes(pool.clone()))
         
+        // WebSocket endpoints for real-time communication
+        .nest("/ws", create_websocket_rest_routes(websocket_service.clone()))
+        
         // Admin endpoints for system management
-        .nest("/api/v1/admin", create_admin_routes(pool.clone()));
+        .nest("/api/v1/admin", create_admin_routes(pool.clone()))
+        
+        // =============================================================================
+        // NEW INFRASTRUCTURE SERVICE ROUTES
+        // =============================================================================
+        
+        // WebSocket REST API endpoints
+        .nest("/api/v1/websocket", create_websocket_rest_routes(websocket_service.clone()))
+        
+        // CDN REST API endpoints
+        .nest("/api/v1/cdn", create_cdn_rest_routes(cdn_service.clone()))
+        
+        // Discovery REST API endpoints
+        .nest("/api/v1/discovery-service", create_discovery_rest_routes(discovery_service.clone()));
     
     Ok(router)
 }
@@ -142,12 +182,12 @@ pub async fn create_complete_router(db_pool: PgPool) -> Result<Router, Box<dyn s
 // =============================================================================
 
 fn create_discovery_routes(
-    song_repository: Arc<PostgresSongRepository>,
-    user_repository: Arc<PostgresUserRepository>,
+    _song_repository: Arc<PostgresSongRepository>,
+    _user_repository: Arc<PostgresUserRepository>,
 ) -> Router {
     use axum::{extract::Query, http::StatusCode, response::Json};
     use serde::{Deserialize, Serialize};
-    use std::collections::HashMap;
+    
     
     #[derive(Deserialize)]
     struct DiscoveryQuery {
@@ -183,8 +223,8 @@ fn create_discovery_routes(
 }
 
 fn create_analytics_routes(
-    song_repository: Arc<PostgresSongRepository>,
-    user_repository: Arc<PostgresUserRepository>,
+    _song_repository: Arc<PostgresSongRepository>,
+    _user_repository: Arc<PostgresUserRepository>,
 ) -> Router {
     use axum::{http::StatusCode, response::Json};
     use serde::Serialize;
@@ -225,9 +265,9 @@ fn create_analytics_routes(
         .route("/platform", get(get_platform_analytics))
 }
 
-fn create_realtime_routes(pool: Arc<PgPool>) -> Router {
-    use axum::{extract::Query, http::StatusCode, response::Json};
-    use serde::{Deserialize, Serialize};
+fn create_realtime_routes(_pool: Arc<PgPool>) -> Router {
+    use axum::{http::StatusCode, response::Json};
+    use serde::Serialize;
     
     #[derive(Serialize)]
     struct RealtimeStats {
@@ -254,9 +294,9 @@ fn create_realtime_routes(pool: Arc<PgPool>) -> Router {
         .route("/notifications", get(get_realtime_stats))
 }
 
-fn create_admin_routes(pool: Arc<PgPool>) -> Router {
-    use axum::{extract::Query, http::StatusCode, response::Json};
-    use serde::{Deserialize, Serialize};
+fn create_admin_routes(_pool: Arc<PgPool>) -> Router {
+    use axum::{http::StatusCode, response::Json};
+    use serde::Serialize;
     
     #[derive(Serialize)]
     struct SystemHealth {
@@ -284,8 +324,53 @@ fn create_admin_routes(pool: Arc<PgPool>) -> Router {
     
     Router::new()
         .route("/health", get(get_system_health))
-        .route("/metrics", get(get_system_health))
-        .route("/logs", get(get_system_health))
+}
+
+// =============================================================================
+// NEW INFRASTRUCTURE SERVICE ROUTE CREATORS
+// =============================================================================
+
+fn create_websocket_rest_routes(
+    websocket_service: Arc<WebSocketService>,
+) -> Router {
+    use axum::routing::{get, post};
+    
+    Router::new()
+        .route("/stats", get(websocket_handlers::get_websocket_stats))
+        .route("/send", post(websocket_handlers::send_message))
+        .route("/connections/:user_id", get(websocket_handlers::get_user_connections))
+        .route("/disconnect/:user_id", post(websocket_handlers::disconnect_user))
+        .with_state(websocket_service.get_sender())
+}
+
+fn create_cdn_rest_routes(
+    cdn_service: Arc<CloudCDNService>,
+) -> Router {
+    use axum::routing::{get, post, delete};
+    
+    Router::new()
+        .route("/upload", post(cdn_controllers::upload_content))
+        .route("/content/:content_id", get(cdn_controllers::get_content_metadata))
+        .route("/content/:content_id", delete(cdn_controllers::delete_content))
+        .route("/stats", get(cdn_controllers::get_cdn_stats))
+        .route("/purge/:content_id", post(cdn_controllers::purge_cache))
+        .with_state(cdn_service)
+}
+
+fn create_discovery_rest_routes(
+    discovery_service: Arc<DiscoveryService>,
+) -> Router {
+    use axum::routing::{get, post, delete};
+    
+    Router::new()
+        .route("/rss", post(discovery_controllers::add_rss_feed))
+        .route("/rss/:feed_id", delete(discovery_controllers::remove_rss_feed))
+        .route("/webhook", post(discovery_controllers::register_webhook))
+        .route("/webhook/:endpoint_id", delete(discovery_controllers::unregister_webhook))
+        .route("/search", get(discovery_controllers::search_content))
+        .route("/stats", get(discovery_controllers::get_discovery_stats))
+        .route("/trigger/:event_type", post(discovery_controllers::trigger_event))
+        .with_state(discovery_service)
 }
 
 // =============================================================================

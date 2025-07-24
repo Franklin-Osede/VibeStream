@@ -7,11 +7,10 @@ pub use video_upload_controller::*;
 
 // Import required dependencies
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Path, Query},
     response::Json,
     http::StatusCode,
 };
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use std::collections::HashMap;
 

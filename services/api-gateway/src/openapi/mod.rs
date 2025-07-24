@@ -376,7 +376,7 @@ pub fn generate_openapi_json() -> String {
 
 /// Función para validar que todos los endpoints estén documentados
 pub fn validate_api_coverage() -> Result<(), Vec<String>> {
-    let mut missing_endpoints = Vec::new();
+    let missing_endpoints = Vec::new();
     
     // Lista de endpoints que deberían estar documentados
     let expected_endpoints = vec![

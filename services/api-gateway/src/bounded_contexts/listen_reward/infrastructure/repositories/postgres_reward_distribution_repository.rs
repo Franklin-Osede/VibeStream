@@ -11,11 +11,10 @@ use serde_json;
 
 use crate::bounded_contexts::listen_reward::domain::aggregates::RewardDistribution;
 use crate::bounded_contexts::listen_reward::domain::value_objects::{
-    ListenSessionId, RewardAmount, RewardTier, ZkProofHash, RewardPoolId, ValidationPeriod
+    RewardAmount, RewardPoolId, ValidationPeriod
 };
 use crate::bounded_contexts::listen_reward::domain::aggregates::reward_distribution::RewardPool;
 use crate::shared::domain::events::DomainEvent;
-use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
 use super::{RewardDistributionRepository, RepositoryResult, Pagination};
 
 // Estructura para mapear la tabla reward_distributions

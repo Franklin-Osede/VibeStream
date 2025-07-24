@@ -1,9 +1,7 @@
 // Event Processor for Listen Reward Events
 use async_trait::async_trait;
-use std::sync::Arc;
 use tokio::sync::mpsc;
 use crate::shared::domain::events::DomainEvent;
-use super::{EventPublisher, EventPublishResult};
 
 #[async_trait]
 pub trait EventProcessor: Send + Sync {

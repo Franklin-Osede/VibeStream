@@ -6,9 +6,7 @@ use crate::bounded_contexts::music::domain::{
     events::*,
     value_objects::*,
 };
-use crate::shared::domain::events::EventMetadata;
 use crate::shared::domain::events::DomainEvent;
-use crate::shared::domain::errors::AppError;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Song {

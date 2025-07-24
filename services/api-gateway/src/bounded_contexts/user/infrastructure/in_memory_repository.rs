@@ -1,13 +1,12 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::RwLock;
-use uuid::Uuid;
 
 use crate::bounded_contexts::user::domain::{
     aggregates::{UserAggregate, UserSummary},
     entities::{UserStats},
     repository::{UserRepository, UserSearchCriteria},
-    value_objects::{UserId, Email, Username, UserTier, UserRole},
+    value_objects::{UserId, Email, Username},
 };
 use crate::shared::domain::errors::AppError;
 
@@ -310,7 +309,7 @@ impl UserRepository for InMemoryUserRepository {
 
     async fn remove_follower(&self, follower_id: &UserId, followee_id: &UserId) -> Result<(), AppError> {
         let mut followers = self.followers.write().unwrap();
-        if let Some(mut follower_list) = followers.get_mut(followee_id) {
+        if let Some(follower_list) = followers.get_mut(followee_id) {
             follower_list.retain(|id| id != follower_id);
             if follower_list.is_empty() {
                 followers.remove(followee_id);

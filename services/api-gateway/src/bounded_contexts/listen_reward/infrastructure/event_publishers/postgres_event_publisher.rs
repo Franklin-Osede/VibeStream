@@ -1,7 +1,6 @@
 // PostgreSQL Event Publisher
 use async_trait::async_trait;
 use sqlx::PgPool;
-use uuid::Uuid;
 use crate::shared::domain::events::{DomainEvent, EventMetadata};
 use super::{EventPublisher, EventPublishResult};
 

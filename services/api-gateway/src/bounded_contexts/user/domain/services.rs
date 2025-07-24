@@ -1,12 +1,11 @@
 use async_trait::async_trait;
 use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::{DateTime, Utc, Duration};
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use super::{
     aggregates::UserAggregate,
-    value_objects::{UserId, Email, Username, PasswordHash, UserTier, UserRole},
+    value_objects::{UserId, Email, Username, PasswordHash, UserTier},
     repository::UserRepository,
     specifications::{EmailSpecification, UsernameSpecification, PasswordSpecification, Specification},
 };

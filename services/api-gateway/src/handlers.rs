@@ -460,17 +460,20 @@ pub async fn login(
                     let email: String = row.get("email");
                     let role: String = row.get("role");
                     
-                    let claims = Claims::new(user_id, username.clone(), email.clone(), role.clone());
+                    let claims = Claims::new(user_id, username.clone(), email.clone(), role.clone(), "access".to_string());
                     
                     match claims.to_jwt() {
                         Ok(token) => {
                             let response = LoginResponse {
-                                token,
+                                token: token.clone(),
+                                refresh_token: "".to_string(), // Placeholder for refresh token
+                                expires_in: 3600,
                                 user: UserInfo {
                                     id: user_id.to_string(),
                                     username,
                                     email,
                                     role,
+                                    is_verified: true,
                                 },
                             };
                             
@@ -540,17 +543,20 @@ pub async fn register(
             let role: String = row.get("role");
             
             // Generar JWT automáticamente
-            let claims = Claims::new(user_id, username.clone(), email.clone(), role.clone());
+            let claims = Claims::new(user_id, username.clone(), email.clone(), role.clone(), "access".to_string());
             
             match claims.to_jwt() {
                 Ok(token) => {
                     let response = LoginResponse {
-                        token,
+                        token: token.clone(),
+                        refresh_token: "".to_string(), // Placeholder for refresh token
+                        expires_in: 3600,
                         user: UserInfo {
                             id: user_id.to_string(),
                             username,
                             email,
                             role,
+                            is_verified: true,
                         },
                     };
                     
@@ -578,10 +584,11 @@ pub async fn register(
 #[axum::debug_handler]
 pub async fn get_profile(claims: Claims) -> Result<Json<UserInfo>, StatusCode> {
     let user_info = UserInfo {
-        id: claims.sub,
+        id: claims.sub.to_string(),
         username: claims.username,
         email: claims.email,
         role: claims.role,
+        is_verified: true,
     };
     
     tracing::info!("📋 Perfil solicitado: {}", user_info.email);
@@ -718,14 +725,22 @@ pub async fn oauth_register(
             let email: String = row.get("email");
             let role: String = row.get("role");
             
-            let claims = Claims::new(user_id, username.clone(), email.clone(), role.clone());
+            let claims = Claims::new(user_id, username.clone(), email.clone(), role.clone(), "access".to_string());
             
             match claims.to_jwt() {
                 Ok(token) => {
                     tracing::info!("✅ OAuth login exitoso: {}", email);
                     Ok(Json(LoginResponse {
-                        token,
-                        user: UserInfo { id: user_id.to_string(), username, email, role },
+                        token: token.clone(),
+                        refresh_token: "".to_string(),
+                        expires_in: 3600,
+                        user: UserInfo {
+                            id: user_id.to_string(),
+                            username,
+                            email,
+                            role,
+                            is_verified: true,
+                        },
                     }))
                 }
                 Err(e) => {
@@ -763,14 +778,22 @@ pub async fn oauth_register(
                     let email: String = row.get("email");
                     let role: String = row.get("role");
                     
-                    let claims = Claims::new(user_id, username.clone(), email.clone(), role.clone());
+                    let claims = Claims::new(user_id, username.clone(), email.clone(), role.clone(), "access".to_string());
                     
                     match claims.to_jwt() {
                         Ok(token) => {
                             tracing::info!("✅ OAuth usuario registrado: {} - wallet: {}", email, wallet_address);
                             Ok(Json(LoginResponse {
-                                token,
-                                user: UserInfo { id: user_id.to_string(), username, email, role },
+                                token: token.clone(),
+                                refresh_token: "".to_string(),
+                                expires_in: 3600,
+                                user: UserInfo {
+                                    id: user_id.to_string(),
+                                    username,
+                                    email,
+                                    role,
+                                    is_verified: true,
+                                },
                             }))
                         }
                         Err(e) => {

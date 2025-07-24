@@ -1,23 +1,17 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
-use serde_json;
 use sqlx::{PgPool, postgres::PgRow};
 use std::collections::HashMap;
-use uuid::Uuid;
 
 use crate::shared::domain::errors::AppError;
 
 use crate::bounded_contexts::fractional_ownership::domain::{
     aggregates::{OwnershipContractAggregate, OwnershipAnalytics},
-    repository::{
-        OwnershipContractRepository, OwnershipContractSpecification, 
-        MarketStatistics, ShareRepository, OwnershipContractQueryRepository
-    },
+    repository::OwnershipContractRepository,
     value_objects::{
         OwnershipContractId, OwnershipPercentage, SharePrice, RevenueAmount, 
-        ShareId, VestingPeriod
+        ShareId
     },
-    entities::{FractionalShare, RevenueDistribution},
+    entities::FractionalShare,
     aggregates::ContractStatus,
 };
 use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
@@ -405,7 +399,7 @@ impl OwnershipContractRepository for PostgresOwnershipContractRepository {
     }
 
     async fn delete(&self, id: &OwnershipContractId) -> Result<(), AppError> {
-        let mut tx = self.pool.begin().await.map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        let tx = self.pool.begin().await.map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
         // TODO: Re-enable when fractional_shares table is created
         // Delete shares first (foreign key constraint)

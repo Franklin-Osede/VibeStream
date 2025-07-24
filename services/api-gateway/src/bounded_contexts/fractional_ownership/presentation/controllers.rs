@@ -4,7 +4,7 @@
 // todas las operaciones HTTP relacionadas con la propiedad fraccionada.
 
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Path, State},
     http::StatusCode,
     response::Json,
     routing::{get, post, put, delete},

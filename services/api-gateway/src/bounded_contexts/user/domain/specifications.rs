@@ -406,17 +406,17 @@ mod tests {
         let spec = PasswordSpecification::new();
         
         // Valid password
-        assert!(spec.is_satisfied_by("SecurePass123!"));
+        assert!(spec.is_satisfied_by(&"SecurePass123!"));
         
         // Invalid passwords
-        assert!(!spec.is_satisfied_by("weak")); // Too short
-        assert!(!spec.is_satisfied_by("password")); // Common password
-        assert!(!spec.is_satisfied_by("PASSWORD123!")); // No lowercase
-        assert!(!spec.is_satisfied_by("password123!")); // No uppercase
-        assert!(!spec.is_satisfied_by("Password!")); // No numbers
-        assert!(!spec.is_satisfied_by("Password123")); // No special chars
-        assert!(!spec.is_satisfied_by("Pass1234")); // Sequential pattern
-        assert!(!spec.is_satisfied_by("Passaaaa1!")); // Repeated chars
+        assert!(!spec.is_satisfied_by(&"weak")); // Too short
+        assert!(!spec.is_satisfied_by(&"password")); // Common password
+        assert!(!spec.is_satisfied_by(&"PASSWORD123!")); // No lowercase
+        assert!(!spec.is_satisfied_by(&"password123!")); // No uppercase
+        assert!(!spec.is_satisfied_by(&"Password!")); // No numbers
+        assert!(!spec.is_satisfied_by(&"Password123")); // No special chars
+        assert!(!spec.is_satisfied_by(&"Pass1234")); // Sequential pattern
+        assert!(!spec.is_satisfied_by(&"Passaaaa1!")); // Repeated chars
     }
 
     #[test]
@@ -424,12 +424,12 @@ mod tests {
         let spec = PasswordSpecification::relaxed();
         
         // Should accept simpler passwords
-        assert!(spec.is_satisfied_by("simple123"));
-        assert!(spec.is_satisfied_by("test456"));
+        assert!(spec.is_satisfied_by(&"simple123"));
+        assert!(spec.is_satisfied_by(&"test456"));
         
         // Still reject common ones
-        assert!(!spec.is_satisfied_by("password"));
-        assert!(!spec.is_satisfied_by("123456"));
+        assert!(!spec.is_satisfied_by(&"password"));
+        assert!(!spec.is_satisfied_by(&"123456"));
     }
 
     #[test]

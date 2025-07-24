@@ -3,7 +3,6 @@
 use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 use crate::shared::domain::errors::AppError;
 use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
@@ -13,12 +12,10 @@ use super::value_objects::{
     OwnershipContractId, OwnershipPercentage, SharePrice, RevenueAmount, 
     ShareId, VestingPeriod
 };
-use super::entities::{FractionalShare, RevenueDistribution, DistributionStatus};
+use super::entities::{FractionalShare, RevenueDistribution};
 use super::events::{
-    OwnershipContractCreated, SharesPurchased, SharesTraded, RevenueDistributed,
-    OwnershipContractUpdated, InvestmentThresholdReached, ThresholdType,
-    OwnershipContractTerminated, TerminationReason, PaymentRequested, PaymentType,
-    PaymentMetadata, UserPortfolioUpdated, PortfolioUpdateType
+    RevenueDistributed, InvestmentThresholdReached, ThresholdType,
+    OwnershipContractTerminated, TerminationReason
 };
 
 /// Aggregate Root: Manages ownership contracts and fractional shares

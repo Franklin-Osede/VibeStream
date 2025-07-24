@@ -4,7 +4,6 @@
 /// particularly with Fractional Ownership for revenue distribution.
 
 use std::sync::Arc;
-use async_trait::async_trait;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 use serde::{Serialize, Deserialize};
@@ -12,17 +11,11 @@ use serde::{Serialize, Deserialize};
 use crate::shared::domain::errors::AppError;
 use crate::bounded_contexts::{
     fractional_ownership::{
-        application::{
-            commands::DistributeRevenue,
-            queries::{GetOwnershipContract, GetOwnershipContractResult},
-        },
+        application::commands::DistributeRevenue,
         integration_service::InMemoryFractionalOwnershipBoundedContext,
         infrastructure::InMemoryOwnershipContractRepository,
     },
-    listen_reward::domain::{
-        events::ListenSessionCompleted,
-        value_objects::RewardAmount,
-    },
+    listen_reward::domain::events::ListenSessionCompleted,
 };
 use crate::bounded_contexts::fractional_ownership::domain::repository::OwnershipContractRepository;
 

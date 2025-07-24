@@ -4,16 +4,13 @@ pub use super::in_memory_repository;
 
 use std::sync::Arc;
 use async_trait::async_trait;
-use uuid::Uuid;
 use crate::bounded_contexts::fractional_ownership::domain::{
     repository::OwnershipContractRepository,
     aggregates::{OwnershipContractAggregate, OwnershipAnalytics},
-    entities::FractionalShare,
-    value_objects::{OwnershipContractId, ShareId},
+    value_objects::OwnershipContractId,
 };
 use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
 use crate::bounded_contexts::user::domain::value_objects::UserId;
-use crate::shared::domain::errors::AppError;
 use crate::shared::domain::repositories::RepoResult;
 
 // Implementaciones para Arc<T> para resolver problemas de trait bounds

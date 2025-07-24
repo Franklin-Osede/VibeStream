@@ -17,7 +17,6 @@ pub use services::AppState;
 // Simple module that works
 pub mod simple {
     use axum::{
-        routing::{get, post},
         Router,
         extract::{State, Json},
         response::Json as ResponseJson,
@@ -25,7 +24,7 @@ pub mod simple {
     };
     use serde::{Deserialize, Serialize};
     use serde_json::json;
-    use crate::music_simple::create_music_routes;
+    
     use crate::services::{AppState, DatabasePool, MessageQueue};
     
     pub async fn create_router() -> Result<Router, Box<dyn std::error::Error>> {

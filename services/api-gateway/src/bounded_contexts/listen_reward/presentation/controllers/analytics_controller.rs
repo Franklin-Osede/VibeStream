@@ -15,11 +15,11 @@ use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
 use crate::bounded_contexts::listen_reward::application::{
-    ListenRewardApplicationService, GetUserListeningHistoryQuery, GetArtistAnalyticsQuery,
+    ListenRewardApplicationService, GetUserListeningHistoryQuery,
 };
 use super::{
     ErrorResponse, SuccessResponse, PaginationParams, DateRangeParams,
-    validate_uuid, validate_positive_number, validate_range,
+    validate_uuid,
 };
 
 // Request DTOs

@@ -1,7 +1,7 @@
 // Event Publisher Trait
 use async_trait::async_trait;
 use crate::shared::domain::events::DomainEvent;
-use super::{EventPublishResult, EventMetadata};
+use super::EventPublishResult;
 
 #[async_trait]
 pub trait EventPublisher: Send + Sync {

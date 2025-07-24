@@ -1,7 +1,5 @@
 use async_trait::async_trait;
 use redis::{Client, aio::Connection};
-use serde_json;
-use uuid::Uuid;
 use crate::shared::domain::events::DomainEvent;
 use super::{EventPublisher, EventPublishResult};
 

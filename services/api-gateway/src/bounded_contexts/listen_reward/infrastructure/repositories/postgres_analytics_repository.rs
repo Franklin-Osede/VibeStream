@@ -11,8 +11,7 @@ use chrono::{DateTime, Utc};
 use super::{
     repository_traits::{
         RewardAnalyticsRepository, UserRewardHistory, ArtistRevenueAnalytics, 
-        SongMetrics, PlatformStatistics, FraudMetrics, TopSong, RevenueTrend,
-        GeographicMetric, TopArtist, FraudIndicator,
+        SongMetrics, PlatformStatistics, FraudMetrics, TopSong, RevenueTrend, TopArtist, FraudIndicator,
     },
     RepositoryResult, Pagination, RewardAnalytics,
 };

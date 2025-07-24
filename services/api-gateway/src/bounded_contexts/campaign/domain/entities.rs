@@ -473,6 +473,7 @@ impl CampaignNFT {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::shared::domain::events::DomainEvent;
 
     fn create_test_campaign() -> Result<(Campaign, CampaignCreated), AppError> {
         let song_id = SongId::new();

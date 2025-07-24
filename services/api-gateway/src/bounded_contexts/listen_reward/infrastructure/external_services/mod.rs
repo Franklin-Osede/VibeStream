@@ -34,7 +34,6 @@ pub use crate::bounded_contexts::listen_reward::infrastructure::external_service
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
 // Common external service configuration

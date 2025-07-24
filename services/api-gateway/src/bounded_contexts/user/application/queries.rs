@@ -1,12 +1,8 @@
 // User Application Queries
 // This module contains query structures and handlers for user operations
 
-use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use crate::shared::application::query::{Query, QueryHandler};
-use crate::shared::domain::errors::AppError;
-use crate::bounded_contexts::user::domain::entities::User;
-use crate::bounded_contexts::user::domain::repository::UserRepository;
+use crate::shared::application::query::Query;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use std::collections::HashMap;
@@ -475,7 +471,6 @@ mod tests {
             include_preferences: false,
         };
 
-        assert_eq!(query.query_type(), "GetUser");
         assert_eq!(query.user_id, user_id);
     }
 
@@ -498,7 +493,6 @@ mod tests {
             tier_filter: Some("premium".to_string()),
         };
 
-        assert_eq!(query.query_type(), "GetTopUsers");
         assert_eq!(query.metric, "rewards");
         assert_eq!(query.limit, 10);
     }

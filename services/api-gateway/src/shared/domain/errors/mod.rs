@@ -1,6 +1,4 @@
 use axum::http::StatusCode;
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
 #[derive(Debug, Clone)]
 pub enum AppError {

@@ -1,5 +1,3 @@
-use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use std::sync::Arc;
 
 use crate::shared::domain::errors::AppError;
@@ -20,9 +18,6 @@ use super::queries::{
     GetOwnershipContractBySongId, GetOwnershipContractBySongIdHandler, GetOwnershipContractBySongIdResult,
     GetUserPortfolio, GetUserPortfolioHandler, GetUserPortfolioResult,
     GetContractAnalytics, GetContractAnalyticsHandler, GetContractAnalyticsResult,
-    GetMarketStatistics, GetMarketStatisticsResult,
-    SearchOwnershipContracts, SearchOwnershipContractsResult,
-    GetContractsByArtist, GetContractsByArtistResult,
 };
 
 use crate::bounded_contexts::fractional_ownership::domain::repository::OwnershipContractRepository;

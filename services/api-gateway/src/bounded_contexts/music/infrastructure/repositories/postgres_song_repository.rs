@@ -1,13 +1,11 @@
 use async_trait::async_trait;
 use sqlx::{PgPool, Row};
-use uuid::Uuid;
 
 use crate::bounded_contexts::music::domain::{
     Song, SongId, ArtistId, Genre, 
     value_objects::{SongTitle, SongDuration, RoyaltyPercentage, ListenCount}
 };
 use crate::bounded_contexts::music::domain::repositories::{SongRepository, RepositoryResult, RepositoryError};
-use crate::shared::domain::errors::AppError;
 
 pub struct PostgresSongRepository {
     pool: PgPool,

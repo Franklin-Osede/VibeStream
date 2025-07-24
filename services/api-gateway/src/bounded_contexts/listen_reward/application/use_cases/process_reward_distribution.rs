@@ -1,14 +1,13 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 use crate::bounded_contexts::listen_reward::domain::{
     entities::ListenSession,
     aggregates::RewardDistribution, 
-    value_objects::{ListenSessionId, RewardAmount, RewardTier, ZkProofHash, ValidationPeriod}
+    value_objects::{RewardAmount, ValidationPeriod}
 };
 use crate::shared::domain::events::DomainEvent;
-use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId, RoyaltyPercentage};
+use crate::bounded_contexts::music::domain::value_objects::RoyaltyPercentage;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProcessRewardDistributionCommand {

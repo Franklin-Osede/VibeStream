@@ -8,7 +8,6 @@
 /// This allows gradual migration without breaking existing functionality.
 
 use std::sync::Arc;
-use async_trait::async_trait;
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 use tracing::{info, warn, error};
@@ -21,7 +20,6 @@ use super::{
     get_partition_key
 };
 use crate::shared::domain::errors::AppError;
-use crate::shared::domain::events::EventMetadata;
 
 /// Hybrid Event Bus that intelligently routes events
 pub struct HybridEventBus {
@@ -177,7 +175,7 @@ impl HybridEventBus {
     where
         F: Fn(DomainEventWrapper) -> Result<(), AppError> + Send + Sync + 'static,
     {
-        use redis::AsyncCommands;
+        
         
         let mut pubsub = self.redis_client.get_async_connection().await
             .map_err(|e| AppError::InternalError(format!("Redis connection failed: {}", e)))?

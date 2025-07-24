@@ -1,10 +1,9 @@
 use async_trait::async_trait;
-use uuid::Uuid;
 use std::collections::HashMap;
 
 use super::{
     aggregates::{UserAggregate, UserSummary},
-    entities::{User, UserProfile, UserPreferences, UserStats},
+    entities::UserStats,
     value_objects::{UserId, Email, Username},
 };
 use crate::shared::domain::errors::AppError;

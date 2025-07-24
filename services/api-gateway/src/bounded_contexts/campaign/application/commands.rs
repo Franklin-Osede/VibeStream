@@ -90,7 +90,7 @@ mod tests {
     impl CampaignRepository for InMemoryRepo {
         async fn find_by_id(&self, id: Uuid) -> RepoResult<Option<Campaign>> {
             let data = self.data.lock().unwrap();
-            Ok(data.iter().cloned().find(|c| c.id() == id))
+            Ok(data.iter().cloned().find(|c| c.id().value() == id))
         }
 
         async fn save(&self, campaign: &Campaign) -> RepoResult<()> {

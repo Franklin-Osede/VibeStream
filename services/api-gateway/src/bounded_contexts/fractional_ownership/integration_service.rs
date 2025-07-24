@@ -1,6 +1,5 @@
 use std::sync::Arc;
 use sqlx::PgPool;
-use tokio::sync::mpsc;
 
 use crate::shared::domain::errors::AppError;
 
@@ -20,7 +19,7 @@ use crate::bounded_contexts::fractional_ownership::{
     },
     
     // Presentation
-    presentation::{AppState, ConcreteApplicationService, create_routes},
+    presentation::AppState,
 };
 
 // Remove derive Debug and add manual implementation

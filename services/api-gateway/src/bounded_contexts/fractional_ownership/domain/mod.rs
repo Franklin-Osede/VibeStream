@@ -10,6 +10,5 @@ pub use entities::*;
 pub use value_objects::*;
 pub use aggregates::*;
 pub use events::*;
-pub use services::*;
 pub use repository::*;
 pub use errors::*; 

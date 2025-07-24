@@ -4,7 +4,6 @@ use std::io::Result as IoResult;
 use std::path::{Path, PathBuf};
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
-use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
 use super::{AudioFileStorage, AudioFileMetadata};

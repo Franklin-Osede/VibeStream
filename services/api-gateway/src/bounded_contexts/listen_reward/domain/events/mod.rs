@@ -3,7 +3,7 @@ use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
 use crate::bounded_contexts::listen_reward::domain::value_objects::{
-    ListenSessionId, RewardAmount, ListenDuration, QualityScore, ZkProofHash, RewardTier
+    ListenSessionId, RewardAmount, ListenDuration, QualityScore, ZkProofHash
 };
 use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
 use crate::shared::domain::events::{DomainEvent, EventMetadata};

@@ -1,7 +1,5 @@
 use async_trait::async_trait;
-use serde_json;
 use std::collections::VecDeque;
-use uuid::Uuid;
 
 use crate::shared::domain::events::DomainEvent;
 

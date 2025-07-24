@@ -54,7 +54,7 @@ impl PostgresPlaylistRepository {
     }
 
     fn row_to_playlist(&self, row: PlaylistRow, tracks: Vec<PlaylistTrack>) -> RepositoryResult<Playlist> {
-        let mut playlist = Playlist::from_persistence(
+        let playlist = Playlist::from_persistence(
             PlaylistId::from_uuid(row.id),
             PlaylistName::new(row.name).map_err(|e| RepositoryError::SerializationError(e))?,
             row.creator_id,

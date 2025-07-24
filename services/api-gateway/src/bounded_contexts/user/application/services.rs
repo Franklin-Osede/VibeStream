@@ -15,7 +15,6 @@ use crate::bounded_contexts::user::application::handlers::{
 use crate::shared::domain::errors::AppError;
 use async_trait::async_trait;
 use std::sync::Arc;
-use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct UserApplicationService<R: UserRepository> {

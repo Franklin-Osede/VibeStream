@@ -4,6 +4,7 @@ pub mod local_storage;
 pub mod ipfs_video_storage;
 pub mod audio_metadata_extractor;
 pub mod audio_transcoder;
+pub mod cdn_storage;
 
 pub use file_storage::*;
 pub use ipfs_storage::*;
@@ -11,10 +12,10 @@ pub use local_storage::*;
 pub use ipfs_video_storage::*;
 pub use audio_metadata_extractor::{AudioMetadataExtractor, AudioMetadata};
 pub use audio_transcoder::{AudioTranscoder, TranscodeConfig};
+pub use cdn_storage::CDNAudioStorage;
 
 use async_trait::async_trait;
 use std::io::Result as IoResult;
-use uuid::Uuid;
 use bytes::Bytes;
 
 /// Unified storage interface for audio files
@@ -71,6 +72,11 @@ pub enum StorageConfig {
         enable_federation: bool,
         enable_content_discovery: bool,
     },
+    /// CDN storage for production
+    CDN {
+        max_file_size: u64,
+        enable_caching: bool,
+    },
 }
 
 /// Create storage instance based on configuration
@@ -78,9 +84,12 @@ pub enum StorageConfig {
 pub fn create_storage(config: StorageConfig) -> Box<dyn AudioFileStorage> {
     match config {
         StorageConfig::Local { base_path, max_file_size } => {
-            println!("🏠 Initializing Local Storage at: {}", base_path);
+            println!("📁 Initializing Local Storage");
+            println!("   Base Path: {}", base_path);
+            println!("   Max File Size: {} MB", max_file_size);
+            
             Box::new(LocalAudioStorage::new(base_path, max_file_size))
-        }
+        },
         StorageConfig::DistributedIPFS { 
             local_node_url, 
             peer_nodes, 
@@ -101,7 +110,14 @@ pub fn create_storage(config: StorageConfig) -> Box<dyn AudioFileStorage> {
                 enable_federation,
                 enable_content_discovery,
             ))
-        }
+        },
+        StorageConfig::CDN { max_file_size, enable_caching } => {
+            println!("☁️ Initializing CDN Storage");
+            println!("   Max File Size: {} MB", max_file_size);
+            println!("   Caching: {}", enable_caching);
+            
+            Box::new(CDNAudioStorage::new_with_default_config())
+        },
     }
 }
 
@@ -130,6 +146,13 @@ pub async fn create_storage_async(config: StorageConfig) -> std::io::Result<Box<
             ).await?;
             
             Ok(Box::new(ipfs_storage))
+        }
+        StorageConfig::CDN { max_file_size, enable_caching } => {
+            println!("☁️ Initializing CDN Storage - Async");
+            println!("   Max File Size: {} MB", max_file_size);
+            println!("   Caching: {}", enable_caching);
+            
+            Ok(Box::new(CDNAudioStorage::new_with_default_config()))
         }
     }
 }

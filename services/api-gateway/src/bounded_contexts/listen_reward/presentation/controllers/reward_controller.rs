@@ -10,8 +10,7 @@ use uuid::Uuid;
 use std::collections::HashMap;
 
 use crate::bounded_contexts::listen_reward::application::use_cases::{
-    ProcessRewardDistributionUseCase, ProcessRewardDistributionCommand, ProcessRewardDistributionResponse,
-    QueueRewardDistributionCommand, QueueRewardDistributionResponse,
+    ProcessRewardDistributionUseCase, ProcessRewardDistributionResponse, QueueRewardDistributionResponse,
 };
 
 // DTOs for API requests/responses

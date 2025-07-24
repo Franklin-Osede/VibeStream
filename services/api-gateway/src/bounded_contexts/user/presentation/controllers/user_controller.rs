@@ -16,13 +16,12 @@ use std::collections::HashMap;
 use crate::bounded_contexts::user::application::{
     handlers::{
         CreateUserCommand, UpdateUserCommand, FollowUserCommand,
-        GetUserQuery, UserResponse,
+        GetUserQuery,
         UserCommandHandler, UserQueryHandler,
     },
     services::UserApplicationService,
 };
 use crate::shared::infrastructure::database::postgres::PostgresUserRepository;
-use crate::shared::domain::errors::AppError;
 
 // Type alias para simplificar el estado
 type UserAppService = UserApplicationService<PostgresUserRepository>;

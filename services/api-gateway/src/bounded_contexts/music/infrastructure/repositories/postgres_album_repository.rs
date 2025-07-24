@@ -4,8 +4,8 @@ use sqlx::{PgPool, FromRow};
 use uuid::Uuid;
 
 use crate::bounded_contexts::music::domain::{
-    entities::{Album, AlbumTrack},
-    value_objects::{AlbumId, AlbumTitle, ArtistId, SongId, Genre, ReleaseType},
+    entities::Album,
+    value_objects::{AlbumId, AlbumTitle, ArtistId, Genre, ReleaseType},
     repositories::{RepositoryResult, RepositoryError},
 };
 

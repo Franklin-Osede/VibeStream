@@ -1,6 +1,5 @@
 use std::path::Path;
 use std::fs::File;
-use std::io::{BufReader, Read, Seek, SeekFrom};
 use symphonia::core::formats::FormatOptions;
 use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
@@ -66,7 +65,7 @@ impl AudioMetadataExtractor {
             .map_err(|e| AppError::InternalError(format!("Failed to probe audio format: {}", e)))?;
 
         // Get the instantiated format reader
-        let mut format_reader = probed.format;
+        let format_reader = probed.format;
 
         // Find the first audio track with a known (decodeable) codec
         let track = format_reader
@@ -337,9 +336,7 @@ mod tests {
     #[test]
     fn test_detect_quality() {
         let mut codec_params = symphonia::core::codecs::CodecParameters::new();
-        codec_params.with_sample_rate(48000)
-            .with_bit_rate(320000)
-            .with_channels(symphonia::core::audio::Channels::STEREO);
+        codec_params.with_sample_rate(48000);
 
         let quality = AudioMetadataExtractor::detect_quality(&codec_params).unwrap();
         assert_eq!(quality, AudioQuality::High);

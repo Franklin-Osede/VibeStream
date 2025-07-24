@@ -4,16 +4,15 @@ use std::collections::HashSet;
 use uuid::Uuid;
 
 use crate::bounded_contexts::music::domain::value_objects::{
-    PlaylistId, PlaylistName, SongId, SongDuration, Genre
+    PlaylistId, PlaylistName, SongId, SongDuration
 };
 use crate::bounded_contexts::music::domain::events::{
-    PlaylistCreated, PlaylistUpdated, PlaylistMadePublic, PlaylistMadePrivate,
-    SongAddedToPlaylist, SongRemovedFromPlaylist, PlaylistShared
+    PlaylistUpdated, PlaylistMadePublic, PlaylistMadePrivate,
+    SongAddedToPlaylist, SongRemovedFromPlaylist
 };
 use crate::shared::domain::events::DomainEvent;
 use crate::bounded_contexts::music::domain::value_objects::IpfsHash;
 use crate::shared::domain::events::EventMetadata;
-use crate::shared::domain::errors::AppError;
 
 /// Playlist entity for organizing songs
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -2,7 +2,6 @@ use axum::{
     extract::{Path, Query},
     http::StatusCode,
     response::Json,
-    Extension,
     Router,
     routing::{post, get},
 };
@@ -12,7 +11,7 @@ use std::collections::HashMap;
 
 use crate::bounded_contexts::listen_reward::application::{
     StartListenSessionUseCase, StartListenSessionCommand,
-    CompleteListenSessionUseCase, CompleteListenSessionCommand,
+    CompleteListenSessionUseCase,
 };
 
 // Exponer públicamente los tipos de respuesta

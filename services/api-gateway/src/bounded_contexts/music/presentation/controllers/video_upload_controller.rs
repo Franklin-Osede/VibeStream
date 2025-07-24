@@ -9,9 +9,8 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use std::sync::Arc;
 
-use crate::shared::domain::errors::AppError;
 use crate::bounded_contexts::music::infrastructure::storage::{
-    IPFSVideoStorage, VideoQuality, VideoFileStorage, StorageConfig
+    IPFSVideoStorage, VideoQuality, VideoFileStorage
 };
 use super::upload_controller::AudioUploadController;
 

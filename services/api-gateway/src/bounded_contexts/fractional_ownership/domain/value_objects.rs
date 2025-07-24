@@ -2,7 +2,6 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use crate::shared::domain::errors::AppError;
-use super::errors::FractionalOwnershipError;
 
 /// Identificador único para un contrato de ownership
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

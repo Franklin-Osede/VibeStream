@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::bounded_contexts::music::domain::entities::Song;
 use crate::bounded_contexts::music::domain::value_objects::{
     SongId, ArtistId, AlbumId, PlaylistId, SongTitle, AlbumTitle, Genre, 
-    RoyaltyPercentage, SongDuration, ListenCount
+    RoyaltyPercentage, SongDuration
 };
 use crate::shared::domain::events::DomainEvent;
 use crate::bounded_contexts::music::domain::events::{

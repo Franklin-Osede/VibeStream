@@ -7,12 +7,11 @@ use crate::shared::application::query::{Query, QueryHandler};
 use crate::shared::domain::errors::AppError;
 
 use crate::bounded_contexts::fractional_ownership::domain::{
-    aggregates::{OwnershipContractAggregate, OwnershipAnalytics},
-    repository::{OwnershipContractRepository, OwnershipContractSpecification, MarketStatistics},
+    aggregates::OwnershipAnalytics,
+    repository::{OwnershipContractRepository, MarketStatistics},
     value_objects::OwnershipContractId,
-    entities::FractionalShare,
 };
-use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
+use crate::bounded_contexts::music::domain::value_objects::SongId;
 use crate::bounded_contexts::user::domain::value_objects::UserId;
 
 /// Query: Get ownership contract by ID

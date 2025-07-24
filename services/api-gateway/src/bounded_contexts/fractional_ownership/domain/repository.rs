@@ -4,7 +4,6 @@ use async_trait::async_trait;
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 
-use crate::shared::domain::errors::AppError;
 use crate::shared::domain::repositories::RepoResult;
 use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
 use crate::bounded_contexts::user::domain::value_objects::UserId;

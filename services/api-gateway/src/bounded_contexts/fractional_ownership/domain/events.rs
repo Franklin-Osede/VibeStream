@@ -4,9 +4,6 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::value_objects::{OwnershipContractId, OwnershipPercentage, SharePrice, RevenueAmount, ShareId};
-use crate::bounded_contexts::music::domain::value_objects::SongId;
-use crate::bounded_contexts::user::domain::value_objects::UserId;
 
 /// Event emitted when a new ownership contract is created for a song
 #[derive(Debug, Clone, Serialize, Deserialize)]

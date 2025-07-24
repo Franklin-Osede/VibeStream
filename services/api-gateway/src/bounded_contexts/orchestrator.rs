@@ -10,7 +10,7 @@ use tokio::sync::mpsc;
 use crate::shared::domain::errors::AppError;
 use crate::bounded_contexts::{
     fractional_ownership::{
-        FractionalOwnershipBoundedContext, PostgresFractionalOwnershipBoundedContext,
+        PostgresFractionalOwnershipBoundedContext,
         infrastructure::PostgresOwnershipContractRepository,
         application::FractionalOwnershipApplicationService,
     },

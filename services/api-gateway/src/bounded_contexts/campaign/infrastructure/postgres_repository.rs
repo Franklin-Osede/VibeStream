@@ -366,15 +366,15 @@ mod tests {
         ];
 
         for (status_str, expected_status) in statuses.iter() {
-            let parsed_status = match status_str {
-                "Draft" => CampaignStatus::Draft,
-                "Active" => CampaignStatus::Active,
-                "Paused" => CampaignStatus::Paused,
-                "Completed" => CampaignStatus::Completed,
-                "Cancelled" => CampaignStatus::Cancelled,
-                "Failed" => CampaignStatus::Failed,
-                _ => panic!("Invalid status"),
-            };
+                    let parsed_status = match *status_str {
+            "Draft" => CampaignStatus::Draft,
+            "Active" => CampaignStatus::Active,
+            "Paused" => CampaignStatus::Paused,
+            "Completed" => CampaignStatus::Completed,
+            "Cancelled" => CampaignStatus::Cancelled,
+            "Failed" => CampaignStatus::Failed,
+            _ => panic!("Invalid status"),
+        };
             
             assert_eq!(format!("{:?}", parsed_status), format!("{:?}", expected_status));
         }

@@ -1,10 +1,8 @@
-use async_trait::async_trait;
 use rdkafka::{
     producer::{FutureProducer, FutureRecord},
     consumer::{Consumer, StreamConsumer},
     config::{ClientConfig, RDKafkaLogLevel},
     message::Message,
-    error::KafkaError,
     util::Timeout,
 };
 use serde::{Serialize, Deserialize};
@@ -14,7 +12,7 @@ use std::{
     collections::HashMap,
 };
 use tokio::{
-    sync::{mpsc, oneshot},
+    sync::oneshot,
     task::JoinHandle,
     time::timeout,
 };

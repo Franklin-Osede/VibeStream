@@ -11,9 +11,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::bounded_contexts::listen_reward::{
     domain::{
-        entities::{ListenSession, SessionStatus},
-        value_objects::{ListenSessionId, RewardTier, RewardAmount},
-        aggregates::RewardDistribution,
+        entities::SessionStatus,
+        value_objects::{ListenSessionId, RewardTier},
     },
     infrastructure::{
         repositories::{
@@ -24,9 +23,9 @@ use crate::bounded_contexts::listen_reward::{
         external_services::ZkProofVerificationService,
     },
     application::use_cases::{
-        StartListenSessionCommand, StartListenSessionResponse,
-        CompleteListenSessionUseCase, CompleteListenSessionCommand, CompleteListenSessionResponse,
-        ProcessRewardDistributionUseCase, ProcessRewardDistributionCommand, ProcessRewardDistributionResponse,
+        StartListenSessionCommand,
+        CompleteListenSessionUseCase, CompleteListenSessionCommand,
+        ProcessRewardDistributionUseCase,
         StartListenSessionUseCase,
     },
 };
@@ -325,7 +324,7 @@ impl ListenRewardApplicationService {
         }
 
         // Clonar sesión para evitar problemas de ownership
-        let mut session_for_usecase = session.clone();
+        let session_for_usecase = session.clone();
 
         // Verificar ZK proof de forma asíncrona usando una referencia a la sesión original
         let zk_verification_task = self

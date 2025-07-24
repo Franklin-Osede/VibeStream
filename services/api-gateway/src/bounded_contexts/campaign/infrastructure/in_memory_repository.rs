@@ -1,13 +1,10 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use std::collections::HashMap;
-use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
 use crate::bounded_contexts::campaign::domain::{
     entities::{Campaign, CampaignStatus},
-    value_objects::{CampaignId, CampaignName},
     repository::CampaignRepository,
 };
 use crate::shared::domain::repositories::RepoResult;

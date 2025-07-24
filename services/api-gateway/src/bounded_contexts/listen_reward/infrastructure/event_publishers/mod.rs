@@ -8,13 +8,9 @@ use async_trait::async_trait;
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
-use std::sync::Arc;
-use tokio::sync::mpsc;
-use std::collections::HashMap;
 use sqlx::PgPool;
 
 use crate::shared::domain::events::DomainEvent;
-use crate::shared::domain::errors::AppError;
 
 mod postgres_event_publisher;
 mod redis_stream_event_publisher;

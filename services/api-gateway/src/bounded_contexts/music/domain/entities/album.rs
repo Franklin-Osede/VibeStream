@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
-use uuid::Uuid;
 use std::collections::HashMap;
 
 use crate::bounded_contexts::music::domain::value_objects::{
@@ -8,12 +7,11 @@ use crate::bounded_contexts::music::domain::value_objects::{
     IpfsHash, SongDuration
 };
 use crate::bounded_contexts::music::domain::events::{
-    AlbumCreated, AlbumUpdated, AlbumPublished, AlbumUnpublished,
+    AlbumUpdated, AlbumPublished, AlbumUnpublished,
     SongAddedToAlbum, SongRemovedFromAlbum
 };
 use crate::shared::domain::events::DomainEvent;
 use crate::shared::domain::events::EventMetadata;
-use crate::shared::domain::errors::AppError;
 
 /// Album entity representing a collection of songs
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -12,8 +12,7 @@ use crate::shared::application::query::{Query, QueryHandler};
 use crate::shared::domain::errors::AppError;
 
 use crate::bounded_contexts::music::domain::{
-    value_objects::{SongId, ArtistId, AlbumId, PlaylistId, Genre},
-    entities::{Song, Album, Playlist, Artist},
+    value_objects::{SongId, Genre},
     repositories::{SongRepository, MusicCatalogRepository},
 };
 

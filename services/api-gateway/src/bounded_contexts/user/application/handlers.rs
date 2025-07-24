@@ -1,7 +1,6 @@
 // User Application Handlers
 // This module contains command and query handlers for user operations
 
-use crate::bounded_contexts::user::domain::entities::User;
 use crate::shared::domain::errors::AppError;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};

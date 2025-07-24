@@ -270,7 +270,7 @@ impl<R: OwnershipContractRepository + Send + Sync> CommandHandler<TradeShares> f
 
         // Find contract containing the share (simplified - in real implementation might need a share-to-contract index)
         let contracts = self.repository.find_active_contracts().await?;
-        let mut target_aggregate: Option<OwnershipContractAggregate> = None;
+        let target_aggregate: Option<OwnershipContractAggregate> = None;
         
         for mut aggregate in contracts {
             if aggregate.shares().contains_key(&share_id) {
