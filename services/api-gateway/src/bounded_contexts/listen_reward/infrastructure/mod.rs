@@ -7,42 +7,18 @@
 // - Configuration management
 
 pub mod repositories;
-pub mod external_services;
 pub mod event_publishers;
-pub mod configuration;
 pub mod integration;
 
-// Re-export repository traits
 pub use repositories::{
-    ListenSessionRepository, RewardDistributionRepository, RewardAnalyticsRepository,
-    PostgresListenSessionRepository, PostgresRewardDistributionRepository,
-    UserRewardHistory, ArtistRevenueAnalytics, SongMetrics, PlatformStatistics, FraudMetrics,
+    PostgresListenSessionRepository, PostgresRewardDistributionRepository, 
+    PostgresRewardAnalyticsRepository,
 };
-
-// Re-export external services
-pub use external_services::{
-    ZkProofVerificationService, ProductionZkProofVerificationService, MockZkProofVerificationService,
-    BlockchainPaymentService, AnalyticsService, FraudDetectionService,
-    ZkProofVerificationResult, ProofVerificationError, PaymentResult, PaymentError, TransactionHash,
-    AnalyticsEvent, MetricsCollection, FraudAssessment, FraudRisk, SuspiciousActivity, ServiceHealth,
-};
-
-// Re-export event publishing
-pub use event_publishers::{
-    EventPublisher, PostgresEventPublisher, EventMetadata,
-};
-
-// Re-export configuration
-pub use configuration::{
-    // ListenRewardConfig, ListenRewardBoundedContext, ListenRewardBoundedContextBuilder,
-    ListenRewardInfrastructureConfig,
-};
-
-// Re-export integration components
+pub use event_publishers::{InMemoryEventPublisher, EventPublisher};
 pub use integration::{
-    FractionalOwnershipIntegrationHandler, RevenueDistributionTriggered,
-    RevenueSplit, RevenueMetadata, ListenRewardIntegrationFactory,
-    IntegrationConfig
+    ListenRewardIntegration, ListenRewardFractionalOwnershipIntegration,
+    // TODO: Add back when fan ventures is fully integrated
+    // FractionalOwnershipIntegrationHandler, RevenueDistributionTriggered,
 };
 
 // Health check utilities

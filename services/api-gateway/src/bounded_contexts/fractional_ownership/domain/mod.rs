@@ -1,14 +1,11 @@
-pub mod entities;
-pub mod value_objects;
-pub mod aggregates;
-pub mod events;
-pub mod services;
-pub mod repository;
-pub mod errors;
+// =============================================================================
+// FAN VENTURES - DOMAIN LAYER (Reemplazando Fractional Ownership)
+// =============================================================================
 
-pub use entities::*;
-pub use value_objects::*;
-pub use aggregates::*;
-pub use events::*;
-pub use repository::*;
-pub use errors::*; 
+pub mod entities;
+
+// Re-export the fan ventures entities
+pub use entities::{
+    ArtistVenture, FanInvestment, RevenueDistribution, VentureBenefit,
+    VentureStatus, InvestmentStatus, InvestmentType, BenefitType
+}; 

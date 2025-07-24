@@ -1,44 +1,34 @@
-// Listen Reward Bounded Context
-//
-// This module contains all components for the Listen Reward bounded context,
-// responsible for managing listening sessions, reward calculations, and distributions.
+// =============================================================================
+// LISTEN REWARD BOUNDED CONTEXT
+// =============================================================================
 
 pub mod domain;
 pub mod application;
 pub mod infrastructure;
 pub mod presentation;
 
-// Re-export main public interfaces
-pub use application::{
-    ListenRewardApplicationService,
-    StartListeningCommand, CompleteListeningCommand, ProcessRewardsCommand,
-    GetUserListeningHistoryQuery, GetArtistAnalyticsQuery,
-    StartListeningResponse, CompleteListeningResponse, ProcessRewardsResponse,
-    UserListeningHistory, ArtistAnalytics,
-};
-
-pub use presentation::controllers::{
-    ListenRewardController, AnalyticsController,
-    listen_reward_routes, analytics_routes,
-};
-
-pub use infrastructure::{
-    ListenSessionRepository, RewardDistributionRepository, RewardAnalyticsRepository,
-    EventPublisher, ZkProofVerificationService,
-    // ListenRewardConfig, ListenRewardBoundedContext,
-    ListenRewardInfrastructureConfig,
-};
-
+// Re-export domain entities and value objects
 pub use domain::{
-    entities::{ListenSession, SessionStatus, SessionAnalytics},
-    value_objects::{
-        ListenSessionId, RewardAmount, ListenDuration, QualityScore, 
-        ZkProofHash, RewardPoolId, RewardTier, ValidationPeriod,
-    },
-    events::{
-        ListenSessionStarted, ListenSessionCompleted, RewardCalculated,
-        RewardDistributed, ArtistRoyaltyPaid, ZkProofVerificationFailed,
-        RewardPoolDepleted,
-    },
-    aggregates::{RewardDistribution},
+    entities::ListenSession,
+    value_objects::RewardAmount,
+    aggregates::RewardPool,
+};
+
+// Re-export application services
+pub use application::ListenRewardApplicationService;
+
+// Re-export infrastructure components
+pub use infrastructure::{
+    PostgresListenSessionRepository, PostgresRewardDistributionRepository, PostgresRewardAnalyticsRepository,
+    EventPublisher, 
+    // TODO: Add back when external services are implemented
+    // ZkProofVerificationService,
+    // ListenRewardInfrastructureConfig,
+};
+
+// Re-export presentation components
+pub use presentation::{
+    ListenRewardController,
+    // TODO: Add back when routes are implemented
+    // create_listen_reward_routes,
 }; 

@@ -9,145 +9,96 @@ use chrono::{DateTime, Utc};
 use serde::{Serialize, Deserialize};
 
 use crate::shared::domain::errors::AppError;
-use crate::bounded_contexts::{
-    fractional_ownership::{
-        application::commands::DistributeRevenue,
-        integration_service::InMemoryFractionalOwnershipBoundedContext,
-        infrastructure::InMemoryOwnershipContractRepository,
-    },
-    listen_reward::domain::events::ListenSessionCompleted,
+use crate::bounded_contexts::listen_reward::domain::{
+    entities::ListenSession,
+    value_objects::RewardAmount,
 };
-use crate::bounded_contexts::fractional_ownership::domain::repository::OwnershipContractRepository;
+use crate::bounded_contexts::listen_reward::RewardDistribution;
+use crate::bounded_contexts::listen_reward::application::ListenRewardApplicationService;
 
-/// Integration event handler that processes listen sessions
-/// and triggers revenue distribution to fractional owners
-#[derive(Debug, Clone)]
-pub struct FractionalOwnershipIntegrationHandler<R: OwnershipContractRepository> {
-    fractional_ownership_context: Arc<crate::bounded_contexts::fractional_ownership::FractionalOwnershipBoundedContext<R>>,
-    config: IntegrationConfig,
+// =============================================================================
+// LISTEN REWARD INTEGRATION MODULE
+// =============================================================================
+
+use async_trait::async_trait;
+use tracing;
+
+// TODO: Update these imports when fan ventures is fully integrated
+// use crate::bounded_contexts::fractional_ownership::{
+//     application::commands::DistributeRevenue,
+//     domain::entities::RevenueDistribution,
+//     domain::repository::OwnershipContractRepository,
+//     infrastructure::InMemoryOwnershipContractRepository,
+// };
+
+use crate::bounded_contexts::listen_reward::domain::RewardDistribution;
+use crate::bounded_contexts::listen_reward::infrastructure::repositories::RewardAnalytics;
+
+// =============================================================================
+// MOCK INTEGRATION (Temporary until fan ventures is fully integrated)
+// =============================================================================
+
+/// Mock integration handler for listen reward and fractional ownership
+pub struct ListenRewardFractionalOwnershipIntegration;
+
+impl ListenRewardFractionalOwnershipIntegration {
+    pub fn new() -> Self {
+        Self
+    }
+    
+    pub async fn distribute_revenue_to_investors(
+        &self,
+        _revenue_distribution: &RewardDistribution,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // TODO: Implement actual integration when fan ventures is ready
+        tracing::info!("Mock: Distributing revenue to investors");
+        Ok(())
+    }
+    
+    pub async fn get_investor_analytics(
+        &self,
+        _venture_id: &str,
+    ) -> Result<RewardAnalytics, Box<dyn std::error::Error>> {
+        // TODO: Implement actual analytics when fan ventures is ready
+        tracing::info!("Mock: Getting investor analytics");
+        Ok(RewardAnalytics {
+            total_sessions: 0,
+            total_rewards_distributed: 0.0,
+            unique_users: 0,
+            unique_songs: 0,
+            average_session_duration: 0.0,
+            average_reward_per_session: 0.0,
+            total_zk_proofs_verified: 0,
+            failed_verifications: 0,
+            period_start: chrono::Utc::now(),
+            period_end: chrono::Utc::now(),
+        })
+    }
 }
 
-impl<R: OwnershipContractRepository> FractionalOwnershipIntegrationHandler<R> {
-    pub fn new(fractional_ownership_context: Arc<crate::bounded_contexts::fractional_ownership::FractionalOwnershipBoundedContext<R>>) -> Self {
-        Self {
-            fractional_ownership_context,
-            config: IntegrationConfig::default(),
-        }
-    }
+// TODO: Update this factory when fan ventures is fully integrated
+// pub struct ListenRewardIntegrationFactory;
+// 
+// impl ListenRewardIntegrationFactory {
+//     pub fn create_fractional_ownership_handler<R: OwnershipContractRepository>(
+//         repository: R,
+//     ) -> FractionalOwnershipIntegrationHandler<R> {
+//         FractionalOwnershipIntegrationHandler { repository }
+//     }
+// }
 
-    /// Handles listen session completion and distributes rewards to fractional owners
-    pub async fn handle_listen_session_completed(
+#[async_trait]
+pub trait ListenRewardIntegration: Send + Sync {
+    async fn on_listen_session_completed(
         &self,
-        event: &ListenSessionCompleted,
-    ) -> Result<Option<RevenueDistributionTriggered>, AppError> {
-        use crate::bounded_contexts::fractional_ownership::application::queries::GetOwnershipContractBySongId;
-        
-        // 1. Check if the song has fractional ownership
-        let song_id_uuid = *event.song_id.value();
+        session: &ListenSession,
+        reward_amount: RewardAmount,
+    ) -> Result<(), AppError>;
 
-        let get_contract_query = GetOwnershipContractBySongId {
-            song_id: song_id_uuid,
-        };
-
-        // Try to get ownership contract for this song
-        let contract_result = match self.fractional_ownership_context
-            .get_application_service()
-            .get_ownership_contract_by_song_id(get_contract_query)
-            .await
-        {
-            Ok(result) => result,
-            Err(AppError::NotFound(_)) => {
-                // No fractional ownership for this song, skip distribution
-                return Ok(None);
-            }
-            Err(e) => return Err(e),
-        };
-
-        // 2. Calculate revenue amounts
-        let total_reward_amount = event.quality_score.score(); // Use score() method
-
-        // 3. Calculate revenue percentage for fractional owners
-        let fractional_owner_percentage = 100.0 - contract_result.artist_retained_percentage;
-        let fractional_revenue = total_reward_amount * fractional_owner_percentage / 100.0;
-
-        // Only distribute if there's meaningful revenue (min $0.01)
-        if fractional_revenue < 0.01 {
-            return Ok(None);
-        }
-
-        // 4. Trigger revenue distribution
-        let distribute_command = DistributeRevenue {
-            contract_id: contract_result.contract_id,
-            total_revenue: fractional_revenue,
-            distribution_period_start: chrono::Utc::now() - chrono::Duration::hours(1),
-            distribution_period_end: chrono::Utc::now(),
-            platform_fee_percentage: 5.0,
-        };
-
-        let distribution_result = self.fractional_ownership_context
-            .get_application_service()
-            .distribute_revenue(distribute_command)
-            .await?;
-
-        // 5. Return success event
-        Ok(Some(RevenueDistributionTriggered {
-            session_id: event.session_id.value(),
-            song_id: song_id_uuid,
-            contract_id: contract_result.contract_id,
-            total_distributed: fractional_revenue,
-            distribution_id: distribution_result.distribution_id,
-            shareholder_count: distribution_result.shareholder_count,
-            triggered_at: chrono::Utc::now(),
-        }))
-    }
-
-    /// Calculate how much of the streaming revenue should go to fractional owners vs artist
-    pub async fn calculate_revenue_split(
+    async fn on_reward_distributed(
         &self,
-        song_id: Uuid,
-        total_revenue: f64,
-    ) -> Result<RevenueSplit, AppError> {
-        use crate::bounded_contexts::fractional_ownership::application::queries::GetOwnershipContractBySongId;
-        
-        let get_contract_query = GetOwnershipContractBySongId {
-            song_id,
-        };
-
-        // Try to get ownership contract for this song
-        match self.fractional_ownership_context
-            .get_application_service()
-            .get_ownership_contract_by_song_id(get_contract_query)
-            .await
-        {
-            Ok(contract_result) => {
-                // Contract exists - calculate split
-                let artist_retained_percentage = contract_result.artist_retained_percentage;
-                let fractional_owners_percentage = 100.0 - artist_retained_percentage;
-                
-                let artist_share = total_revenue * artist_retained_percentage / 100.0;
-                let fractional_owners_share = total_revenue * fractional_owners_percentage / 100.0;
-
-                Ok(RevenueSplit {
-                    total_revenue,
-                    artist_share,
-                    fractional_owners_share,
-                    artist_retained_percentage,
-                    has_fractional_ownership: true,
-                })
-            }
-            Err(AppError::NotFound(_)) => {
-                // No fractional ownership - artist gets everything
-                Ok(RevenueSplit {
-                    total_revenue,
-                    artist_share: total_revenue,
-                    fractional_owners_share: 0.0,
-                    artist_retained_percentage: 100.0,
-                    has_fractional_ownership: false,
-                })
-            }
-            Err(e) => Err(e),
-        }
-    }
+        distribution: &RewardDistribution,
+    ) -> Result<(), AppError>;
 }
 
 /// Event emitted when revenue distribution is triggered for fractional owners
@@ -180,18 +131,6 @@ pub struct RevenueMetadata {
     pub song_id: Uuid,
     pub listen_duration_seconds: Option<u32>,
     pub quality_score: Option<f64>,
-}
-
-/// Factory for creating integration handlers
-pub struct ListenRewardIntegrationFactory;
-
-impl ListenRewardIntegrationFactory {
-    /// Create fractional ownership integration handler
-    pub fn create_fractional_ownership_handler(
-        fractional_ownership_context: Arc<InMemoryFractionalOwnershipBoundedContext>,
-    ) -> FractionalOwnershipIntegrationHandler<InMemoryOwnershipContractRepository> {
-        FractionalOwnershipIntegrationHandler::new(fractional_ownership_context)
-    }
 }
 
 /// Integration configuration

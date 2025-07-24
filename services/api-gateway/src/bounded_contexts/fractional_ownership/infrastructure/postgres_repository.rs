@@ -1,522 +1,425 @@
-use async_trait::async_trait;
-use sqlx::{PgPool, postgres::PgRow};
-use std::collections::HashMap;
-
+use sqlx::{PgPool, Row};
+use uuid::Uuid;
+use chrono::{DateTime, Utc};
 use crate::shared::domain::errors::AppError;
-
-use crate::bounded_contexts::fractional_ownership::domain::{
-    aggregates::{OwnershipContractAggregate, OwnershipAnalytics},
-    repository::OwnershipContractRepository,
-    value_objects::{
-        OwnershipContractId, OwnershipPercentage, SharePrice, RevenueAmount, 
-        ShareId
-    },
-    entities::FractionalShare,
-    aggregates::ContractStatus,
+use crate::bounded_contexts::fractional_ownership::domain::entities::{
+    FanInvestment, ArtistVenture, RevenueDistribution, VentureBenefit, 
+    InvestmentStatus, VentureStatus, InvestmentType, BenefitType
 };
-use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
-use crate::bounded_contexts::user::domain::value_objects::UserId;
 
-/// PostgreSQL implementation of OwnershipContractRepository
-/// 
-/// This repository handles the persistence of ownership contract aggregates
-/// to PostgreSQL database, including proper mapping between domain objects
-/// and database records.
-pub struct PostgresOwnershipContractRepository {
+// =============================================================================
+// FAN VENTURES - POSTGRES REPOSITORY
+// =============================================================================
+
+pub struct PostgresFanVenturesRepository {
     pool: PgPool,
 }
 
-impl PostgresOwnershipContractRepository {
+impl PostgresFanVenturesRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
-    /// Maps database row to domain aggregate
-    async fn map_row_to_aggregate(&self, row: &PgRow) -> Result<OwnershipContractAggregate, AppError> {
-        // TODO: Re-enable when ownership_contracts table is created
-        // Temporarily return a dummy aggregate to allow compilation
-        let _row = row;
-        
-        // Create a dummy aggregate for compilation
-        let dummy_aggregate = OwnershipContractAggregate::create_contract(
-            SongId::new(),
-            ArtistId::new(),
-            1000,
-            SharePrice::new(10.0).unwrap(),
-            OwnershipPercentage::new(51.0).unwrap(),
-            Some(RevenueAmount::new(100.0).unwrap()),
-            Some(OwnershipPercentage::new(20.0).unwrap()),
-        ).unwrap();
-        
-        Ok(dummy_aggregate)
-        
-        /*
-        let id = OwnershipContractId::from_uuid(row.get("id"));
-        let song_id = SongId::from_uuid(row.get("song_id"));
-        let artist_id = ArtistId::from_uuid(row.get("artist_id"));
-        let total_shares: i32 = row.get("total_shares");
-        let price_per_share: f64 = row.get("price_per_share");
-        let artist_retained_percentage: f64 = row.get("artist_retained_percentage");
-        let shares_available_for_sale: i32 = row.get("shares_available_for_sale");
-        let shares_sold: i32 = row.get("shares_sold");
-        let minimum_investment: Option<f64> = row.get("minimum_investment");
-        let maximum_ownership_per_user: Option<f64> = row.get("maximum_ownership_per_user");
-        let contract_status: String = row.get("contract_status");
-        let created_at: DateTime<Utc> = row.get("created_at");
-        let updated_at: DateTime<Utc> = row.get("updated_at");
-        let version: i32 = row.get("version");
+    // =============================================================================
+    // ARTIST VENTURES
+    // =============================================================================
 
-        let contract = OwnershipContract::from_db(
-            id,
-            song_id,
-            artist_id,
-            total_shares as u32,
-            SharePrice::new(price_per_share).unwrap(),
-            OwnershipPercentage::new(artist_retained_percentage).unwrap(),
-            shares_available_for_sale as u32,
-            shares_sold as u32,
-            minimum_investment.map(|v| RevenueAmount::new(v).unwrap()),
-            maximum_ownership_per_user.map(|v| OwnershipPercentage::new(v).unwrap()),
-            Self::parse_contract_status(&contract_status)?,
-            created_at,
-            updated_at,
-        );
-
-        let shares = self.load_shares_for_contract(&id).await?;
-        let mut aggregate = OwnershipContractAggregate::new(contract);
-        aggregate.load_shares(shares);
-        aggregate.mark_as_loaded();
-        aggregate.set_version(version as u64);
-
-        Ok(aggregate)
-        */
-    }
-
-    /// Load all shares belonging to a contract
-    async fn load_shares_for_contract(&self, contract_id: &OwnershipContractId) -> Result<HashMap<ShareId, FractionalShare>, AppError> {
-        // TODO: Re-enable when fractional_shares table is created
-        // Temporarily return empty HashMap to allow compilation
-        let _contract_id = contract_id;
-        return Ok(HashMap::new());
-        
-        /*
-        let rows = sqlx::query!(
-            r#"
-            SELECT 
-                id, contract_id, song_id, owner_id, ownership_percentage,
-                purchase_price, current_market_value, total_revenue_received,
-                is_locked, lock_reason, vesting_start_date, vesting_end_date,
-                purchased_at, created_at, updated_at
-            FROM fractional_shares 
-            WHERE contract_id = $1
-            "#,
-            contract_id.value()
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
-
-        let mut shares = HashMap::new();
-        for row in rows {
-            let share_id = ShareId::from_uuid(row.id);
-            let owner_id = UserId::from_uuid(row.owner_id);
-            let song_id = SongId::from_uuid(row.song_id);
-            let ownership_percentage = OwnershipPercentage::new(row.ownership_percentage)?;
-            let purchase_price = SharePrice::new(row.purchase_price)?;
-            let current_market_value = SharePrice::new(row.current_market_value)?;
-            let total_revenue_received = RevenueAmount::new(row.total_revenue_received)?;
-
-            let vesting_period = if let (Some(start), Some(end)) = (row.vesting_start_date, row.vesting_end_date) {
-                Some(VestingPeriod::new(start, end)?)
-            } else {
-                None
-            };
-
-            let share = FractionalShare::reconstruct(
-                share_id.clone(),
-                OwnershipContractId::from_uuid(row.contract_id),
-                song_id,
-                owner_id,
-                ownership_percentage,
-                purchase_price,
-                current_market_value,
-                total_revenue_received,
-                row.is_locked,
-                row.lock_reason,
-                vesting_period,
-                row.purchased_at,
-                row.created_at,
-                row.updated_at,
-            )?;
-
-            shares.insert(share_id, share);
-        }
-
-        Ok(shares)
-        */
-    }
-
-    /// Parse string to ContractStatus enum
-    fn parse_contract_status(status: &str) -> Result<ContractStatus, AppError> {
-        match status {
-            "Draft" => Ok(ContractStatus::Draft),
-            "Active" => Ok(ContractStatus::Active),
-            "Paused" => Ok(ContractStatus::Paused),
-            "SoldOut" => Ok(ContractStatus::SoldOut),
-            "Terminated" => Ok(ContractStatus::Terminated),
-            _ => Err(AppError::InvalidInput(format!("Invalid contract status: {}", status))),
-        }
-    }
-
-    /// Save shares to database
-    async fn save_shares(&self, contract_id: &OwnershipContractId, shares: &HashMap<ShareId, FractionalShare>) -> Result<(), AppError> {
-        // TODO: Re-enable when fractional_shares table is created
-        // Temporarily do nothing to allow compilation
-        let _contract_id = contract_id;
-        let _shares = shares;
-        return Ok(());
-        
-        /*
-        let mut tx = self.pool.begin().await.map_err(|e| AppError::DatabaseError(e.to_string()))?;
-
-        // Delete existing shares for this contract
-        sqlx::query!(
-            "DELETE FROM fractional_shares WHERE contract_id = $1",
-            contract_id.value()
-        )
-        .execute(&mut *tx)
-        .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
-
-        // Insert all shares
-        for share in shares.values() {
-            let vesting_start = share.vesting_period().as_ref().map(|vp| vp.start_date());
-            let vesting_end = share.vesting_period().as_ref().map(|vp| vp.end_date());
-
-            sqlx::query!(
-                r#"
-                INSERT INTO fractional_shares (
-                    id, contract_id, song_id, owner_id, ownership_percentage,
-                    purchase_price, current_market_value, total_revenue_received,
-                    is_locked, lock_reason, vesting_start_date, vesting_end_date,
-                    purchased_at, created_at, updated_at
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-                "#,
-                share.id().value(),
-                share.contract_id().value(),
-                share.song_id().value(),
-                share.owner_id().value(),
-                share.ownership_percentage().value(),
-                share.purchase_price().value(),
-                share.current_market_value().value(),
-                share.total_revenue_received().value(),
-                share.is_locked(),
-                share.lock_reason(),
-                vesting_start,
-                vesting_end,
-                share.purchased_at(),
-                share.created_at(),
-                share.updated_at()
-            )
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
-        }
-
-        tx.commit().await.map_err(|e| AppError::DatabaseError(e.to_string()))?;
-        Ok(())
-        */
-    }
-
-    /// Save domain events to event store
-    async fn save_events(&self, aggregate: &OwnershipContractAggregate) -> Result<(), AppError> {
-        // TODO: Re-enable when domain_events table is created
-        // Temporarily do nothing to allow compilation
-        let _aggregate = aggregate;
-        return Ok(());
-        
-        /*
-        if aggregate.pending_events().is_empty() {
-            return Ok(());
-        }
-
-        let mut tx = self.pool.begin().await.map_err(|e| AppError::DatabaseError(e.to_string()))?;
-
-        for event in aggregate.pending_events() {
-            let event_data = serde_json::to_value(event)
-                .map_err(|e| AppError::SerializationError(e.to_string()))?;
-
-            sqlx::query!(
-                r#"
-                INSERT INTO domain_events (
-                    id, aggregate_id, aggregate_type, event_type, 
-                    event_data, event_version, occurred_at
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-                "#,
-                Uuid::new_v4(),
-                aggregate.id().value(),
-                "OwnershipContract",
-                event.event_type(),
-                event_data,
-                event.version(),
-                event.occurred_at()
-            )
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
-        }
-
-        tx.commit().await.map_err(|e| AppError::DatabaseError(e.to_string()))?;
-        Ok(())
-        */
-    }
-}
-
-#[async_trait]
-impl OwnershipContractRepository for PostgresOwnershipContractRepository {
-    async fn save(&self, aggregate: &OwnershipContractAggregate) -> Result<(), AppError> {
-        // TODO: Re-enable when ownership_contracts table is created
-        // Temporarily do nothing to allow compilation
-        let _aggregate = aggregate;
-        return Ok(());
-        
-        /*
-        let mut tx = self.pool.begin().await.map_err(|e| AppError::DatabaseError(e.to_string()))?;
-
-        let contract = aggregate.contract();
-
-        // Insert ownership contract
+    pub async fn create_venture(&self, venture: &ArtistVenture) -> Result<(), AppError> {
         sqlx::query!(
             r#"
-            INSERT INTO ownership_contracts (
-                id, song_id, artist_id, total_shares, price_per_share,
-                artist_retained_percentage, shares_available_for_sale, shares_sold,
-                minimum_investment, maximum_ownership_per_user, contract_status,
-                created_at, updated_at, version
+            INSERT INTO artist_ventures (
+                id, artist_id, title, description, investment_type, 
+                min_investment, max_investment, total_goal, current_amount,
+                max_investors, current_investors, created_at, expires_at, status
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             "#,
-            aggregate.id().value(),
-            contract.song_id.value(),
-            contract.artist_id.value(),
-            contract.total_shares as i32,
-            contract.price_per_share.value(),
-            contract.artist_retained_percentage.value(),
-            contract.shares_available_for_sale as i32,
-            contract.shares_sold as i32,
-            contract.minimum_investment.as_ref().map(|mi| mi.value()),
-            contract.maximum_ownership_per_user.as_ref().map(|mo| mo.value()),
-            format!("{:?}", contract.contract_status),
-            contract.created_at,
-            contract.updated_at,
-            aggregate.version()
+            venture.id,
+            venture.artist_id,
+            venture.title,
+            venture.description,
+            venture.investment_type.to_string(),
+            venture.min_investment,
+            venture.max_investment,
+            venture.total_goal,
+            venture.current_amount,
+            venture.max_investors,
+            venture.current_investors as i32,
+            venture.created_at,
+            venture.expires_at,
+            venture.status.to_string()
         )
-        .execute(&mut *tx)
+        .execute(&self.pool)
         .await
         .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-        tx.commit().await.map_err(|e| AppError::DatabaseError(e.to_string()))?;
-
-        // Save shares separately
-        self.save_shares(aggregate.id(), aggregate.shares()).await?;
-
-        // Save domain events
-        self.save_events(aggregate).await?;
-
-        Ok(())
-        */
-    }
-
-    async fn update(&self, aggregate: &OwnershipContractAggregate) -> Result<(), AppError> {
-        // TODO: Re-enable when ownership_contracts table is created
-        // Temporarily do nothing to allow compilation
-        let _aggregate = aggregate;
-        return Ok(());
-        
-        /*
-        let mut tx = self.pool.begin().await.map_err(|e| AppError::DatabaseError(e.to_string()))?;
-
-        let contract = aggregate.contract();
-
-        // Update ownership contract with optimistic locking
-        let result = sqlx::query!(
-            r#"
-            UPDATE ownership_contracts 
-            SET 
-                shares_available_for_sale = $1,
-                shares_sold = $2,
-                contract_status = $3,
-                updated_at = $4,
-                version = $5
-            WHERE id = $6 AND version = $7
-            "#,
-            contract.shares_available_for_sale as i32,
-            contract.shares_sold as i32,
-            format!("{:?}", contract.contract_status),
-            Utc::now(),
-            aggregate.version() + 1,
-            aggregate.id().value(),
-            aggregate.version()
-        )
-        .execute(&mut *tx)
-        .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
-
-        if result.rows_affected() == 0 {
-            return Err(AppError::ConcurrencyConflict("Contract was modified by another transaction".to_string()));
+        // Insert benefits
+        for benefit in &venture.benefits {
+            self.create_venture_benefit(benefit).await?;
         }
 
-        tx.commit().await.map_err(|e| AppError::DatabaseError(e.to_string()))?;
-
-        // Update shares
-        self.save_shares(aggregate.id(), aggregate.shares()).await?;
-
-        // Save domain events
-        self.save_events(aggregate).await?;
-
         Ok(())
-        */
     }
 
-    async fn find_by_id(&self, id: &OwnershipContractId) -> Result<Option<OwnershipContractAggregate>, AppError> {
-        // Ownership contracts table is now created - activating PostgreSQL implementation
+    pub async fn get_venture(&self, venture_id: Uuid) -> Result<Option<ArtistVenture>, AppError> {
         let row = sqlx::query!(
             r#"
-            SELECT id, song_id, artist_id, total_shares, price_per_share, 
-                   artist_retained_percentage, shares_available_for_sale, shares_sold,
-                   minimum_investment, maximum_ownership_per_user, contract_status,
-                   created_at, updated_at, version
-            FROM ownership_contracts 
-            WHERE id = $1
+            SELECT * FROM artist_ventures WHERE id = $1
             "#,
-            id.value()
+            venture_id
         )
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-        let _ = row; // TODO: Mapear columnas a aggregate cuando esté implementado
-        Ok(None)
+        match row {
+            Some(row) => {
+                let benefits = self.get_venture_benefits(venture_id).await?;
+                
+                Ok(Some(ArtistVenture {
+                    id: row.id,
+                    artist_id: row.artist_id,
+                    title: row.title,
+                    description: row.description,
+                    investment_type: InvestmentType::from_string(&row.investment_type)?,
+                    min_investment: row.min_investment,
+                    max_investment: row.max_investment,
+                    total_goal: row.total_goal,
+                    current_amount: row.current_amount,
+                    max_investors: row.max_investors.map(|v| v as u32),
+                    current_investors: row.current_investors as u32,
+                    created_at: row.created_at,
+                    expires_at: row.expires_at,
+                    status: VentureStatus::from_string(&row.status)?,
+                    benefits,
+                }))
+            },
+            None => Ok(None),
+        }
     }
 
-    async fn delete(&self, id: &OwnershipContractId) -> Result<(), AppError> {
-        let tx = self.pool.begin().await.map_err(|e| AppError::DatabaseError(e.to_string()))?;
-
-        // TODO: Re-enable when fractional_shares table is created
-        // Delete shares first (foreign key constraint)
-        /*
-        sqlx::query!(
-            "DELETE FROM fractional_shares WHERE contract_id = $1",
-            id.value()
-        )
-        .execute(&mut *tx)
-        .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
-
-        // Delete contract
-        sqlx::query!(
-            "DELETE FROM ownership_contracts WHERE id = $1",
-            id.value()
-        )
-        .execute(&mut *tx)
-        .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
-
-        tx.commit().await.map_err(|e| AppError::DatabaseError(e.to_string()))?;
-        */
+    pub async fn list_open_ventures(&self, limit: Option<i32>) -> Result<Vec<ArtistVenture>, AppError> {
+        let limit = limit.unwrap_or(50);
         
-        // TODO: Re-enable when ownership_contracts table is created
-        let _id = id;
+        let rows = sqlx::query!(
+            r#"
+            SELECT * FROM artist_ventures 
+            WHERE status = 'Open' AND expires_at > NOW()
+            ORDER BY created_at DESC 
+            LIMIT $1
+            "#,
+            limit
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        let mut ventures = Vec::new();
+        for row in rows {
+            let benefits = self.get_venture_benefits(row.id).await?;
+            
+            ventures.push(ArtistVenture {
+                id: row.id,
+                artist_id: row.artist_id,
+                title: row.title,
+                description: row.description,
+                investment_type: InvestmentType::from_string(&row.investment_type).unwrap_or(InvestmentType::Custom("Unknown".to_string())),
+                min_investment: row.min_investment,
+                max_investment: row.max_investment,
+                total_goal: row.total_goal,
+                current_amount: row.current_amount,
+                max_investors: row.max_investors.map(|v| v as u32),
+                current_investors: row.current_investors as u32,
+                created_at: row.created_at,
+                expires_at: row.expires_at,
+                status: VentureStatus::from_string(&row.status).unwrap_or(VentureStatus::Draft),
+                benefits,
+            });
+        }
+
+        Ok(ventures)
+    }
+
+    // =============================================================================
+    // FAN INVESTMENTS
+    // =============================================================================
+
+    pub async fn create_fan_investment(&self, investment: &FanInvestment) -> Result<(), AppError> {
+        sqlx::query!(
+            r#"
+            INSERT INTO fan_investments (
+                id, artist_id, fan_id, investment_amount, investment_type,
+                created_at, status, expected_return, duration_months
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            "#,
+            investment.id,
+            investment.artist_id,
+            investment.fan_id,
+            investment.investment_amount,
+            investment.investment_type.to_string(),
+            investment.created_at,
+            investment.status.to_string(),
+            investment.expected_return,
+            investment.duration_months as i32
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        // Update venture current amount and investors count
+        sqlx::query!(
+            r#"
+            UPDATE artist_ventures 
+            SET current_amount = current_amount + $1,
+                current_investors = current_investors + 1
+            WHERE artist_id = $2
+            "#,
+            investment.investment_amount,
+            investment.artist_id
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
         Ok(())
     }
 
-    // TODO: Re-enable all methods below when ownership_contracts table is created
-    async fn find_by_song_id(&self, song_id: &SongId) -> Result<Vec<OwnershipContractAggregate>, AppError> {
-        let _song_id = song_id;
-        Ok(Vec::new())
+    pub async fn get_fan_investments(&self, fan_id: Uuid) -> Result<Vec<FanInvestment>, AppError> {
+        let rows = sqlx::query!(
+            r#"
+            SELECT * FROM fan_investments WHERE fan_id = $1
+            ORDER BY created_at DESC
+            "#,
+            fan_id
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        let investments = rows.into_iter().map(|row| FanInvestment {
+            id: row.id,
+            artist_id: row.artist_id,
+            fan_id: row.fan_id,
+            investment_amount: row.investment_amount,
+            investment_type: InvestmentType::from_string(&row.investment_type).unwrap_or(InvestmentType::Custom("Unknown".to_string())),
+            created_at: row.created_at,
+            status: InvestmentStatus::from_string(&row.status).unwrap_or(InvestmentStatus::Pending),
+            expected_return: row.expected_return,
+            duration_months: row.duration_months as u32,
+        }).collect();
+
+        Ok(investments)
     }
 
-    async fn find_by_artist_id(&self, artist_id: &ArtistId) -> Result<Vec<OwnershipContractAggregate>, AppError> {
-        let _artist_id = artist_id;
-        Ok(Vec::new())
+    // =============================================================================
+    // VENTURE BENEFITS
+    // =============================================================================
+
+    pub async fn create_venture_benefit(&self, benefit: &VentureBenefit) -> Result<(), AppError> {
+        sqlx::query!(
+            r#"
+            INSERT INTO venture_benefits (
+                id, venture_id, title, description, benefit_type,
+                delivery_date, is_delivered
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            "#,
+            benefit.id,
+            benefit.venture_id,
+            benefit.title,
+            benefit.description,
+            benefit.benefit_type.to_string(),
+            benefit.delivery_date,
+            benefit.is_delivered
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        Ok(())
     }
 
-    async fn find_active_contracts(&self) -> Result<Vec<OwnershipContractAggregate>, AppError> {
-        Ok(Vec::new())
+    pub async fn get_venture_benefits(&self, venture_id: Uuid) -> Result<Vec<VentureBenefit>, AppError> {
+        let rows = sqlx::query!(
+            r#"
+            SELECT * FROM venture_benefits WHERE venture_id = $1
+            ORDER BY created_at ASC
+            "#,
+            venture_id
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        let benefits = rows.into_iter().map(|row| VentureBenefit {
+            id: row.id,
+            venture_id: row.venture_id,
+            title: row.title,
+            description: row.description,
+            benefit_type: BenefitType::from_string(&row.benefit_type).unwrap_or(BenefitType::Custom("Unknown".to_string())),
+            delivery_date: row.delivery_date,
+            is_delivered: row.is_delivered,
+        }).collect();
+
+        Ok(benefits)
     }
 
-    async fn find_paginated(&self, offset: u32, limit: u32) -> Result<(Vec<OwnershipContractAggregate>, u64), AppError> {
-        let _offset = offset;
-        let _limit = limit;
-        Ok((Vec::new(), 0))
+    // =============================================================================
+    // REVENUE DISTRIBUTIONS
+    // =============================================================================
+
+    pub async fn create_revenue_distribution(&self, distribution: &RevenueDistribution) -> Result<(), AppError> {
+        sqlx::query!(
+            r#"
+            INSERT INTO revenue_distributions (
+                id, venture_id, total_revenue, artist_share, 
+                fan_share, platform_fee, distributed_at, period_start, period_end
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            "#,
+            distribution.id,
+            distribution.venture_id,
+            distribution.total_revenue,
+            distribution.artist_share,
+            distribution.fan_share,
+            distribution.platform_fee,
+            distribution.distributed_at,
+            distribution.period_start,
+            distribution.period_end
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        Ok(())
     }
 
-    async fn exists_for_song(&self, song_id: &SongId) -> Result<bool, AppError> {
-        let _song_id = song_id;
-        Ok(false)
-    }
+    pub async fn get_venture_distributions(&self, venture_id: Uuid) -> Result<Vec<RevenueDistribution>, AppError> {
+        let rows = sqlx::query!(
+            r#"
+            SELECT * FROM revenue_distributions 
+            WHERE venture_id = $1
+            ORDER BY distributed_at DESC
+            "#,
+            venture_id
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-    async fn find_by_status(&self, status: &str) -> Result<Vec<OwnershipContractAggregate>, AppError> {
-        let _status = status;
-        Ok(Vec::new())
-    }
+        let distributions = rows.into_iter().map(|row| RevenueDistribution {
+            id: row.id,
+            venture_id: row.venture_id,
+            total_revenue: row.total_revenue,
+            artist_share: row.artist_share,
+            fan_share: row.fan_share,
+            platform_fee: row.platform_fee,
+            distributed_at: row.distributed_at,
+            period_start: row.period_start,
+            period_end: row.period_end,
+        }).collect();
 
-    async fn get_contract_analytics(&self, id: &OwnershipContractId) -> Result<Option<OwnershipAnalytics>, AppError> {
-        let _id = id;
-        Ok(None)
-    }
-
-    async fn get_total_market_value(&self) -> Result<f64, AppError> {
-        Ok(0.0)
-    }
-
-    async fn find_by_completion_range(&self, min_completion: f64, max_completion: f64) -> Result<Vec<OwnershipContractAggregate>, AppError> {
-        let _min = min_completion;
-        let _max = max_completion;
-        Ok(Vec::new())
-    }
-
-    async fn find_contracts_with_user_shares(&self, user_id: &UserId) -> Result<Vec<OwnershipContractAggregate>, AppError> {
-        let _user_id = user_id;
-        Ok(Vec::new())
+        Ok(distributions)
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use sqlx::PgPool;
+// =============================================================================
+// HELPER IMPLEMENTATIONS
+// =============================================================================
 
-    async fn setup_test_db() -> PgPool {
-        // This would set up a test database
-        // For now, we'll skip the actual database tests
-        todo!("Setup test database for integration tests")
+impl VentureStatus {
+    fn to_string(&self) -> String {
+        match self {
+            VentureStatus::Draft => "Draft".to_string(),
+            VentureStatus::Open => "Open".to_string(),
+            VentureStatus::Closed => "Closed".to_string(),
+            VentureStatus::Cancelled => "Cancelled".to_string(),
+        }
     }
 
-    #[tokio::test]
-    #[ignore] // Ignore until test database is set up
-    async fn test_postgres_repository_save_and_find() {
-        let pool = setup_test_db().await;
-        let repo = PostgresOwnershipContractRepository::new(pool);
+    fn from_string(s: &str) -> Result<Self, AppError> {
+        match s {
+            "Draft" => Ok(VentureStatus::Draft),
+            "Open" => Ok(VentureStatus::Open),
+            "Closed" => Ok(VentureStatus::Closed),
+            "Cancelled" => Ok(VentureStatus::Cancelled),
+            _ => Err(AppError::DomainRuleViolation(format!("Invalid venture status: {}", s))),
+        }
+    }
+}
 
-        // Create test aggregate
-        let aggregate = OwnershipContractAggregate::create_contract(
-            SongId::new(),
-            ArtistId::new(),
-            1000,
-            SharePrice::new(10.0).unwrap(),
-            OwnershipPercentage::new(51.0).unwrap(),
-            Some(RevenueAmount::new(100.0).unwrap()),
-            Some(OwnershipPercentage::new(20.0).unwrap()),
-        ).unwrap();
+impl InvestmentStatus {
+    fn to_string(&self) -> String {
+        match self {
+            InvestmentStatus::Pending => "Pending".to_string(),
+            InvestmentStatus::Active => "Active".to_string(),
+            InvestmentStatus::Completed => "Completed".to_string(),
+            InvestmentStatus::Cancelled => "Cancelled".to_string(),
+        }
+    }
 
-        // Save
-        repo.save(&aggregate).await.unwrap();
+    fn from_string(s: &str) -> Result<Self, AppError> {
+        match s {
+            "Pending" => Ok(InvestmentStatus::Pending),
+            "Active" => Ok(InvestmentStatus::Active),
+            "Completed" => Ok(InvestmentStatus::Completed),
+            "Cancelled" => Ok(InvestmentStatus::Cancelled),
+            _ => Err(AppError::DomainRuleViolation(format!("Invalid investment status: {}", s))),
+        }
+    }
+}
 
-        // Find
-        let found = repo.find_by_id(aggregate.id()).await.unwrap();
-        assert!(found.is_some());
+impl InvestmentType {
+    fn to_string(&self) -> String {
+        match self {
+            InvestmentType::EarlyAccess => "EarlyAccess".to_string(),
+            InvestmentType::ExclusiveContent => "ExclusiveContent".to_string(),
+            InvestmentType::Merchandise => "Merchandise".to_string(),
+            InvestmentType::ConcertTickets => "ConcertTickets".to_string(),
+            InvestmentType::MeetAndGreet => "MeetAndGreet".to_string(),
+            InvestmentType::RevenueShare => "RevenueShare".to_string(),
+            InvestmentType::Custom(s) => format!("Custom:{}", s),
+        }
+    }
 
-        let found_aggregate = found.unwrap();
-        assert_eq!(found_aggregate.id(), aggregate.id());
+    fn from_string(s: &str) -> Result<Self, AppError> {
+        match s {
+            "EarlyAccess" => Ok(InvestmentType::EarlyAccess),
+            "ExclusiveContent" => Ok(InvestmentType::ExclusiveContent),
+            "Merchandise" => Ok(InvestmentType::Merchandise),
+            "ConcertTickets" => Ok(InvestmentType::ConcertTickets),
+            "MeetAndGreet" => Ok(InvestmentType::MeetAndGreet),
+            "RevenueShare" => Ok(InvestmentType::RevenueShare),
+            s if s.starts_with("Custom:") => {
+                let custom = s.strip_prefix("Custom:").unwrap_or("Unknown");
+                Ok(InvestmentType::Custom(custom.to_string()))
+            },
+            _ => Err(AppError::DomainRuleViolation(format!("Invalid investment type: {}", s))),
+        }
+    }
+}
+
+impl BenefitType {
+    fn to_string(&self) -> String {
+        match self {
+            BenefitType::DigitalContent => "DigitalContent".to_string(),
+            BenefitType::PhysicalProduct => "PhysicalProduct".to_string(),
+            BenefitType::Experience => "Experience".to_string(),
+            BenefitType::RevenueShare => "RevenueShare".to_string(),
+            BenefitType::Recognition => "Recognition".to_string(),
+            BenefitType::Custom(s) => format!("Custom:{}", s),
+        }
+    }
+
+    fn from_string(s: &str) -> Result<Self, AppError> {
+        match s {
+            "DigitalContent" => Ok(BenefitType::DigitalContent),
+            "PhysicalProduct" => Ok(BenefitType::PhysicalProduct),
+            "Experience" => Ok(BenefitType::Experience),
+            "RevenueShare" => Ok(BenefitType::RevenueShare),
+            "Recognition" => Ok(BenefitType::Recognition),
+            s if s.starts_with("Custom:") => {
+                let custom = s.strip_prefix("Custom:").unwrap_or("Unknown");
+                Ok(BenefitType::Custom(custom.to_string()))
+            },
+            _ => Err(AppError::DomainRuleViolation(format!("Invalid benefit type: {}", s))),
+        }
     }
 } 
