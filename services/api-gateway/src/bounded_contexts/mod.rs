@@ -8,8 +8,8 @@ pub mod music;
 // Listen & Reward Context - working independently
 pub mod listen_reward;
 
-// Fractional Ownership Context
-pub mod fractional_ownership;
+// Fan Ventures Context
+pub mod fan_ventures;
 
 // Cross-context orchestrator
 pub mod orchestrator; 

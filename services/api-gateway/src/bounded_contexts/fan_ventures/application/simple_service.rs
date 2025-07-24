@@ -1,11 +1,11 @@
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 use crate::shared::domain::errors::AppError;
-use crate::bounded_contexts::fractional_ownership::domain::entities::{
+use crate::bounded_contexts::fan_ventures::domain::entities::{
     ArtistVenture, FanInvestment, RevenueDistribution, VentureBenefit,
     VentureStatus, InvestmentStatus, InvestmentType, BenefitType
 };
-use crate::bounded_contexts::fractional_ownership::infrastructure::postgres_repository::PostgresFanVenturesRepository;
+use crate::bounded_contexts::fan_ventures::infrastructure::postgres_repository::PostgresFanVenturesRepository;
 
 // =============================================================================
 // FAN VENTURES SERVICE (Reemplazando Fractional Ownership)
@@ -61,16 +61,16 @@ impl FanVenturesService {
             id: Uuid::new_v4(),
             artist_id,
             title,
-            description,
+            description: Some(description),
             investment_type,
             min_investment,
-            max_investment,
+            max_investment: Some(max_investment),
             total_goal,
             current_amount: 0.0,
-            max_investors,
+            max_investors: max_investors.map(|v| v as i32),
             current_investors: 0,
             created_at: Utc::now(),
-            expires_at,
+            expires_at: Some(expires_at),
             status: VentureStatus::Draft,
             benefits,
         };
@@ -130,11 +130,18 @@ impl FanVenturesService {
             ));
         }
 
-        if investment_amount < venture.min_investment || investment_amount > venture.max_investment {
+        if investment_amount < venture.min_investment {
             return Err(AppError::DomainRuleViolation(
-                format!("Investment amount must be between ${} and ${}", 
-                    venture.min_investment, venture.max_investment)
+                format!("Investment amount must be at least ${}", venture.min_investment)
             ));
+        }
+
+        if let Some(max_inv) = venture.max_investment {
+            if investment_amount > max_inv {
+                return Err(AppError::DomainRuleViolation(
+                    format!("Investment amount must be at most ${}", max_inv)
+                ));
+            }
         }
 
         if venture.current_amount + investment_amount > venture.total_goal {
@@ -160,7 +167,7 @@ impl FanVenturesService {
             created_at: Utc::now(),
             status: InvestmentStatus::Pending,
             expected_return,
-            duration_months,
+            duration_months: duration_months as i32,
         };
 
         self.repository.create_fan_investment(&investment).await?;
@@ -320,7 +327,7 @@ impl FanVenturesService {
 
         Ok(VentureAnalytics {
             venture_id,
-            total_investors,
+            total_investors: total_investors as u32,
             average_investment,
             funding_progress,
             total_revenue_generated,

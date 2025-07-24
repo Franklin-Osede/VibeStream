@@ -34,9 +34,9 @@ use crate::bounded_contexts::{
         infrastructure::event_publishers::InMemoryEventPublisher,
         presentation::controllers::{ListenRewardController, listen_reward_routes},
     },
-    fractional_ownership::{
+    fan_ventures::{
         presentation::controllers::AppState,
-        presentation::controllers::create_fractional_ownership_routes,
+        presentation::controllers::create_fan_ventures_routes,
     },
 };
 
@@ -132,9 +132,9 @@ pub async fn create_complete_router(db_pool: PgPool) -> Result<Router, Box<dyn s
         ))))
         
         // =============================================================================
-        // FRACTIONAL OWNERSHIP CONTEXT - Investment & Trading
+        // FAN VENTURES CONTEXT - Investment & Trading
         // =============================================================================
-        .nest("/api/v1", create_fractional_ownership_routes().with_state(AppState::default()))
+        .nest("/api/v1", create_fan_ventures_routes().with_state(AppState::default()))
         
         // =============================================================================
         // CROSS-CONTEXT ENDPOINTS

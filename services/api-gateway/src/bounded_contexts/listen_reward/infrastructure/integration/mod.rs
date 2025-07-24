@@ -13,7 +13,7 @@ use crate::bounded_contexts::listen_reward::domain::{
     entities::ListenSession,
     value_objects::RewardAmount,
 };
-use crate::bounded_contexts::listen_reward::RewardDistribution;
+use crate::bounded_contexts::listen_reward::domain::RewardDistribution;
 use crate::bounded_contexts::listen_reward::application::ListenRewardApplicationService;
 
 // =============================================================================
@@ -30,8 +30,6 @@ use tracing;
 //     domain::repository::OwnershipContractRepository,
 //     infrastructure::InMemoryOwnershipContractRepository,
 // };
-
-use crate::bounded_contexts::listen_reward::domain::RewardDistribution;
 use crate::bounded_contexts::listen_reward::infrastructure::repositories::RewardAnalytics;
 
 // =============================================================================

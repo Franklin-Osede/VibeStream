@@ -190,7 +190,7 @@ pub async fn delete_contract(
 }
 
 /// Create Fractional Ownership Routes
-pub fn create_fractional_ownership_routes() -> Router<AppState> {
+pub fn create_fan_ventures_routes() -> Router<AppState> {
     Router::new()
         .route("/contracts", get(get_contracts))
         .route("/contracts", post(create_contract))
@@ -201,7 +201,7 @@ pub fn create_fractional_ownership_routes() -> Router<AppState> {
 
 // Alias for compatibility
 pub fn create_routes() -> Router<AppState> {
-    create_fractional_ownership_routes()
+            create_fan_ventures_routes()
 }
 
 // Mock admin routes

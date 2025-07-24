@@ -32,7 +32,7 @@ use crate::bounded_contexts::{
         infrastructure::event_publishers::InMemoryEventPublisher,
     },
     // TODO: Update these imports when fan ventures is fully integrated
-    // fractional_ownership::{
+    // fan_ventures::{
     //     PostgresFractionalOwnershipBoundedContext,
     //     infrastructure::PostgresOwnershipContractRepository,
     //     application::FractionalOwnershipApplicationService,
