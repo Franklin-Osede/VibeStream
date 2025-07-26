@@ -18,7 +18,7 @@ use crate::bounded_contexts::{
             PostgresSongRepository,
             PostgresAlbumRepository,
             PostgresPlaylistRepository,
-        },
+    },
         presentation::routes::create_music_routes,
     },
     campaign::{
@@ -30,13 +30,22 @@ use crate::bounded_contexts::{
             PostgresListenSessionRepository,
             PostgresRewardDistributionRepository,
             PostgresRewardAnalyticsRepository,
-        },
+    },
         infrastructure::event_publishers::InMemoryEventPublisher,
         presentation::controllers::{ListenRewardController, listen_reward_routes},
     },
     fan_ventures::{
         presentation::controllers::AppState,
         presentation::controllers::create_fan_ventures_routes,
+    },
+    notifications::{
+        application::NotificationApplicationService,
+        infrastructure::{
+            PostgresNotificationRepository,
+            PostgresNotificationPreferencesRepository,
+            PostgresNotificationTemplateRepository,
+        },
+        presentation::controllers::{create_notification_routes, NotificationState},
     },
 };
 
@@ -74,6 +83,21 @@ pub async fn create_complete_router(db_pool: PgPool) -> Result<Router, Box<dyn s
     let song_repository = Arc::new(PostgresSongRepository::new((*pool).clone()));
     let _album_repository = Arc::new(PostgresAlbumRepository::new((*pool).clone()));
     let _playlist_repository = Arc::new(PostgresPlaylistRepository::new((*pool).clone()));
+
+    // Notification Context Repositories & Services
+    let notification_repository = PostgresNotificationRepository::new((*pool).clone());
+    let notification_preferences_repository = PostgresNotificationPreferencesRepository::new((*pool).clone());
+    let notification_template_repository = PostgresNotificationTemplateRepository::new((*pool).clone());
+    
+    let notification_service = Arc::new(NotificationApplicationService::new(
+        notification_repository,
+        notification_preferences_repository,
+        notification_template_repository,
+    ));
+    
+    let notification_state = Arc::new(NotificationState {
+        app_service: notification_service,
+    });
 
     // =============================================================================
     // NEW INFRASTRUCTURE SERVICES (Replacing P2P, Federation, Monitoring)
@@ -135,6 +159,11 @@ pub async fn create_complete_router(db_pool: PgPool) -> Result<Router, Box<dyn s
         // FAN VENTURES CONTEXT - Investment & Trading
         // =============================================================================
         .nest("/api/v1", create_fan_ventures_routes().with_state(AppState::default()))
+        
+        // =============================================================================
+        // NOTIFICATIONS CONTEXT - User Notifications & Preferences
+        // =============================================================================
+        .nest("/api/v1/notifications", create_notification_routes().with_state(notification_state))
         
         // =============================================================================
         // CROSS-CONTEXT ENDPOINTS

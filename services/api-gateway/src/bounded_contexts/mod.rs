@@ -11,5 +11,8 @@ pub mod listen_reward;
 // Fan Ventures Context
 pub mod fan_ventures;
 
+// Notifications Context
+pub mod notifications;
+
 // Cross-context orchestrator
 pub mod orchestrator; 

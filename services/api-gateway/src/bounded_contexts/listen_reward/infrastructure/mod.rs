@@ -11,7 +11,7 @@ pub mod event_publishers;
 pub mod integration;
 
 pub use repositories::{
-    PostgresListenSessionRepository, PostgresRewardDistributionRepository, 
+    PostgresListenSessionRepository, PostgresRewardDistributionRepository,
     PostgresRewardAnalyticsRepository,
 };
 pub use event_publishers::{InMemoryEventPublisher, EventPublisher};
