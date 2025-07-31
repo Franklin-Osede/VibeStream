@@ -81,7 +81,7 @@ impl PostgresFractionalOwnershipBoundedContext {
 
         // 4. Initialize presentation state  
         let concrete_service: Arc<FractionalOwnershipApplicationService<PostgresOwnershipContractRepository>> = Arc::clone(&application_service);
-        let app_state = AppState::default();
+        let app_state = AppState::default().await;
 
         // 5. Setup event processor with handlers
         let mut event_processor = EventProcessor::new(event_receiver);
@@ -181,8 +181,7 @@ impl<R: OwnershipContractRepository> FractionalOwnershipBoundedContext<R> {
 
 /// Factory for creating test instances
 impl InMemoryFractionalOwnershipBoundedContext {
-    /// Create a test instance with in-memory implementations
-    pub fn create_for_testing() -> Self {
+    pub async fn create_for_testing() -> Self {
         use crate::bounded_contexts::fractional_ownership::infrastructure::InMemoryEventPublisher;
         // TODO: Commented out until mock repository is properly defined
         // use crate::bounded_contexts::fractional_ownership::domain::repository::tests::MockOwnershipContractRepository;
@@ -190,7 +189,7 @@ impl InMemoryFractionalOwnershipBoundedContext {
         let repository = Arc::new(crate::bounded_contexts::fractional_ownership::infrastructure::InMemoryOwnershipContractRepository::new());
         let event_publisher = Arc::new(InMemoryEventPublisher::new());
         let application_service = Arc::new(FractionalOwnershipApplicationService::new(repository.clone()));
-        let app_state = AppState::default();
+        let app_state = AppState::default().await;
 
         Self {
             application_service,
@@ -379,7 +378,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_bounded_context_test_creation() {
-        let context = InMemoryFractionalOwnershipBoundedContext::create_for_testing();
+        let context = InMemoryFractionalOwnershipBoundedContext::create_for_testing().await;
         
         // Verify all components are initialized
         assert!(Arc::strong_count(&context.application_service) >= 1);
@@ -406,7 +405,7 @@ mod tests {
         assert!(registry.get_fractional_ownership().is_none());
         
         // Test that we can create the test context separately
-        let _context = InMemoryFractionalOwnershipBoundedContext::create_for_testing();
+        let _context = InMemoryFractionalOwnershipBoundedContext::create_for_testing().await;
         assert!(true); // Context created successfully
     }
 

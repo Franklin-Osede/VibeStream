@@ -158,7 +158,7 @@ pub async fn create_complete_router(db_pool: PgPool) -> Result<Router, Box<dyn s
         // =============================================================================
         // FAN VENTURES CONTEXT - Investment & Trading
         // =============================================================================
-        .nest("/api/v1", create_fan_ventures_routes().with_state(AppState::default()))
+        .nest("/api/v1", create_fan_ventures_routes().with_state(AppState::default().await))
         
         // =============================================================================
         // NOTIFICATIONS CONTEXT - User Notifications & Preferences

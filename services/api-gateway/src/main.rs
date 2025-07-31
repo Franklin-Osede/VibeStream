@@ -37,14 +37,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api-docs/health", get(docs_health_check));
 
     // Iniciar servidor
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3001));
     println!("🌐 API Gateway listening on {}", addr);
     println!("");
     println!("📚 DOCUMENTACIÓN OPENAPI:");
-    println!("   📖 Swagger UI:  http://localhost:3000/docs");
-    println!("   📘 ReDoc:       http://localhost:3000/redoc");
-    println!("   📄 OpenAPI JSON: http://localhost:3000/api-docs/openapi.json");
-    println!("   📄 OpenAPI YAML: http://localhost:3000/api-docs/openapi.yaml");
+    println!("   📖 Swagger UI:  http://localhost:3001/docs");
+    println!("   📘 ReDoc:       http://localhost:3001/redoc");
+    println!("   📄 OpenAPI JSON: http://localhost:3001/api-docs/openapi.json");
+    println!("   📄 OpenAPI YAML: http://localhost:3001/api-docs/openapi.yaml");
     println!("");
     println!("🎵 ENDPOINTS DISPONIBLES:");
     println!("   GET  /api/music/songs/discover");

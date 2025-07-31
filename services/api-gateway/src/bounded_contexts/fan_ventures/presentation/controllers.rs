@@ -53,7 +53,7 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(_application_service: Arc<FractionalOwnershipApplicationService>) -> Self {
+    pub async fn new(_application_service: Arc<FractionalOwnershipApplicationService>) -> Self {
         Self {
             contract_repository: Arc::new(()),
             share_repository: Arc::new(()),
@@ -62,11 +62,11 @@ impl AppState {
             blockchain_service: Arc::new(()),
             zk_service: Arc::new(()),
             ipfs_service: Arc::new(()),
-            db_pool: Arc::new(unsafe { std::mem::zeroed() }), // Mock pool
+            db_pool: Arc::new(PgPool::connect("postgresql://vibestream:vibestream@localhost:5433/vibestream").await.unwrap_or_else(|_| panic!("Failed to connect to database"))),
         }
     }
 
-    pub fn default() -> Self {
+    pub async fn default() -> Self {
         Self {
             contract_repository: Arc::new(()),
             share_repository: Arc::new(()),
@@ -75,7 +75,7 @@ impl AppState {
             blockchain_service: Arc::new(()),
             zk_service: Arc::new(()),
             ipfs_service: Arc::new(()),
-            db_pool: Arc::new(unsafe { std::mem::zeroed() }), // Mock pool
+            db_pool: Arc::new(PgPool::connect("postgresql://vibestream:vibestream@localhost:5433/vibestream").await.unwrap_or_else(|_| panic!("Failed to connect to database"))),
         }
     }
 }
