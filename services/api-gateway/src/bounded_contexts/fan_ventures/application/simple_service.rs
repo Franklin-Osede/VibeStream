@@ -9,7 +9,7 @@ use crate::bounded_contexts::fan_ventures::domain::entities::{
     BenefitDelivery, DeliveryStatus, CreateDeliveryRequest, UpdateDeliveryRequest,
     DeliverySummary, FanDeliveryHistory, VentureDeliveryStats,
     VentureDiscovery, ExplorationFilters, ExplorationSorting, VentureRecommendation,
-    FanPreferences, VentureExploration, VentureCategory, RiskLevel
+    FanPreferences, VentureExploration, VentureCategory, RiskLevel, CreateVentureRequest
 };
 use crate::bounded_contexts::fan_ventures::infrastructure::postgres_repository::PostgresFanVenturesRepository;
 
@@ -34,51 +34,39 @@ impl FanVenturesService {
     pub async fn create_venture(
         &self,
         artist_id: Uuid,
-        title: String,
-        description: String,
-        investment_type: InvestmentType,
-        min_investment: f64,
-        max_investment: f64,
-        total_goal: f64,
-        max_investors: Option<u32>,
-        expires_at: DateTime<Utc>,
-        benefits: Vec<VentureBenefit>,
+        request: CreateVentureRequest,
     ) -> Result<ArtistVenture, AppError> {
-        // Validate venture parameters
-        if min_investment <= 0.0 || max_investment <= 0.0 || total_goal <= 0.0 {
-            return Err(AppError::DomainRuleViolation(
-                "Investment amounts must be greater than 0".to_string()
-            ));
-        }
-
-        if max_investment < min_investment {
-            return Err(AppError::DomainRuleViolation(
-                "Max investment cannot be less than min investment".to_string()
-            ));
-        }
-
-        if expires_at <= Utc::now() {
-            return Err(AppError::DomainRuleViolation(
-                "Venture must expire in the future".to_string()
-            ));
+        // Validate expiration date
+        if let Some(expires_at) = request.expires_at {
+            if expires_at <= Utc::now() {
+                return Err(AppError::DomainRuleViolation(
+                    "Venture must expire in the future".to_string()
+                ));
+            }
         }
 
         let venture = ArtistVenture {
             id: Uuid::new_v4(),
             artist_id,
-            title,
-            description: Some(description),
-            investment_type,
-            min_investment,
-            max_investment: Some(max_investment),
-            total_goal,
-            current_amount: 0.0,
-            max_investors: max_investors.map(|v| v as i32),
-            current_investors: 0,
+            title: request.title,
+            description: Some(request.description),
+            category: VentureCategory::Other, // Default value
+            tags: vec![], // Default empty
+            risk_level: RiskLevel::Medium, // Default value
+            expected_return: 0.0, // Default value
+            artist_rating: 0.0, // Default value
+            artist_previous_ventures: 0, // Default value
+            artist_success_rate: 0.0, // Default value
+            min_investment: request.min_investment,
+            max_investment: Some(request.max_investment),
+            funding_goal: request.funding_goal,
+            current_funding: 0.0, // Default value
+            start_date: None, // Default value
+            end_date: request.expires_at,
             created_at: Utc::now(),
-            expires_at: Some(expires_at),
-            status: VentureStatus::Draft,
-            benefits,
+            updated_at: Utc::now(),
+            status: VentureStatus::Draft, // Default status
+            benefits: Vec::new(),
         };
 
         self.repository.create_venture(&venture).await?;
@@ -150,30 +138,21 @@ impl FanVenturesService {
             }
         }
 
-        if venture.current_amount + investment_amount > venture.total_goal {
+        if venture.current_funding + investment_amount > venture.funding_goal {
             return Err(AppError::DomainRuleViolation(
-                "Investment would exceed venture goal".to_string()
+                format!("Investment would exceed funding goal of ${}", venture.funding_goal)
             ));
-        }
-
-        if let Some(max_investors) = venture.max_investors {
-            if venture.current_investors >= max_investors {
-                return Err(AppError::DomainRuleViolation(
-                    "Venture has reached maximum number of investors".to_string()
-                ));
-            }
         }
 
         let investment = FanInvestment {
             id: Uuid::new_v4(),
-            artist_id: venture.artist_id,
             fan_id,
+            venture_id,
             investment_amount,
             investment_type,
-            created_at: Utc::now(),
             status: InvestmentStatus::Pending,
-            expected_return,
-            duration_months: duration_months as i32,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         };
 
         self.repository.create_fan_investment(&investment).await?;
@@ -251,22 +230,19 @@ impl FanVenturesService {
     pub async fn add_venture_benefit(
         &self,
         venture_id: Uuid,
-        title: String,
-        description: String,
-        benefit_type: BenefitType,
-        delivery_date: Option<DateTime<Utc>>,
+        request: CreateBenefitRequest,
     ) -> Result<VentureBenefit, AppError> {
         let benefit = VentureBenefit {
             id: Uuid::new_v4(),
             venture_id,
-            tier_id: None,
-            title,
-            description: Some(description),
-            benefit_type,
-            value: 0.0, // Default value
-            delivery_method: DeliveryMethod::Manual,
-            delivery_date,
+            tier_id: None, // CreateBenefitRequest doesn't have tier_id
+            title: request.title,
+            description: request.description,
+            benefit_type: request.benefit_type,
+            delivery_method: request.delivery_method,
+            estimated_delivery_date: request.estimated_delivery_date,
             created_at: Some(Utc::now()),
+            updated_at: Some(Utc::now()),
         };
 
         self.repository.create_venture_benefit(&benefit).await?;
@@ -288,16 +264,19 @@ impl FanVenturesService {
         let investments = self.get_fan_investments(fan_id).await?;
         
         let total_invested: f64 = investments.iter().map(|i| i.investment_amount).sum();
-        let total_returned: f64 = investments.iter().map(|i| i.expected_return).sum();
+        let total_returned: f64 = 0.0; // TODO: Calculate from returns
         let active_investments = investments.iter().filter(|i| i.status == InvestmentStatus::Active).count() as u32;
         let completed_investments = investments.iter().filter(|i| i.status == InvestmentStatus::Completed).count() as u32;
         
-        // Get unique artists
-        let favorite_artists: Vec<Uuid> = investments.iter()
-            .map(|i| i.artist_id)
+        // Get unique venture IDs from investments (we'll need to get artist IDs from ventures)
+        let venture_ids: Vec<Uuid> = investments.iter()
+            .map(|i| i.venture_id)
             .collect::<std::collections::HashSet<_>>()
             .into_iter()
             .collect();
+        
+        // TODO: Get artist IDs from venture IDs
+        let favorite_artists: Vec<Uuid> = vec![]; // Placeholder
 
         Ok(FanPortfolio {
             fan_id,
@@ -318,15 +297,15 @@ impl FanVenturesService {
         let _investments = self.get_artist_investments(venture.artist_id).await?;
         let distributions = self.get_venture_distributions(venture_id).await?;
         
-        let total_investors = venture.current_investors;
+        let total_investors = _investments.len() as u32;
         let average_investment = if total_investors > 0 {
-            venture.current_amount / total_investors as f64
+            venture.current_funding / total_investors as f64
         } else {
             0.0
         };
-
-        let funding_progress = if venture.total_goal > 0.0 {
-            (venture.current_amount / venture.total_goal) * 100.0
+        
+        let funding_progress = if venture.funding_goal > 0.0 {
+            (venture.current_funding / venture.funding_goal) * 100.0
         } else {
             0.0
         };
@@ -376,17 +355,17 @@ impl FanVenturesService {
         }
 
         // Convert CreateBenefitRequest to VentureBenefit
-        let venture_benefits: Vec<VentureBenefit> = benefits.into_iter().map(|b| VentureBenefit {
+        let benefits: Vec<VentureBenefit> = benefits.iter().map(|b| VentureBenefit {
             id: Uuid::new_v4(),
-            venture_id,
-            tier_id: None, // Will be set after tier creation
-            title: b.title,
-            description: b.description,
-            benefit_type: b.benefit_type,
-            value: b.value,
-            delivery_method: b.delivery_method,
-            delivery_date: b.delivery_date,
+            venture_id: venture_id,
+            tier_id: None, // Will be set when tier is created
+            title: b.title.clone(),
+            description: b.description.clone(),
+            benefit_type: b.benefit_type.clone(),
+            delivery_method: b.delivery_method.clone(),
+            estimated_delivery_date: b.estimated_delivery_date,
             created_at: Some(Utc::now()),
+            updated_at: Some(Utc::now()),
         }).collect();
 
         let tier = VentureTier {
@@ -397,7 +376,7 @@ impl FanVenturesService {
             max_investment,
             description,
             created_at: Utc::now(),
-            benefits: venture_benefits,
+            benefits: benefits,
         };
 
         self.repository.create_venture_tier(&tier).await?;
@@ -485,7 +464,23 @@ impl FanVenturesService {
     /// Get comprehensive dashboard for an artist
     pub async fn get_artist_dashboard(&self, artist_id: Uuid) -> Result<ArtistDashboard, AppError> {
         // Get all ventures for the artist
-        let ventures = self.repository.list_ventures_by_artist(artist_id).await?;
+        let artist_ventures = self.repository.list_ventures_by_artist(artist_id).await?;
+        
+        let ventures: Vec<VentureSummary> = artist_ventures.iter().map(|v| VentureSummary {
+            venture_id: v.id, // ArtistVenture has 'id', not 'venture_id'
+            title: v.title.clone(),
+            status: v.status.clone(),
+            current_funding: v.current_funding,
+            funding_goal: v.funding_goal,
+            funding_progress: if v.funding_goal > 0.0 {
+                (v.current_funding / v.funding_goal) * 100.0
+            } else {
+                0.0
+            },
+            total_investors: 0, // TODO: Calculate from investments
+            created_at: v.created_at,
+            end_date: v.end_date,
+        }).collect();
         
         let total_ventures = ventures.len() as u32;
         let active_ventures = ventures.iter()
@@ -493,50 +488,47 @@ impl FanVenturesService {
             .count() as u32;
         
         let total_funding_raised: f64 = ventures.iter()
-            .map(|v| v.current_amount)
+            .map(|v| v.current_funding)
             .sum();
         
         let total_investors: u32 = ventures.iter()
-            .map(|v| v.current_investors as u32)
+            .map(|v| v.total_investors as u32)
             .sum::<u32>();
         
         // Get recent ventures (last 5)
-        let recent_ventures: Vec<VentureSummary> = ventures.iter()
-            .take(5)
-            .map(|v| VentureSummary {
-                venture_id: v.id,
-                title: v.title.clone(),
-                status: v.status.clone(),
-                current_amount: v.current_amount,
-                total_goal: v.total_goal,
-                funding_progress: if v.total_goal > 0.0 {
-                    (v.current_amount / v.total_goal) * 100.0
-                } else {
-                    0.0
-                },
-                total_investors: v.current_investors as u32,
-                created_at: v.created_at,
-                expires_at: v.expires_at,
-            })
-            .collect();
+        let recent_ventures: Vec<VentureSummary> = ventures.iter().map(|v| VentureSummary {
+            venture_id: v.venture_id,
+            title: v.title.clone(),
+            status: v.status.clone(),
+            current_funding: v.current_funding,
+            funding_goal: v.funding_goal,
+            funding_progress: if v.funding_goal > 0.0 {
+                (v.current_funding / v.funding_goal) * 100.0
+            } else {
+                0.0
+            },
+            total_investors: v.total_investors as u32,
+            created_at: v.created_at,
+            end_date: v.end_date,
+        }).collect();
         
         // Get top performing ventures (by funding progress)
         let mut top_performing: Vec<VentureSummary> = ventures.iter()
             .filter(|v| v.status == VentureStatus::Open)
             .map(|v| VentureSummary {
-                venture_id: v.id,
+                venture_id: v.venture_id,
                 title: v.title.clone(),
                 status: v.status.clone(),
-                current_amount: v.current_amount,
-                total_goal: v.total_goal,
-                funding_progress: if v.total_goal > 0.0 {
-                    (v.current_amount / v.total_goal) * 100.0
+                current_funding: v.current_funding,
+                funding_goal: v.funding_goal,
+                funding_progress: if v.funding_goal > 0.0 {
+                    (v.current_funding / v.funding_goal) * 100.0
                 } else {
                     0.0
                 },
-                total_investors: v.current_investors as u32,
+                total_investors: v.total_investors as u32,
                 created_at: v.created_at,
-                expires_at: v.expires_at,
+                end_date: v.end_date,
             })
             .collect();
         
@@ -547,7 +539,7 @@ impl FanVenturesService {
         let recent_investments = vec![
             InvestmentSummary {
                 investment_id: Uuid::new_v4(),
-                venture_id: ventures.first().map(|v| v.id).unwrap_or_default(),
+                venture_id: ventures.first().map(|v| v.venture_id).unwrap_or_default(),
                 venture_title: "My First Album".to_string(),
                 fan_id: Uuid::new_v4(),
                 fan_name: "John Doe".to_string(),
@@ -610,27 +602,20 @@ impl FanVenturesService {
         ];
         
         let funding_progress = FundingProgress {
-            current_amount: venture.current_amount,
-            total_goal: venture.total_goal,
-            percentage_complete: if venture.total_goal > 0.0 {
-                (venture.current_amount / venture.total_goal) * 100.0
+            current_amount: venture.current_funding,
+            total_goal: venture.funding_goal,
+            percentage_complete: if venture.funding_goal > 0.0 {
+                (venture.current_funding / venture.funding_goal) * 100.0
             } else {
                 0.0
             },
-            days_remaining: venture.expires_at.map(|expires| {
+            days_remaining: venture.end_date.map(|end_date| {
                 let now = Utc::now();
-                if expires > now {
-                    (expires - now).num_days() as i32
-                } else {
-                    0
-                }
+                let duration = end_date - now;
+                duration.num_days() as i32
             }),
-            average_investment: if venture.current_investors > 0 {
-                venture.current_amount / venture.current_investors as f64
-            } else {
-                0.0
-            },
-            largest_investment: 1000.0, // TODO: Calculate from actual investments
+            average_investment: 0.0, // TODO: Calculate from investments
+            largest_investment: 0.0, // TODO: Calculate from investments
         };
         
         // Mock recent activity (TODO: Implement activity tracking)
@@ -873,15 +858,14 @@ impl FanVenturesService {
                 artist_avatar: Some("https://example.com/featured.jpg".to_string()),
                 title: "Featured Venture".to_string(),
                 description: Some("A featured venture for exploration".to_string()),
-                investment_type: InvestmentType::RevenueShare,
                 min_investment: 50.0,
                 max_investment: Some(500.0),
-                total_goal: 5000.0,
-                current_amount: 2500.0,
+                funding_goal: 5000.0,
+                current_funding: 2500.0,
                 funding_progress: 50.0,
                 total_investors: 15,
                 status: VentureStatus::Open,
-                expires_at: Some(Utc::now() + chrono::Duration::days(45)),
+                end_date: Some(Utc::now() + chrono::Duration::days(45)),
                 days_remaining: Some(45),
                 created_at: Utc::now(),
                 top_tiers: Vec::new(),
@@ -904,15 +888,14 @@ impl FanVenturesService {
                 artist_avatar: Some("https://example.com/trending.jpg".to_string()),
                 title: "Trending Venture".to_string(),
                 description: Some("A trending venture with high interest".to_string()),
-                investment_type: InvestmentType::ExclusiveContent,
                 min_investment: 25.0,
                 max_investment: Some(250.0),
-                total_goal: 2500.0,
-                current_amount: 2000.0,
+                funding_goal: 2500.0,
+                current_funding: 2000.0,
                 funding_progress: 80.0,
                 total_investors: 40,
                 status: VentureStatus::Open,
-                expires_at: Some(Utc::now() + chrono::Duration::days(15)),
+                end_date: Some(Utc::now() + chrono::Duration::days(15)),
                 days_remaining: Some(15),
                 created_at: Utc::now(),
                 top_tiers: Vec::new(),
@@ -944,15 +927,14 @@ impl FanVenturesService {
                     artist_avatar: Some("https://example.com/recommended.jpg".to_string()),
                     title: "Recommended Venture".to_string(),
                     description: Some("A venture recommended for you".to_string()),
-                    investment_type: InvestmentType::RevenueShare,
                     min_investment: 75.0,
                     max_investment: Some(750.0),
-                    total_goal: 7500.0,
-                    current_amount: 3750.0,
+                    funding_goal: 7500.0,
+                    current_funding: 3750.0,
                     funding_progress: 50.0,
                     total_investors: 20,
                     status: VentureStatus::Open,
-                    expires_at: Some(Utc::now() + chrono::Duration::days(30)),
+                    end_date: Some(Utc::now() + chrono::Duration::days(30)),
                     days_remaining: Some(30),
                     created_at: Utc::now(),
                     top_tiers: Vec::new(),

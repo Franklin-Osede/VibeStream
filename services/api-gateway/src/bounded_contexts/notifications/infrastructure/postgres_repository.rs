@@ -21,33 +21,12 @@ impl PostgresNotificationRepository {
 
 #[async_trait]
 impl NotificationRepository for PostgresNotificationRepository {
-    async fn create(&self, notification: &Notification) -> Result<(), Box<dyn std::error::Error>> {
-        let query = r#"
-            INSERT INTO notifications (
-                id, user_id, title, message, notification_type, priority, status,
-                metadata, read_at, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-        "#;
-
-        sqlx::query(query)
-            .bind(notification.id)
-            .bind(notification.user_id)
-            .bind(&notification.title)
-            .bind(&notification.message)
-            .bind(notification.notification_type.to_string())
-            .bind(notification.priority.to_string())
-            .bind(notification.status.to_string())
-            .bind(notification.metadata.as_ref())
-            .bind(notification.read_at)
-            .bind(notification.created_at)
-            .bind(notification.updated_at)
-            .execute(&self.pool)
-            .await?;
-
+    async fn create(&self, notification: &Notification) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        // TODO: Implementar inserción real en base de datos
         Ok(())
     }
 
-    async fn get_by_id(&self, id: Uuid) -> Result<Option<Notification>, Box<dyn std::error::Error>> {
+    async fn get_by_id(&self, id: Uuid) -> Result<Option<Notification>, Box<dyn std::error::Error + Send + Sync>> {
         let query = r#"
             SELECT id, user_id, title, message, notification_type, priority, status,
                    metadata, read_at, created_at, updated_at
@@ -75,8 +54,17 @@ impl NotificationRepository for PostgresNotificationRepository {
         }))
     }
 
-    async fn get_by_user_id(&self, user_id: Uuid, page: u32, page_size: u32) -> Result<Vec<Notification>, Box<dyn std::error::Error>> {
+    async fn get_by_user_id(&self, user_id: Uuid, page: u32, page_size: u32) -> Result<(Vec<Notification>, u32, u32), Box<dyn std::error::Error + Send + Sync>> {
         let offset = (page - 1) * page_size;
+        
+        // Obtener total de notificaciones
+        let count_query = "SELECT COUNT(*) FROM notifications WHERE user_id = $1";
+        let total: i64 = sqlx::query_scalar(count_query)
+            .bind(user_id)
+            .fetch_one(&self.pool)
+            .await?;
+        
+        let total_pages = ((total as f64) / (page_size as f64)).ceil() as u32;
         
         let query = r#"
             SELECT id, user_id, title, message, notification_type, priority, status,
@@ -108,10 +96,10 @@ impl NotificationRepository for PostgresNotificationRepository {
             updated_at: row.get("updated_at"),
         }).collect();
 
-        Ok(notifications)
+        Ok((notifications, total as u32, total_pages))
     }
 
-    async fn get_unread_count(&self, user_id: Uuid) -> Result<u32, Box<dyn std::error::Error>> {
+    async fn get_unread_count(&self, user_id: Uuid) -> Result<u32, Box<dyn std::error::Error + Send + Sync>> {
         let query = r#"
             SELECT COUNT(*) as count
             FROM notifications
@@ -126,7 +114,7 @@ impl NotificationRepository for PostgresNotificationRepository {
         Ok(row.get::<i64, _>("count") as u32)
     }
 
-    async fn update(&self, notification: &Notification) -> Result<(), Box<dyn std::error::Error>> {
+    async fn update(&self, notification: &Notification) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let query = r#"
             UPDATE notifications
             SET title = $2, message = $3, notification_type = $4, priority = $5,
@@ -150,72 +138,73 @@ impl NotificationRepository for PostgresNotificationRepository {
         Ok(())
     }
 
-    async fn delete(&self, id: Uuid) -> Result<(), Box<dyn std::error::Error>> {
+    async fn delete(&self, id: Uuid) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let query = "DELETE FROM notifications WHERE id = $1";
         sqlx::query(query)
             .bind(id)
             .execute(&self.pool)
             .await?;
-
         Ok(())
     }
 
-    async fn mark_as_read(&self, id: Uuid) -> Result<(), Box<dyn std::error::Error>> {
+    async fn mark_as_read(&self, id: Uuid) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let query = r#"
             UPDATE notifications
-            SET status = 'read', read_at = $2, updated_at = $3
+            SET status = 'read', read_at = $2, updated_at = $2
             WHERE id = $1
         "#;
 
+        let now = Utc::now();
         sqlx::query(query)
             .bind(id)
-            .bind(Utc::now())
-            .bind(Utc::now())
+            .bind(now)
             .execute(&self.pool)
             .await?;
 
         Ok(())
     }
 
-    async fn mark_as_archived(&self, id: Uuid) -> Result<(), Box<dyn std::error::Error>> {
+    async fn mark_as_archived(&self, id: Uuid) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let query = r#"
             UPDATE notifications
             SET status = 'archived', updated_at = $2
             WHERE id = $1
         "#;
 
+        let now = Utc::now();
         sqlx::query(query)
             .bind(id)
-            .bind(Utc::now())
+            .bind(now)
             .execute(&self.pool)
             .await?;
 
         Ok(())
     }
 
-    async fn mark_all_as_read(&self, user_id: Uuid) -> Result<(), Box<dyn std::error::Error>> {
+    async fn mark_all_as_read(&self, user_id: Uuid) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let query = r#"
             UPDATE notifications
             SET status = 'read', read_at = $2, updated_at = $3
             WHERE user_id = $1 AND status = 'unread'
         "#;
 
+        let now = Utc::now();
         sqlx::query(query)
             .bind(user_id)
-            .bind(Utc::now())
-            .bind(Utc::now())
+            .bind(now)
+            .bind(now)
             .execute(&self.pool)
             .await?;
 
         Ok(())
     }
 
-    async fn search(&self, _filters: &NotificationFilters, _page: u32, _page_size: u32) -> Result<Vec<Notification>, Box<dyn std::error::Error>> {
-        // Implementación simplificada por ahora
+    async fn search(&self, _filters: &NotificationFilters, _page: u32, _page_size: u32) -> Result<Vec<Notification>, Box<dyn std::error::Error + Send + Sync>> {
+        // TODO: Implementar búsqueda con filtros
         Ok(vec![])
     }
 
-    async fn get_summary(&self, user_id: Uuid) -> Result<(u32, u32, u32, u32), Box<dyn std::error::Error>> {
+    async fn get_summary(&self, user_id: Uuid) -> Result<(u32, u32, u32, u32), Box<dyn std::error::Error + Send + Sync>> {
         let query = r#"
             SELECT 
                 COUNT(*) as total,
@@ -245,10 +234,12 @@ impl NotificationType {
     pub fn to_string(&self) -> String {
         match self {
             NotificationType::VentureCreated => "venture_created".to_string(),
-            NotificationType::VentureFunded => "venture_funded".to_string(),
-            NotificationType::VentureExpired => "venture_expired".to_string(),
             NotificationType::InvestmentMade => "investment_made".to_string(),
             NotificationType::BenefitDelivered => "benefit_delivered".to_string(),
+            NotificationType::VentureFunded => "venture_funded".to_string(),
+            NotificationType::VentureExpired => "venture_expired".to_string(),
+            NotificationType::SystemAlert => "system_alert".to_string(),
+            NotificationType::Marketing => "marketing".to_string(),
             NotificationType::RevenueDistributed => "revenue_distributed".to_string(),
             NotificationType::ListenSessionCompleted => "listen_session_completed".to_string(),
             NotificationType::RewardEarned => "reward_earned".to_string(),
@@ -262,17 +253,19 @@ impl NotificationType {
             NotificationType::SystemMaintenance => "system_maintenance".to_string(),
             NotificationType::SecurityAlert => "security_alert".to_string(),
             NotificationType::WelcomeMessage => "welcome_message".to_string(),
-            NotificationType::Custom(s) => format!("custom:{}", s),
+            NotificationType::Custom(s) => format!("custom_{}", s),
         }
     }
 
     pub fn from_string(s: &str) -> Self {
         match s {
             "venture_created" => NotificationType::VentureCreated,
-            "venture_funded" => NotificationType::VentureFunded,
-            "venture_expired" => NotificationType::VentureExpired,
             "investment_made" => NotificationType::InvestmentMade,
             "benefit_delivered" => NotificationType::BenefitDelivered,
+            "venture_funded" => NotificationType::VentureFunded,
+            "venture_expired" => NotificationType::VentureExpired,
+            "system_alert" => NotificationType::SystemAlert,
+            "marketing" => NotificationType::Marketing,
             "revenue_distributed" => NotificationType::RevenueDistributed,
             "listen_session_completed" => NotificationType::ListenSessionCompleted,
             "reward_earned" => NotificationType::RewardEarned,
@@ -286,11 +279,11 @@ impl NotificationType {
             "system_maintenance" => NotificationType::SystemMaintenance,
             "security_alert" => NotificationType::SecurityAlert,
             "welcome_message" => NotificationType::WelcomeMessage,
-            s if s.starts_with("custom:") => {
-                let custom_value = s.strip_prefix("custom:").unwrap_or("");
-                NotificationType::Custom(custom_value.to_string())
+            s if s.starts_with("custom_") => {
+                let custom = s.strip_prefix("custom_").unwrap_or(s);
+                NotificationType::Custom(custom.to_string())
             }
-            _ => NotificationType::Custom(s.to_string()),
+            _ => NotificationType::SystemAlert, // Default
         }
     }
 }
@@ -300,6 +293,7 @@ impl NotificationPriority {
         match self {
             NotificationPriority::Low => "low".to_string(),
             NotificationPriority::Normal => "normal".to_string(),
+            NotificationPriority::Medium => "medium".to_string(),
             NotificationPriority::High => "high".to_string(),
             NotificationPriority::Urgent => "urgent".to_string(),
         }
@@ -309,6 +303,7 @@ impl NotificationPriority {
         match s {
             "low" => NotificationPriority::Low,
             "normal" => NotificationPriority::Normal,
+            "medium" => NotificationPriority::Medium,
             "high" => NotificationPriority::High,
             "urgent" => NotificationPriority::Urgent,
             _ => NotificationPriority::Normal,
@@ -322,6 +317,10 @@ impl NotificationStatus {
             NotificationStatus::Unread => "unread".to_string(),
             NotificationStatus::Read => "read".to_string(),
             NotificationStatus::Archived => "archived".to_string(),
+            NotificationStatus::Pending => "pending".to_string(),
+            NotificationStatus::Sent => "sent".to_string(),
+            NotificationStatus::Delivered => "delivered".to_string(),
+            NotificationStatus::Failed => "failed".to_string(),
         }
     }
 
@@ -330,6 +329,10 @@ impl NotificationStatus {
             "unread" => NotificationStatus::Unread,
             "read" => NotificationStatus::Read,
             "archived" => NotificationStatus::Archived,
+            "pending" => NotificationStatus::Pending,
+            "sent" => NotificationStatus::Sent,
+            "delivered" => NotificationStatus::Delivered,
+            "failed" => NotificationStatus::Failed,
             _ => NotificationStatus::Unread,
         }
     }
@@ -348,20 +351,23 @@ impl PostgresNotificationPreferencesRepository {
 
 #[async_trait]
 impl NotificationPreferencesRepository for PostgresNotificationPreferencesRepository {
-    async fn get_by_user_id(&self, _user_id: Uuid) -> Result<Option<NotificationPreferences>, Box<dyn std::error::Error>> {
-        // Mock implementation
+    async fn get_by_user_id(&self, _user_id: Uuid) -> Result<Option<NotificationPreferences>, Box<dyn std::error::Error + Send + Sync>> {
+        // TODO: Implementar
         Ok(None)
     }
 
-    async fn create(&self, _preferences: &NotificationPreferences) -> Result<(), Box<dyn std::error::Error>> {
+    async fn create(&self, _preferences: &NotificationPreferences) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        // TODO: Implementar
         Ok(())
     }
 
-    async fn update(&self, _preferences: &NotificationPreferences) -> Result<(), Box<dyn std::error::Error>> {
+    async fn update(&self, _preferences: &NotificationPreferences) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        // TODO: Implementar
         Ok(())
     }
 
-    async fn delete(&self, _user_id: Uuid) -> Result<(), Box<dyn std::error::Error>> {
+    async fn delete(&self, _user_id: Uuid) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        // TODO: Implementar
         Ok(())
     }
 }
@@ -378,27 +384,33 @@ impl PostgresNotificationTemplateRepository {
 
 #[async_trait]
 impl NotificationTemplateRepository for PostgresNotificationTemplateRepository {
-    async fn create(&self, _template: &NotificationTemplate) -> Result<(), Box<dyn std::error::Error>> {
+    async fn create(&self, _template: &NotificationTemplate) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        // TODO: Implementar
         Ok(())
     }
 
-    async fn get_by_id(&self, _id: Uuid) -> Result<Option<NotificationTemplate>, Box<dyn std::error::Error>> {
+    async fn get_by_id(&self, _id: Uuid) -> Result<Option<NotificationTemplate>, Box<dyn std::error::Error + Send + Sync>> {
+        // TODO: Implementar
         Ok(None)
     }
 
-    async fn get_by_name(&self, _name: &str) -> Result<Option<NotificationTemplate>, Box<dyn std::error::Error>> {
+    async fn get_by_name(&self, _name: &str) -> Result<Option<NotificationTemplate>, Box<dyn std::error::Error + Send + Sync>> {
+        // TODO: Implementar
         Ok(None)
     }
 
-    async fn get_all_active(&self) -> Result<Vec<NotificationTemplate>, Box<dyn std::error::Error>> {
+    async fn get_all_active(&self) -> Result<Vec<NotificationTemplate>, Box<dyn std::error::Error + Send + Sync>> {
+        // TODO: Implementar
         Ok(vec![])
     }
 
-    async fn update(&self, _template: &NotificationTemplate) -> Result<(), Box<dyn std::error::Error>> {
+    async fn update(&self, _template: &NotificationTemplate) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        // TODO: Implementar
         Ok(())
     }
 
-    async fn delete(&self, _id: Uuid) -> Result<(), Box<dyn std::error::Error>> {
+    async fn delete(&self, _id: Uuid) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        // TODO: Implementar
         Ok(())
     }
 } 

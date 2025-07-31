@@ -10,14 +10,13 @@ use chrono::{DateTime, Utc};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FanInvestment {
     pub id: Uuid,
-    pub artist_id: Uuid,
     pub fan_id: Uuid,
+    pub venture_id: Uuid,
     pub investment_amount: f64,
     pub investment_type: InvestmentType,
-    pub created_at: DateTime<Utc>,
     pub status: InvestmentStatus,
-    pub expected_return: f64,
-    pub duration_months: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 /// Tipo de inversión del fan
@@ -48,16 +47,22 @@ pub struct ArtistVenture {
     pub artist_id: Uuid,
     pub title: String,
     pub description: Option<String>,
-    pub investment_type: InvestmentType,
+    pub category: VentureCategory,
+    pub tags: Vec<String>,
+    pub risk_level: RiskLevel,
+    pub expected_return: f64,
+    pub artist_rating: f64,
+    pub artist_previous_ventures: i32,
+    pub artist_success_rate: f64,
+    pub funding_goal: f64,
+    pub current_funding: f64,
     pub min_investment: f64,
     pub max_investment: Option<f64>,
-    pub total_goal: f64,
-    pub current_amount: f64,
-    pub max_investors: Option<i32>,
-    pub current_investors: i32,
-    pub created_at: DateTime<Utc>,
-    pub expires_at: Option<DateTime<Utc>>,
     pub status: VentureStatus,
+    pub start_date: Option<DateTime<Utc>>,
+    pub end_date: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
     pub benefits: Vec<VentureBenefit>,
 }
 
@@ -92,10 +97,10 @@ pub struct VentureBenefit {
     pub title: String,
     pub description: Option<String>,
     pub benefit_type: BenefitType,
-    pub value: f64,
     pub delivery_method: DeliveryMethod,
-    pub delivery_date: Option<DateTime<Utc>>,
+    pub estimated_delivery_date: Option<DateTime<Utc>>,
     pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
 /// Tipo de beneficio
@@ -177,9 +182,8 @@ pub struct CreateBenefitRequest {
     pub title: String,
     pub description: Option<String>,
     pub benefit_type: BenefitType,
-    pub value: f64,
     pub delivery_method: DeliveryMethod,
-    pub delivery_date: Option<DateTime<Utc>>,
+    pub estimated_delivery_date: Option<DateTime<Utc>>,
 }
 
 /// Response para un tier con sus beneficios
@@ -216,12 +220,12 @@ pub struct VentureSummary {
     pub venture_id: Uuid,
     pub title: String,
     pub status: VentureStatus,
-    pub current_amount: f64,
-    pub total_goal: f64,
+    pub current_funding: f64,
+    pub funding_goal: f64,
     pub funding_progress: f64,
     pub total_investors: u32,
     pub created_at: DateTime<Utc>,
-    pub expires_at: Option<DateTime<Utc>>,
+    pub end_date: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -406,15 +410,14 @@ pub struct VentureDiscovery {
     pub artist_avatar: Option<String>,
     pub title: String,
     pub description: Option<String>,
-    pub investment_type: InvestmentType,
     pub min_investment: f64,
     pub max_investment: Option<f64>,
-    pub total_goal: f64,
-    pub current_amount: f64,
+    pub funding_goal: f64,
+    pub current_funding: f64,
     pub funding_progress: f64,
     pub total_investors: u32,
     pub status: VentureStatus,
-    pub expires_at: Option<DateTime<Utc>>,
+    pub end_date: Option<DateTime<Utc>>,
     pub days_remaining: Option<i32>,
     pub created_at: DateTime<Utc>,
     pub top_tiers: Vec<VentureTier>,
@@ -513,4 +516,18 @@ pub struct VentureRecommendationsRequest {
     pub fan_id: Uuid,
     pub limit: Option<u32>,
     pub include_explanation: Option<bool>,
+} 
+
+// =============================================================================
+// REQUEST/RESPONSE TYPES
+// =============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateVentureRequest {
+    pub title: String,
+    pub description: String,
+    pub funding_goal: f64,
+    pub min_investment: f64,
+    pub max_investment: f64,
+    pub expires_at: Option<DateTime<Utc>>,
 } 

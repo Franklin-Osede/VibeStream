@@ -165,14 +165,16 @@ mod tests {
 
     #[test]
     fn test_content_type_detection() {
+        let storage = CDNAudioStorage::new_with_default_config();
+        
         assert!(matches!(
-            CDNAudioStorage::get_content_type_from_filename("song.mp3"),
-            ContentType::Audio(content_type) if content_type == "audio/mpeg"
+            storage.get_content_type("mp3"),
+            ContentType::Audio
         ));
         
         assert!(matches!(
-            CDNAudioStorage::get_content_type_from_filename("song.wav"),
-            ContentType::Audio(content_type) if content_type == "audio/wav"
+            storage.get_content_type("wav"),
+            ContentType::Audio
         ));
     }
 } 

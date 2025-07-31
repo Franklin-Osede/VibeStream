@@ -459,7 +459,7 @@ INSERT INTO royalty_distributions (
 );
 
 -- Refresh materialized views
-SELECT refresh_payment_analytics();
+-- SELECT refresh_payment_analytics();
 
 -- =====================================================
 -- COMMENTS FOR DOCUMENTATION

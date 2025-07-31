@@ -32,25 +32,32 @@ impl PostgresFanVenturesRepository {
         sqlx::query!(
             r#"
             INSERT INTO artist_ventures (
-                id, artist_id, title, description, investment_type, 
-                min_investment, max_investment, total_goal, current_amount,
-                max_investors, current_investors, created_at, expires_at, status
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                id, artist_id, title, description, category, tags, risk_level,
+                expected_return, artist_rating, artist_previous_ventures, artist_success_rate,
+                funding_goal, current_funding, min_investment, max_investment, status,
+                start_date, end_date, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
             "#,
             venture.id,
             venture.artist_id,
             venture.title,
             venture.description,
-            venture.investment_type.to_string(),
+            venture.category.to_string(),
+            &venture.tags,
+            venture.risk_level.to_string(),
+            venture.expected_return,
+            venture.artist_rating,
+            venture.artist_previous_ventures,
+            venture.artist_success_rate,
+            venture.funding_goal,
+            venture.current_funding,
             venture.min_investment,
             venture.max_investment,
-            venture.total_goal,
-            venture.current_amount,
-            venture.max_investors,
-            venture.current_investors as i32,
+            venture.status.to_string(),
+            venture.start_date,
+            venture.end_date,
             venture.created_at,
-            venture.expires_at,
-            venture.status.to_string()
+            venture.updated_at
         )
         .execute(&self.pool)
         .await
@@ -84,16 +91,22 @@ impl PostgresFanVenturesRepository {
                     artist_id: row.artist_id,
                     title: row.title,
                     description: row.description,
-                    investment_type: InvestmentType::from_string(&row.investment_type)?,
-                    min_investment: row.min_investment.unwrap_or(0.0),
+                    category: VentureCategory::from_string(&row.category.unwrap_or_else(|| "other".to_string()))?,
+                    tags: row.tags.unwrap_or_default(),
+                    risk_level: RiskLevel::from_string(&row.risk_level.unwrap_or_else(|| "medium".to_string()))?,
+                    expected_return: row.expected_return.unwrap_or(0.0),
+                    artist_rating: row.artist_rating.unwrap_or(0.0),
+                    artist_previous_ventures: row.artist_previous_ventures.unwrap_or(0),
+                    artist_success_rate: row.artist_success_rate.unwrap_or(0.0),
+                    funding_goal: row.funding_goal,
+                    current_funding: row.current_funding.unwrap_or(0.0),
+                    min_investment: row.min_investment,
                     max_investment: row.max_investment,
-                    total_goal: row.total_goal,
-                    current_amount: row.current_amount.unwrap_or(0.0),
-                    max_investors: row.max_investors,
-                    current_investors: row.current_investors.unwrap_or(0),
+                    status: VentureStatus::from_string(&row.status.unwrap_or_else(|| "draft".to_string()))?,
+                    start_date: row.start_date,
+                    end_date: row.end_date,
                     created_at: row.created_at.unwrap_or_else(|| Utc::now()),
-                    expires_at: row.expires_at,
-                    status: VentureStatus::from_string(&row.status)?,
+                    updated_at: row.updated_at.unwrap_or_else(|| Utc::now()),
                     benefits,
                 }))
             },
@@ -107,7 +120,7 @@ impl PostgresFanVenturesRepository {
         let rows = sqlx::query!(
             r#"
             SELECT * FROM artist_ventures 
-            WHERE status = 'Open' AND expires_at > NOW()
+            WHERE status = 'active' AND (end_date IS NULL OR end_date > NOW())
             ORDER BY created_at DESC 
             LIMIT $1
             "#,
@@ -126,16 +139,22 @@ impl PostgresFanVenturesRepository {
                 artist_id: row.artist_id,
                 title: row.title,
                 description: row.description,
-                investment_type: InvestmentType::from_string(&row.investment_type).unwrap_or(InvestmentType::Custom("Unknown".to_string())),
-                min_investment: row.min_investment.unwrap_or(0.0),
+                category: VentureCategory::from_string(&row.category.unwrap_or_else(|| "other".to_string())).unwrap_or(VentureCategory::Other),
+                tags: row.tags.unwrap_or_default(),
+                risk_level: RiskLevel::from_string(&row.risk_level.unwrap_or_else(|| "medium".to_string())).unwrap_or(RiskLevel::Medium),
+                expected_return: row.expected_return.unwrap_or(0.0),
+                artist_rating: row.artist_rating.unwrap_or(0.0),
+                artist_previous_ventures: row.artist_previous_ventures.unwrap_or(0),
+                artist_success_rate: row.artist_success_rate.unwrap_or(0.0),
+                funding_goal: row.funding_goal,
+                current_funding: row.current_funding.unwrap_or(0.0),
+                min_investment: row.min_investment,
                 max_investment: row.max_investment,
-                total_goal: row.total_goal,
-                current_amount: row.current_amount.unwrap_or(0.0),
-                max_investors: row.max_investors,
-                current_investors: row.current_investors.unwrap_or(0),
+                status: VentureStatus::from_string(&row.status.unwrap_or_else(|| "draft".to_string())).unwrap_or(VentureStatus::Draft),
+                start_date: row.start_date,
+                end_date: row.end_date,
                 created_at: row.created_at.unwrap_or_else(|| Utc::now()),
-                expires_at: row.expires_at,
-                status: VentureStatus::from_string(&row.status).unwrap_or(VentureStatus::Draft),
+                updated_at: row.updated_at.unwrap_or_else(|| Utc::now()),
                 benefits,
             });
         }
@@ -151,34 +170,17 @@ impl PostgresFanVenturesRepository {
         sqlx::query!(
             r#"
             INSERT INTO fan_investments (
-                id, artist_id, fan_id, investment_amount, investment_type,
-                created_at, status, expected_return, duration_months
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                id, fan_id, venture_id, investment_amount, investment_type, status, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             "#,
             investment.id,
-            investment.artist_id,
             investment.fan_id,
+            investment.venture_id,
             investment.investment_amount,
             investment.investment_type.to_string(),
-            investment.created_at,
             investment.status.to_string(),
-            investment.expected_return,
-            investment.duration_months as i32
-        )
-        .execute(&self.pool)
-        .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
-
-        // Update venture current amount and investors count
-        sqlx::query!(
-            r#"
-            UPDATE artist_ventures 
-            SET current_amount = current_amount + $1,
-                current_investors = current_investors + 1
-            WHERE artist_id = $2
-            "#,
-            investment.investment_amount,
-            investment.artist_id
+            investment.created_at,
+            investment.updated_at
         )
         .execute(&self.pool)
         .await
@@ -191,7 +193,6 @@ impl PostgresFanVenturesRepository {
         let rows = sqlx::query!(
             r#"
             SELECT * FROM fan_investments WHERE fan_id = $1
-            ORDER BY created_at DESC
             "#,
             fan_id
         )
@@ -199,17 +200,19 @@ impl PostgresFanVenturesRepository {
         .await
         .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-        let investments = rows.into_iter().map(|row| FanInvestment {
-            id: row.id,
-            artist_id: row.artist_id,
-            fan_id: row.fan_id,
-            investment_amount: row.investment_amount,
-            investment_type: InvestmentType::from_string(&row.investment_type).unwrap_or(InvestmentType::Custom("Unknown".to_string())),
-            created_at: row.created_at.unwrap_or_else(|| Utc::now()),
-            status: InvestmentStatus::from_string(&row.status).unwrap_or(InvestmentStatus::Pending),
-            expected_return: row.expected_return,
-            duration_months: row.duration_months,
-        }).collect();
+        let mut investments = Vec::new();
+        for row in rows {
+            investments.push(FanInvestment {
+                id: row.id,
+                fan_id: row.fan_id,
+                venture_id: row.venture_id,
+                investment_amount: row.investment_amount,
+                investment_type: InvestmentType::from_string(&row.investment_type.unwrap_or_else(|| "equity".to_string())).unwrap_or(InvestmentType::Custom("Unknown".to_string())),
+                status: InvestmentStatus::from_string(&row.status.unwrap_or_else(|| "pending".to_string())).unwrap_or(InvestmentStatus::Pending),
+                created_at: row.created_at.unwrap_or_else(|| Utc::now()),
+                updated_at: row.updated_at.unwrap_or_else(|| Utc::now()),
+            });
+        }
 
         Ok(investments)
     }
@@ -349,8 +352,8 @@ impl PostgresFanVenturesRepository {
         sqlx::query!(
             r#"
             INSERT INTO venture_benefits (
-                id, venture_id, tier_id, title, description, benefit_type,
-                value, delivery_method, delivery_date, created_at
+                id, venture_id, tier_id, title, description, benefit_type, 
+                delivery_method, estimated_delivery_date, created_at, updated_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             "#,
             benefit.id,
@@ -359,10 +362,10 @@ impl PostgresFanVenturesRepository {
             benefit.title,
             benefit.description,
             benefit.benefit_type.to_string(),
-            sqlx::types::BigDecimal::from_f64(benefit.value).unwrap_or_default(),
             benefit.delivery_method.to_string(),
-            benefit.delivery_date,
-            benefit.created_at.unwrap_or_else(|| Utc::now())
+            benefit.estimated_delivery_date,
+            benefit.created_at.unwrap_or_else(|| Utc::now()),
+            benefit.updated_at.unwrap_or_else(|| Utc::now())
         )
         .execute(&self.pool)
         .await
@@ -375,7 +378,6 @@ impl PostgresFanVenturesRepository {
         let rows = sqlx::query!(
             r#"
             SELECT * FROM venture_benefits WHERE venture_id = $1
-            ORDER BY created_at ASC
             "#,
             venture_id
         )
@@ -383,18 +385,21 @@ impl PostgresFanVenturesRepository {
         .await
         .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-        let benefits = rows.into_iter().map(|row| VentureBenefit {
-            id: row.id,
-            venture_id: row.venture_id,
-            tier_id: row.tier_id,
-            title: row.title,
-            description: row.description,
-            benefit_type: BenefitType::from_string(&row.benefit_type).unwrap_or(BenefitType::Custom("Unknown".to_string())),
-            value: row.value.to_string().parse::<f64>().unwrap_or(0.0),
-            delivery_method: DeliveryMethod::from_string(&row.delivery_method.unwrap_or_else(|| "manual".to_string())).unwrap_or(DeliveryMethod::Manual),
-            delivery_date: row.delivery_date,
-            created_at: row.created_at,
-        }).collect();
+        let mut benefits = Vec::new();
+        for row in rows {
+            benefits.push(VentureBenefit {
+                id: row.id,
+                venture_id: row.venture_id,
+                tier_id: row.tier_id,
+                title: row.title,
+                description: row.description,
+                benefit_type: BenefitType::from_string(&row.benefit_type).unwrap_or(BenefitType::Custom("Unknown".to_string())),
+                delivery_method: DeliveryMethod::from_string(&row.delivery_method.unwrap_or_else(|| "manual".to_string())).unwrap_or(DeliveryMethod::Manual),
+                estimated_delivery_date: row.estimated_delivery_date,
+                created_at: row.created_at,
+                updated_at: row.updated_at,
+            });
+        }
 
         Ok(benefits)
     }
@@ -418,10 +423,10 @@ impl PostgresFanVenturesRepository {
             title: row.title,
             description: row.description,
             benefit_type: BenefitType::from_string(&row.benefit_type).unwrap_or(BenefitType::Custom("Unknown".to_string())),
-            value: row.value.to_string().parse::<f64>().unwrap_or(0.0),
             delivery_method: DeliveryMethod::from_string(&row.delivery_method.unwrap_or_else(|| "manual".to_string())).unwrap_or(DeliveryMethod::Manual),
-            delivery_date: row.delivery_date,
+            estimated_delivery_date: row.estimated_delivery_date,
             created_at: row.created_at,
+            updated_at: row.updated_at,
         }).collect();
 
         Ok(benefits)
@@ -490,9 +495,7 @@ impl PostgresFanVenturesRepository {
     pub async fn list_ventures_by_artist(&self, artist_id: Uuid) -> Result<Vec<ArtistVenture>, AppError> {
         let rows = sqlx::query!(
             r#"
-            SELECT * FROM artist_ventures 
-            WHERE artist_id = $1
-            ORDER BY created_at DESC
+            SELECT * FROM artist_ventures WHERE artist_id = $1
             "#,
             artist_id
         )
@@ -500,23 +503,34 @@ impl PostgresFanVenturesRepository {
         .await
         .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-        let ventures = rows.into_iter().map(|row| ArtistVenture {
-            id: row.id,
-            artist_id: row.artist_id,
-            title: row.title,
-            description: row.description,
-            investment_type: InvestmentType::from_string(&row.investment_type).unwrap_or(InvestmentType::RevenueShare),
-            min_investment: row.min_investment.unwrap_or(0.0),
-            max_investment: row.max_investment,
-            total_goal: row.total_goal,
-            current_amount: row.current_amount.unwrap_or(0.0),
-            max_investors: row.max_investors,
-            current_investors: row.current_investors.unwrap_or(0),
-            status: VentureStatus::from_string(&row.status).unwrap_or(VentureStatus::Draft),
-            expires_at: row.expires_at,
-            created_at: row.created_at.unwrap_or_else(|| Utc::now()),
-            benefits: Vec::new(), // TODO: Load benefits separately
-        }).collect();
+        let mut ventures = Vec::new();
+        for row in rows {
+            let benefits = self.get_venture_benefits(row.id).await?;
+            
+            ventures.push(ArtistVenture {
+                id: row.id,
+                artist_id: row.artist_id,
+                title: row.title,
+                description: row.description,
+                category: VentureCategory::from_string(&row.category.unwrap_or_else(|| "other".to_string())).unwrap_or(VentureCategory::Other),
+                tags: row.tags.unwrap_or_default(),
+                risk_level: RiskLevel::from_string(&row.risk_level.unwrap_or_else(|| "medium".to_string())).unwrap_or(RiskLevel::Medium),
+                expected_return: row.expected_return.unwrap_or(0.0),
+                artist_rating: row.artist_rating.unwrap_or(0.0),
+                artist_previous_ventures: row.artist_previous_ventures.unwrap_or(0),
+                artist_success_rate: row.artist_success_rate.unwrap_or(0.0),
+                funding_goal: row.funding_goal,
+                current_funding: row.current_funding.unwrap_or(0.0),
+                min_investment: row.min_investment,
+                max_investment: row.max_investment,
+                status: VentureStatus::from_string(&row.status.unwrap_or_else(|| "draft".to_string())).unwrap_or(VentureStatus::Draft),
+                start_date: row.start_date,
+                end_date: row.end_date,
+                created_at: row.created_at.unwrap_or_else(|| Utc::now()),
+                updated_at: row.updated_at.unwrap_or_else(|| Utc::now()),
+                benefits,
+            });
+        }
 
         Ok(ventures)
     }
@@ -858,15 +872,14 @@ impl PostgresFanVenturesRepository {
                 artist_avatar: Some("https://example.com/avatar.jpg".to_string()),
                 title: "My First Album".to_string(),
                 description: Some("An amazing debut album".to_string()),
-                investment_type: InvestmentType::RevenueShare,
                 min_investment: 100.0,
                 max_investment: Some(1000.0),
-                total_goal: 10000.0,
-                current_amount: 5000.0,
+                funding_goal: 10000.0,
+                current_funding: 5000.0,
                 funding_progress: 50.0,
                 total_investors: 25,
                 status: VentureStatus::Open,
-                expires_at: Some(Utc::now() + chrono::Duration::days(30)),
+                end_date: Some(Utc::now() + chrono::Duration::days(30)),
                 days_remaining: Some(30),
                 created_at: Utc::now(),
                 top_tiers: Vec::new(),
@@ -964,19 +977,20 @@ impl PostgresFanVenturesRepository {
                 let favorite_categories: Vec<VentureCategory> = row.favorite_categories
                     .unwrap_or_default()
                     .into_iter()
-                    .filter_map(|s| VentureCategory::from_string(&s).ok())
+                    .filter_map(|s| VentureCategory::from_string(s.as_str()).ok())
                     .collect();
-
-                let preferred_investment_types: Vec<InvestmentType> = row.preferred_investment_types
+                
+                let investment_types: Vec<InvestmentType> = row
+                    .preferred_investment_types
                     .unwrap_or_default()
                     .into_iter()
-                    .filter_map(|s| InvestmentType::from_string(&s).ok())
+                    .filter_map(|s| InvestmentType::from_string(s.as_str()).ok())
                     .collect();
 
                 Ok(Some(FanPreferences {
                     fan_id: row.fan_id,
                     favorite_categories,
-                    preferred_investment_types,
+                    preferred_investment_types: investment_types,
                     risk_tolerance: RiskLevel::from_string(&row.risk_tolerance.unwrap_or_else(|| "medium".to_string())).unwrap_or(RiskLevel::Medium),
                     min_investment: row.min_investment.unwrap_or(0.0),
                     max_investment: row.max_investment.unwrap_or(10000.0),

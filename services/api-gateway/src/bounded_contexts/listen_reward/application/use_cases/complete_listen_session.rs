@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::bounded_contexts::listen_reward::domain::entities::ListenSession;
 use crate::bounded_contexts::listen_reward::domain::value_objects::{

@@ -21,7 +21,7 @@ pub use controllers::CampaignController;
 pub use routes::{create_campaign_routes, create_versioned_campaign_routes};
 
 #[derive(Deserialize)]
-struct CreateCampaignRequest {
+pub struct CampaignApiRequest {
     artist_id: String,
     nft_contract: String,
     start: String, // ISO-8601 datetime
@@ -30,7 +30,7 @@ struct CreateCampaignRequest {
 }
 
 #[derive(Serialize)]
-struct CreateCampaignResponse {
+pub struct CreateCampaignResponse {
     campaign_id: String,
 }
 
@@ -39,7 +39,7 @@ pub fn routes() -> Router<AppState> {
         .route("/campaigns", post(create_campaign))
 }
 
-async fn create_campaign(State(state): State<AppState>, Json(req): Json<CreateCampaignRequest>) -> Result<(StatusCode, Json<CreateCampaignResponse>), StatusCode> {
+async fn create_campaign(State(state): State<AppState>, Json(req): Json<CampaignApiRequest>) -> Result<(StatusCode, Json<CreateCampaignResponse>), StatusCode> {
     // Parse UUID and datetimes
     let artist_id = Uuid::parse_str(&req.artist_id).map_err(|_| StatusCode::BAD_REQUEST)?;
     let start_dt = DateTime::parse_from_rfc3339(&req.start)

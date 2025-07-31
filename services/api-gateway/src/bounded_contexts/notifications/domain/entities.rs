@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, Timelike};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -12,11 +12,38 @@ pub struct Notification {
     pub priority: NotificationPriority,
     pub status: NotificationStatus,
     pub read_at: Option<DateTime<Utc>>,
+    pub metadata: Option<serde_json::Value>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+impl Notification {
+    pub fn new(
+        user_id: Uuid,
+        title: String,
+        message: String,
+        notification_type: NotificationType,
+        priority: NotificationPriority,
+        metadata: Option<serde_json::Value>,
+    ) -> Self {
+        let now = Utc::now();
+        Self {
+            id: Uuid::new_v4(),
+            user_id,
+            title,
+            message,
+            notification_type,
+            priority,
+            status: NotificationStatus::Unread,
+            read_at: None,
+            metadata,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum NotificationType {
     VentureCreated,
     InvestmentMade,
@@ -42,7 +69,7 @@ pub enum NotificationType {
     Custom(String),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum NotificationPriority {
     Low,
     Medium,
@@ -82,6 +109,24 @@ pub struct NotificationPreferences {
 }
 
 impl NotificationPreferences {
+    pub fn new(user_id: Uuid) -> Self {
+        Self {
+            user_id,
+            email_enabled: true,
+            push_enabled: true,
+            sms_enabled: false,
+            quiet_hours_start: None,
+            quiet_hours_end: None,
+            venture_notifications: true,
+            investment_notifications: true,
+            benefit_notifications: true,
+            marketing_notifications: true,
+            system_notifications: true,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
     pub fn is_quiet_hours(&self) -> bool {
         if let (Some(start), Some(end)) = (self.quiet_hours_start, self.quiet_hours_end) {
             let now = (Utc::now().time().num_seconds_from_midnight() / 3600) as u8;
@@ -104,8 +149,24 @@ pub struct NotificationTemplate {
     pub message_template: String,
     pub notification_type: NotificationType,
     pub priority: NotificationPriority,
+    pub is_active: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+impl NotificationTemplate {
+    pub fn render(&self, variables: std::collections::HashMap<String, String>) -> Result<(String, String), Box<dyn std::error::Error + Send + Sync>> {
+        let mut title = self.title_template.clone();
+        let mut message = self.message_template.clone();
+
+        for (key, value) in variables {
+            let placeholder = format!("{{{}}}", key);
+            title = title.replace(&placeholder, &value);
+            message = message.replace(&placeholder, &value);
+        }
+
+        Ok((title, message))
+    }
 }
 
 // DTOs para requests y responses
@@ -115,7 +176,8 @@ pub struct CreateNotificationRequest {
     pub title: String,
     pub message: String,
     pub notification_type: NotificationType,
-    pub priority: NotificationPriority,
+    pub priority: Option<NotificationPriority>,
+    pub metadata: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -150,6 +212,8 @@ pub struct NotificationFilters {
 pub struct NotificationSummary {
     pub total: i64,
     pub unread: i64,
+    pub read: i64,
+    pub archived: i64,
     pub by_type: Vec<NotificationTypeCount>,
 }
 
@@ -188,5 +252,24 @@ pub struct NotificationListResponse {
     pub notifications: Vec<NotificationResponse>,
     pub total: i64,
     pub page: i32,
-    pub per_page: i32,
+    pub page_size: i32,
+    pub total_pages: i32,
+    pub summary: NotificationSummary,
+}
+
+// Implementación de From para conversiones
+impl From<Notification> for NotificationResponse {
+    fn from(notification: Notification) -> Self {
+        Self {
+            id: notification.id,
+            user_id: notification.user_id,
+            title: notification.title,
+            message: notification.message,
+            notification_type: notification.notification_type,
+            priority: notification.priority,
+            status: notification.status,
+            read_at: notification.read_at,
+            created_at: notification.created_at,
+        }
+    }
 } 

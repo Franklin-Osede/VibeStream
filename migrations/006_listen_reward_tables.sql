@@ -73,7 +73,7 @@ CREATE TABLE reward_distributions (
 -- Indexes for reward distributions
 CREATE INDEX idx_reward_distributions_pool_id ON reward_distributions(pool_id);
 CREATE INDEX idx_reward_distributions_period ON reward_distributions(validation_period_start, validation_period_end);
-CREATE INDEX idx_reward_distributions_active ON reward_distributions(validation_period_end) WHERE validation_period_end > NOW();
+-- CREATE INDEX idx_reward_distributions_active ON reward_distributions(validation_period_end) WHERE validation_period_end > NOW();
 CREATE INDEX idx_reward_distributions_pending ON reward_distributions(pending_distributions_count) WHERE pending_distributions_count > 0;
 
 -- Trigger for reward distributions updated_at

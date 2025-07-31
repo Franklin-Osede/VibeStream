@@ -59,10 +59,11 @@ pub struct NotificationQueryParams {
 pub struct UpdatePreferencesDto {
     pub email_enabled: Option<bool>,
     pub push_enabled: Option<bool>,
-    pub in_app_enabled: Option<bool>,
+    pub sms_enabled: Option<bool>,
     pub venture_notifications: Option<bool>,
-    pub reward_notifications: Option<bool>,
-    pub campaign_notifications: Option<bool>,
+    pub investment_notifications: Option<bool>,
+    pub benefit_notifications: Option<bool>,
+    pub marketing_notifications: Option<bool>,
     pub system_notifications: Option<bool>,
     pub quiet_hours_start: Option<u8>,
     pub quiet_hours_end: Option<u8>,
@@ -203,6 +204,7 @@ pub async fn get_notification_summary(
 }
 
 /// Obtener preferencias de notificaciones
+#[axum::debug_handler]
 pub async fn get_notification_preferences(
     State(state): State<Arc<NotificationState>>,
     Path(user_id): Path<Uuid>,
@@ -246,17 +248,20 @@ pub async fn update_notification_preferences(
     if let Some(push_enabled) = dto.push_enabled {
         updated_preferences.push_enabled = push_enabled;
     }
-    if let Some(in_app_enabled) = dto.in_app_enabled {
-        updated_preferences.in_app_enabled = in_app_enabled;
+    if let Some(sms_enabled) = dto.sms_enabled {
+        updated_preferences.sms_enabled = sms_enabled;
     }
     if let Some(venture_notifications) = dto.venture_notifications {
         updated_preferences.venture_notifications = venture_notifications;
     }
-    if let Some(reward_notifications) = dto.reward_notifications {
-        updated_preferences.reward_notifications = reward_notifications;
+    if let Some(investment_notifications) = dto.investment_notifications {
+        updated_preferences.investment_notifications = investment_notifications;
     }
-    if let Some(campaign_notifications) = dto.campaign_notifications {
-        updated_preferences.campaign_notifications = campaign_notifications;
+    if let Some(benefit_notifications) = dto.benefit_notifications {
+        updated_preferences.benefit_notifications = benefit_notifications;
+    }
+    if let Some(marketing_notifications) = dto.marketing_notifications {
+        updated_preferences.marketing_notifications = marketing_notifications;
     }
     if let Some(system_notifications) = dto.system_notifications {
         updated_preferences.system_notifications = system_notifications;

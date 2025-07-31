@@ -461,27 +461,27 @@ FROM users
 ON CONFLICT DO NOTHING;
 
 -- Insert sample ownership contract
-INSERT INTO ownership_contracts (
-    song_id, artist_id, contract_name, total_shares, shares_available, 
-    price_per_share, artist_retained_percentage
-)
-SELECT 
-    s.id, s.artist_id, s.title || ' - Ownership Contract', 1000, 800,
-    10.0, 20.0
-FROM songs s
-LIMIT 1
-ON CONFLICT DO NOTHING;
+-- INSERT INTO ownership_contracts (
+--     song_id, artist_id, contract_name, total_shares, shares_available, 
+--     price_per_share, artist_retained_percentage
+-- )
+-- SELECT 
+--     s.id, s.artist_id, s.title || ' - Ownership Contract', 1000, 800,
+--     10.0, 20.0
+-- FROM songs s
+-- LIMIT 1
+-- ON CONFLICT DO NOTHING;
 
 -- Insert sample campaign
-INSERT INTO campaigns (
-    song_id, artist_id, name, description, start_date, end_date,
-    nft_price, max_nfts, boost_multiplier
-)
-SELECT 
-    s.id, s.artist_id, s.title || ' - NFT Drop', 'Limited edition NFTs with listening boosts',
-    NOW(), NOW() + INTERVAL '30 days', 25.0, 1000, 2.0
-FROM songs s
-LIMIT 1
-ON CONFLICT DO NOTHING;
+-- INSERT INTO campaigns (
+--     song_id, artist_id, name, description, start_date, end_date,
+--     nft_price, max_nfts, boost_multiplier
+-- )
+-- SELECT 
+--     s.id, s.artist_id, s.title || ' - NFT Drop', 'Limited edition NFTs with listening boosts',
+--     NOW(), NOW() + INTERVAL '30 days', 25.0, 1000, 2.0
+-- FROM songs s
+-- LIMIT 1
+-- ON CONFLICT DO NOTHING;
 
 COMMIT; 
