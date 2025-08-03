@@ -13,7 +13,7 @@ use crate::shared::domain::events::DomainEvent;
 use crate::bounded_contexts::listen_reward::domain::events::{
     RewardDistributed, ArtistRoyaltyPaid, RewardPoolDepleted, RewardDistributionCreated
 };
-use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId, RoyaltyPercentage};
+use vibestream_types::RoyaltyPercentage;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RewardPool {
@@ -126,7 +126,7 @@ pub struct RewardDistribution {
     reward_pool: RewardPool,
     pending_distributions: HashMap<ListenSessionId, PendingDistribution>,
     completed_distributions: Vec<CompletedDistribution>,
-    artist_royalties: HashMap<ArtistId, ArtistRoyaltyInfo>,
+    artist_royalties: HashMap<Uuid, ArtistRoyaltyInfo>,
     distribution_limits: DistributionLimits,
     created_at: DateTime<Utc>,
     uncommitted_events: Vec<Box<dyn DomainEvent>>,
@@ -136,8 +136,8 @@ pub struct RewardDistribution {
 pub struct PendingDistribution {
     session_id: ListenSessionId,
     user_id: Uuid,
-    artist_id: ArtistId,
-    song_id: SongId,
+    artist_id: Uuid,
+    song_id: Uuid,
     reward_amount: RewardAmount,
     royalty_percentage: f64,
     created_at: DateTime<Utc>,
@@ -147,7 +147,7 @@ pub struct PendingDistribution {
 pub struct CompletedDistribution {
     session_id: ListenSessionId,
     user_id: Uuid,
-    artist_id: ArtistId,
+    artist_id: Uuid,
     reward_amount: RewardAmount,
     royalty_amount: RewardAmount,
     user_transaction_hash: String,
@@ -157,7 +157,7 @@ pub struct CompletedDistribution {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArtistRoyaltyInfo {
-    artist_id: ArtistId,
+    artist_id: Uuid,
     total_earned: RewardAmount,
     pending_amount: RewardAmount,
     last_payout: Option<DateTime<Utc>>,
@@ -200,7 +200,7 @@ impl RewardDistribution {
             aggregate.id,
             ListenSessionId::new(), // placeholder
             Uuid::new_v4(), // placeholder user_id
-            ArtistId::new(), // placeholder artist_id
+            Uuid::new_v4(), // placeholder artist_id
             aggregate.reward_pool.total_tokens().clone(),
             RewardAmount::zero(),
             RewardAmount::zero(),
@@ -398,7 +398,7 @@ impl RewardDistribution {
             .count() as u32
     }
 
-    pub fn get_artist_pending_royalties(&self, artist_id: &ArtistId) -> RewardAmount {
+    pub fn get_artist_pending_royalties(&self, artist_id: &Uuid) -> RewardAmount {
         self.artist_royalties
             .get(artist_id)
             .map(|info| info.pending_amount.clone())
@@ -461,7 +461,7 @@ impl RewardDistribution {
         Ok(())
     }
 
-    fn update_artist_royalty(&mut self, artist_id: &ArtistId, royalty_amount: &RewardAmount) {
+    fn update_artist_royalty(&mut self, artist_id: &Uuid, royalty_amount: &RewardAmount) {
         let royalty_info = self.artist_royalties.entry(artist_id.clone()).or_insert_with(|| {
             ArtistRoyaltyInfo {
                 artist_id: artist_id.clone(),

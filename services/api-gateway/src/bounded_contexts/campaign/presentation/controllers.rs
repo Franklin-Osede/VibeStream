@@ -16,7 +16,7 @@ use super::super::domain::{
     value_objects::{CampaignId, DateRange},
     events::CampaignEndReason,
 };
-use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
+// Removed unused imports - using Uuid directly
 
 // ============================================================================
 // REQUEST/RESPONSE DTOs

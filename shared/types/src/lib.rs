@@ -5,6 +5,8 @@ pub mod blockchain;
 pub mod messages;
 pub mod errors;
 pub mod models;
+pub mod contracts;
+pub mod integration_events;
 
 // Re-exports principales
 pub use blockchain::*;
@@ -18,6 +20,10 @@ pub use models::{
     TransactionRecord, TransactionType,
     ListenEvent, CreateListenEvent
 };
+
+// Re-exports de contratos compartidos
+pub use contracts::*;
+pub use integration_events::*;
 
 // Re-export commonly used external types
 pub use uuid::Uuid;

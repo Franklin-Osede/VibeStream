@@ -5,7 +5,7 @@ use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 
 use crate::shared::domain::repositories::RepoResult;
-use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
+use vibestream_types::{SongContract, ArtistContract};
 use crate::bounded_contexts::user::domain::value_objects::UserId;
 
 use super::value_objects::{OwnershipContractId, ShareId};
@@ -25,10 +25,10 @@ pub trait OwnershipContractRepository: Send + Sync {
     async fn find_by_id(&self, id: &OwnershipContractId) -> RepoResult<Option<OwnershipContractAggregate>>;
 
     /// Find ownership contracts by song ID
-    async fn find_by_song_id(&self, song_id: &SongId) -> RepoResult<Vec<OwnershipContractAggregate>>;
+    async fn find_by_song_id(&self, song_id: &Uuid) -> RepoResult<Vec<OwnershipContractAggregate>>;
 
     /// Find ownership contracts by artist ID
-    async fn find_by_artist_id(&self, artist_id: &ArtistId) -> RepoResult<Vec<OwnershipContractAggregate>>;
+    async fn find_by_artist_id(&self, artist_id: &Uuid) -> RepoResult<Vec<OwnershipContractAggregate>>;
 
     /// Find active ownership contracts (status = Active)
     async fn find_active_contracts(&self) -> RepoResult<Vec<OwnershipContractAggregate>>;
@@ -40,7 +40,7 @@ pub trait OwnershipContractRepository: Send + Sync {
     async fn find_by_status(&self, status: &str) -> RepoResult<Vec<OwnershipContractAggregate>>;
 
     /// Check if contract exists for a song
-    async fn exists_for_song(&self, song_id: &SongId) -> RepoResult<bool>;
+    async fn exists_for_song(&self, song_id: &Uuid) -> RepoResult<bool>;
 
     /// Delete ownership contract (soft delete recommended)
     async fn delete(&self, id: &OwnershipContractId) -> RepoResult<()>;
@@ -74,7 +74,7 @@ pub trait ShareRepository: Send + Sync {
     async fn find_tradeable_shares(&self) -> RepoResult<Vec<FractionalShare>>;
 
     /// Find shares by song
-    async fn find_by_song(&self, song_id: &SongId) -> RepoResult<Vec<FractionalShare>>;
+    async fn find_by_song(&self, song_id: &Uuid) -> RepoResult<Vec<FractionalShare>>;
 
     /// Find locked shares
     async fn find_locked_shares(&self) -> RepoResult<Vec<FractionalShare>>;
@@ -91,8 +91,8 @@ pub trait ShareRepository: Send + Sync {
 
 /// Specification pattern for complex queries
 pub struct OwnershipContractSpecification {
-    pub artist_id: Option<ArtistId>,
-    pub song_id: Option<SongId>,
+    pub artist_id: Option<Uuid>,
+    pub song_id: Option<Uuid>,
     pub status: Option<String>,
     pub min_completion: Option<f64>,
     pub max_completion: Option<f64>,
@@ -244,19 +244,19 @@ pub mod tests {
             Ok(contracts.get(id).cloned())
         }
 
-        async fn find_by_song_id(&self, song_id: &SongId) -> RepoResult<Vec<OwnershipContractAggregate>> {
+        async fn find_by_song_id(&self, song_id: &Uuid) -> RepoResult<Vec<OwnershipContractAggregate>> {
             let contracts = self.contracts.read().await;
             let results: Vec<_> = contracts.values()
-                .filter(|contract| contract.contract().song_id().value() == song_id.value())
+                .filter(|contract| contract.contract().song_contract().id == *song_id)
                 .cloned()
                 .collect();
             Ok(results)
         }
 
-        async fn find_by_artist_id(&self, artist_id: &ArtistId) -> RepoResult<Vec<OwnershipContractAggregate>> {
+        async fn find_by_artist_id(&self, artist_id: &Uuid) -> RepoResult<Vec<OwnershipContractAggregate>> {
             let contracts = self.contracts.read().await;
             let results: Vec<_> = contracts.values()
-                .filter(|contract| contract.contract().artist_id().value() == artist_id.value())
+                .filter(|contract| contract.contract().artist_contract().id == *artist_id)
                 .cloned()
                 .collect();
             Ok(results)
@@ -285,10 +285,10 @@ pub mod tests {
             Ok(vec![])
         }
 
-        async fn exists_for_song(&self, song_id: &SongId) -> RepoResult<bool> {
+        async fn exists_for_song(&self, song_id: &Uuid) -> RepoResult<bool> {
             let contracts = self.contracts.read().await;
             let exists = contracts.values()
-                .any(|contract| contract.contract().song_id().value() == song_id.value());
+                .any(|contract| contract.contract().song_contract().id == *song_id);
             Ok(exists)
         }
 

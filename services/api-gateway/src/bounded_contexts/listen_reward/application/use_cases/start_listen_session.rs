@@ -4,13 +4,13 @@ use uuid::Uuid;
 use crate::bounded_contexts::listen_reward::domain::entities::ListenSession;
 use crate::bounded_contexts::listen_reward::domain::value_objects::RewardTier;
 use crate::shared::domain::events::DomainEvent;
-use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
+use vibestream_types::{SongContract, ArtistContract};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StartListenSessionCommand {
     pub user_id: Uuid,
-    pub song_id: String,
-    pub artist_id: String,
+    pub song_contract: SongContract,
+    pub artist_contract: ArtistContract,
     pub user_tier: String,
 }
 
@@ -39,20 +39,14 @@ impl StartListenSessionUseCase {
         self.validate_command(&command)?;
 
         // Parse value objects
-        let song_id = SongId::from_string(&command.song_id)
-            .map_err(|e| format!("Invalid song ID: {}", e))?;
-        
-        let artist_id = ArtistId::from_string(&command.artist_id)
-            .map_err(|e| format!("Invalid artist ID: {}", e))?;
-        
         let user_tier = RewardTier::from_string(&command.user_tier)
             .map_err(|e| format!("Invalid user tier: {}", e))?;
 
         // Create listen session
         let (session, event) = ListenSession::new(
             command.user_id,
-            song_id,
-            artist_id,
+            command.song_contract,
+            command.artist_contract,
             user_tier.clone(),
         );
 
@@ -60,8 +54,8 @@ impl StartListenSessionUseCase {
         let response = StartListenSessionResponse {
             session_id: session.id().to_string(),
             user_id: session.user_id(),
-            song_id: command.song_id,
-            artist_id: command.artist_id,
+            song_id: command.song_contract.id.to_string(),
+            artist_id: command.artist_contract.id.to_string(),
             user_tier: user_tier.to_string(),
             started_at: session.started_at().to_rfc3339(),
         };
@@ -70,14 +64,6 @@ impl StartListenSessionUseCase {
     }
 
     fn validate_command(&self, command: &StartListenSessionCommand) -> Result<(), String> {
-        if command.song_id.is_empty() {
-            return Err("Song ID cannot be empty".to_string());
-        }
-
-        if command.artist_id.is_empty() {
-            return Err("Artist ID cannot be empty".to_string());
-        }
-
         if command.user_tier.is_empty() {
             return Err("User tier cannot be empty".to_string());
         }
@@ -94,10 +80,39 @@ mod tests {
     use super::*;
 
     fn create_valid_command() -> StartListenSessionCommand {
+        let song_contract = SongContract {
+            id: Uuid::new_v4(),
+            title: "Test Song".to_string(),
+            artist_id: Uuid::new_v4(),
+            artist_name: "Test Artist".to_string(),
+            duration_seconds: Some(180),
+            genre: Some("Pop".to_string()),
+            ipfs_hash: None,
+            metadata_url: None,
+            nft_contract_address: None,
+            nft_token_id: None,
+            royalty_percentage: None,
+            is_minted: false,
+            created_at: chrono::Utc::now(),
+        };
+        
+        let artist_contract = ArtistContract {
+            id: Uuid::new_v4(),
+            name: "Test Artist".to_string(),
+            verified: true,
+            bio: Some("Test bio".to_string()),
+            avatar_url: None,
+            social_links: None,
+            genres: vec!["Pop".to_string()],
+            total_streams: 0,
+            monthly_listeners: 0,
+            created_at: chrono::Utc::now(),
+        };
+        
         StartListenSessionCommand {
             user_id: Uuid::new_v4(),
-            song_id: Uuid::new_v4().to_string(),
-            artist_id: Uuid::new_v4().to_string(),
+            song_contract,
+            artist_contract,
             user_tier: "basic".to_string(),
         }
     }

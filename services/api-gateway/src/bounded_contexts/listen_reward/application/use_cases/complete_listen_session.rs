@@ -108,13 +108,42 @@ impl CompleteListenSessionUseCase {
 mod tests {
     use super::*;
     use crate::bounded_contexts::listen_reward::domain::RewardTier;
-    use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
+    use vibestream_types::{SongContract, ArtistContract};
 
     fn create_test_session() -> ListenSession {
+        let song_contract = SongContract {
+            id: Uuid::new_v4(),
+            title: "Test Song".to_string(),
+            artist_id: Uuid::new_v4(),
+            artist_name: "Test Artist".to_string(),
+            duration_seconds: Some(180),
+            genre: Some("Pop".to_string()),
+            ipfs_hash: None,
+            metadata_url: None,
+            nft_contract_address: None,
+            nft_token_id: None,
+            royalty_percentage: None,
+            is_minted: false,
+            created_at: chrono::Utc::now(),
+        };
+        
+        let artist_contract = ArtistContract {
+            id: Uuid::new_v4(),
+            name: "Test Artist".to_string(),
+            verified: true,
+            bio: Some("Test bio".to_string()),
+            avatar_url: None,
+            social_links: None,
+            genres: vec!["Pop".to_string()],
+            total_streams: 0,
+            monthly_listeners: 0,
+            created_at: chrono::Utc::now(),
+        };
+        
         let (session, _) = ListenSession::new(
             Uuid::new_v4(),
-            SongId::new(),
-            ArtistId::new(),
+            song_contract,
+            artist_contract,
             RewardTier::Basic,
         );
         session

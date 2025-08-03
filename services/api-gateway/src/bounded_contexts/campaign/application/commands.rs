@@ -10,7 +10,7 @@ use crate::bounded_contexts::campaign::domain::{
     value_objects::DateRange,
     repository::CampaignRepository,
 };
-use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
+use vibestream_types::{SongContract, ArtistContract};
 
 // ---------------- Comando ----------------
 #[derive(Debug, Clone)]
@@ -50,9 +50,39 @@ where
 
     async fn handle(&self, cmd: CreateCampaign) -> Result<Self::Output, AppError> {
         let period = DateRange::new(cmd.start, cmd.end)?;
+        // Create temporary contracts for the command
+        let song_contract = SongContract {
+            id: cmd.song_id,
+            title: "Unknown".to_string(), // Placeholder
+            artist_id: cmd.artist_id,
+            artist_name: "Unknown".to_string(), // Placeholder
+            duration_seconds: None,
+            genre: None,
+            ipfs_hash: None,
+            metadata_url: None,
+            nft_contract_address: None,
+            nft_token_id: None,
+            royalty_percentage: None,
+            is_minted: false,
+            created_at: Utc::now(),
+        };
+        
+        let artist_contract = ArtistContract {
+            id: cmd.artist_id,
+            name: "Unknown".to_string(), // Placeholder
+            verified: false,
+            bio: None,
+            avatar_url: None,
+            social_links: None,
+            genres: vec![],
+            total_streams: 0,
+            monthly_listeners: 0,
+            created_at: Utc::now(),
+        };
+        
         let (campaign, _event) = Campaign::create(
-            SongId::from_uuid(cmd.song_id),
-            ArtistId::from_uuid(cmd.artist_id),
+            song_contract,
+            artist_contract,
             cmd.name,
             cmd.description.unwrap_or_default(),
             period,

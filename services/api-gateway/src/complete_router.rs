@@ -8,6 +8,7 @@ use std::sync::Arc;
 use sqlx::PgPool;
 
 // Import all controllers
+use crate::shared::infrastructure::AppState;
 use crate::bounded_contexts::{
     user::{
         application::UserApplicationService,
@@ -35,7 +36,6 @@ use crate::bounded_contexts::{
         presentation::controllers::{ListenRewardController, listen_reward_routes},
     },
     fan_ventures::{
-        presentation::controllers::AppState,
         presentation::controllers::create_fan_ventures_routes,
     },
     notifications::{

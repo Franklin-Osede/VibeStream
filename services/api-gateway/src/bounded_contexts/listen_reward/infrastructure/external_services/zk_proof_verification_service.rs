@@ -349,7 +349,7 @@ mod tests {
         value_objects::{RewardTier, ListenDuration, QualityScore, ZkProofHash},
         entities::SessionStatus,
     };
-    use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
+    use vibestream_types::{SongContract, ArtistContract};
 
     fn create_test_session() -> ListenSession {
         let (session, _) = ListenSession::new(

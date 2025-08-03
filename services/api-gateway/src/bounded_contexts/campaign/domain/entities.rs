@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::shared::domain::errors::AppError;
-use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
+use vibestream_types::{SongContract, ArtistContract};
 
 use super::events::*;
 use super::value_objects::*;
@@ -23,8 +23,8 @@ pub enum CampaignStatus {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Campaign {
     id: CampaignId,
-    song_id: SongId,
-    artist_id: ArtistId,
+    song_contract: SongContract,
+    artist_contract: ArtistContract,
     name: CampaignName,
     description: String,
     date_range: DateRange,
@@ -40,8 +40,8 @@ pub struct Campaign {
 
 impl Campaign {
     pub fn create(
-        song_id: SongId,
-        artist_id: ArtistId,
+        song_contract: SongContract,
+        artist_contract: ArtistContract,
         name: String,
         description: String,
         date_range: DateRange,
@@ -81,8 +81,8 @@ impl Campaign {
 
         let campaign = Self {
             id: id.clone(),
-            song_id: song_id.clone(),
-            artist_id: artist_id.clone(),
+            song_contract: song_contract.clone(),
+            artist_contract: artist_contract.clone(),
             name: campaign_name.clone(),
             description,
             date_range: date_range.clone(),
@@ -99,8 +99,8 @@ impl Campaign {
         let event = CampaignCreated {
             aggregate_id: id.value(),
             campaign_id: id.value(),
-            artist_id: *artist_id.value(),
-            song_id: *song_id.value(),
+            artist_id: artist_contract.id,
+            song_id: song_contract.id,
             campaign_name: campaign_name.value().to_string(),
             nft_contract: "".to_string(), // Will be set when deployed
             start_date: date_range.start(),
@@ -136,8 +136,8 @@ impl Campaign {
         Ok(CampaignActivated {
             aggregate_id: self.id.value(),
             campaign_id: self.id.value(),
-            artist_id: *self.artist_id.value(),
-            song_id: *self.song_id.value(),
+            artist_id: self.artist_contract.id,
+            song_id: self.song_contract.id,
             boost_multiplier: self.boost_multiplier.value(),
             activated_at: self.updated_at,
             end_date: self.date_range.end(),
@@ -308,12 +308,12 @@ impl Campaign {
         &self.id
     }
 
-    pub fn song_id(&self) -> &SongId {
-        &self.song_id
+    pub fn song_contract(&self) -> &SongContract {
+        &self.song_contract
     }
 
-    pub fn artist_id(&self) -> &ArtistId {
-        &self.artist_id
+    pub fn artist_contract(&self) -> &ArtistContract {
+        &self.artist_contract
     }
 
     pub fn name(&self) -> &str {
@@ -474,17 +474,27 @@ impl CampaignNFT {
 mod tests {
     use super::*;
     use crate::shared::domain::events::DomainEvent;
+    use vibestream_types::{SongContract, ArtistContract};
 
     fn create_test_campaign() -> Result<(Campaign, CampaignCreated), AppError> {
-        let song_id = SongId::new();
-        let artist_id = ArtistId::new();
+        let song_contract = SongContract::new(
+            Uuid::new_v4(),
+            "Test Song".to_string(),
+            Uuid::new_v4(),
+            "Test Artist".to_string(),
+        );
+        let artist_contract = ArtistContract::new(
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            "Test Artist".to_string(),
+        );
         let start = Utc::now() + chrono::Duration::days(1);
         let end = start + chrono::Duration::days(30);
         let date_range = DateRange::new(start, end)?;
 
         Campaign::create(
-            song_id,
-            artist_id,
+            song_contract,
+            artist_contract,
             "Test Campaign".to_string(),
             "A test campaign".to_string(),
             date_range,

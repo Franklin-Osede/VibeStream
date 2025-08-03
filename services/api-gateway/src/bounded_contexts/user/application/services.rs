@@ -15,6 +15,26 @@ use crate::bounded_contexts::user::application::handlers::{
 use crate::shared::domain::errors::AppError;
 use async_trait::async_trait;
 use std::sync::Arc;
+use serde_json::Value;
+use uuid::Uuid;
+
+/// Mock application service for User context
+#[derive(Clone)]
+pub struct MockUserApplicationService;
+
+impl MockUserApplicationService {
+    pub fn new() -> Self {
+        Self
+    }
+    
+    pub async fn create_user(&self, _request: Value) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        Ok(())
+    }
+    
+    pub async fn get_all_users(&self) -> Result<Vec<()>, Box<dyn std::error::Error + Send + Sync>> {
+        Ok(vec![])
+    }
+}
 
 #[derive(Clone)]
 pub struct UserApplicationService<R: UserRepository> {

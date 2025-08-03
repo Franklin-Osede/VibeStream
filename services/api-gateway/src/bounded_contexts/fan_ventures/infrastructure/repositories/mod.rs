@@ -9,7 +9,7 @@ use crate::bounded_contexts::fractional_ownership::domain::{
     aggregates::{OwnershipContractAggregate, OwnershipAnalytics},
     value_objects::OwnershipContractId,
 };
-use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
+use vibestream_types::{SongContract, ArtistContract};
 use crate::bounded_contexts::user::domain::value_objects::UserId;
 use crate::shared::domain::repositories::RepoResult;
 

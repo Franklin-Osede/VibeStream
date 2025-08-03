@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::shared::domain::errors::AppError;
-use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
+use vibestream_types::{SongContract, ArtistContract};
 use crate::bounded_contexts::user::domain::value_objects::UserId;
 
 use super::value_objects::{
@@ -32,8 +32,8 @@ pub struct OwnershipContractAggregate {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OwnershipContract {
     id: OwnershipContractId,
-    song_id: SongId,
-    artist_id: ArtistId,
+    song_contract: SongContract,
+    artist_contract: ArtistContract,
     total_shares: u32,
     price_per_share: SharePrice,
     artist_retained_percentage: OwnershipPercentage,
@@ -70,8 +70,8 @@ impl std::fmt::Display for ContractStatus {
 impl OwnershipContract {
     // Getter methods for accessing private fields
     pub fn id(&self) -> &OwnershipContractId { &self.id }
-    pub fn song_id(&self) -> &SongId { &self.song_id }
-    pub fn artist_id(&self) -> &ArtistId { &self.artist_id }
+    pub fn song_contract(&self) -> &SongContract { &self.song_contract }
+    pub fn artist_contract(&self) -> &ArtistContract { &self.artist_contract }
     pub fn total_shares(&self) -> u32 { self.total_shares }
     pub fn price_per_share(&self) -> &SharePrice { &self.price_per_share }
     pub fn artist_retained_percentage(&self) -> &OwnershipPercentage { &self.artist_retained_percentage }
@@ -87,8 +87,8 @@ impl OwnershipContract {
 impl OwnershipContractAggregate {
     // Additional getter methods
     pub fn contract(&self) -> &OwnershipContract { &self.contract }
-    pub fn song_id(&self) -> &SongId { &self.contract.song_id }
-    pub fn artist_id(&self) -> &ArtistId { &self.contract.artist_id }
+    pub fn song_contract(&self) -> &SongContract { &self.contract.song_contract }
+    pub fn artist_contract(&self) -> &ArtistContract { &self.contract.artist_contract }
     pub fn is_active(&self) -> bool { 
         matches!(self.contract.contract_status, ContractStatus::Active) 
     }
@@ -101,8 +101,8 @@ impl OwnershipContractAggregate {
 impl OwnershipContractAggregate {
     /// Create a new ownership contract - Domain Factory
     pub fn create_contract(
-        song_id: SongId,
-        artist_id: ArtistId,
+        song_contract: SongContract,
+        artist_contract: ArtistContract,
         total_shares: u32,
         price_per_share: SharePrice,
         artist_retained_percentage: OwnershipPercentage,
@@ -136,8 +136,8 @@ impl OwnershipContractAggregate {
 
         let contract = OwnershipContract {
             id: contract_id.clone(),
-            song_id: song_id.clone(),
-            artist_id: artist_id.clone(),
+            song_contract: song_contract.clone(),
+            artist_contract: artist_contract.clone(),
             total_shares,
             price_per_share: price_per_share.clone(),
             artist_retained_percentage: artist_retained_percentage.clone(),
@@ -552,9 +552,38 @@ mod tests {
     use chrono::Duration;
 
     fn create_test_aggregate() -> Result<OwnershipContractAggregate, AppError> {
+        let song_contract = SongContract {
+            id: Uuid::new_v4(),
+            title: "Test Song".to_string(),
+            artist_id: Uuid::new_v4(),
+            artist_name: "Test Artist".to_string(),
+            duration_seconds: Some(180),
+            genre: Some("Pop".to_string()),
+            ipfs_hash: None,
+            metadata_url: None,
+            nft_contract_address: None,
+            nft_token_id: None,
+            royalty_percentage: None,
+            is_minted: false,
+            created_at: Utc::now(),
+        };
+        
+        let artist_contract = ArtistContract {
+            id: Uuid::new_v4(),
+            name: "Test Artist".to_string(),
+            verified: true,
+            bio: Some("Test bio".to_string()),
+            avatar_url: None,
+            social_links: None,
+            genres: vec!["Pop".to_string()],
+            total_streams: 0,
+            monthly_listeners: 0,
+            created_at: Utc::now(),
+        };
+        
         OwnershipContractAggregate::create_contract(
-            SongId::new(),
-            ArtistId::new(),
+            song_contract,
+            artist_contract,
             1000, // total shares
             SharePrice::new(10.0)?, // $10 per share
             OwnershipPercentage::new(51.0)?, // Artist retains 51%

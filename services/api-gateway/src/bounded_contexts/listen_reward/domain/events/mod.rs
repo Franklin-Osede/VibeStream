@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 use crate::bounded_contexts::listen_reward::domain::value_objects::{
     ListenSessionId, RewardAmount, ListenDuration, QualityScore, ZkProofHash
 };
-use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
+// Removed unused imports
 use crate::shared::domain::events::{DomainEvent, EventMetadata};
 
 // Listen session started
@@ -13,8 +13,8 @@ use crate::shared::domain::events::{DomainEvent, EventMetadata};
 pub struct ListenSessionStarted {
     pub session_id: ListenSessionId,
     pub user_id: Uuid,
-    pub song_id: SongId,
-    pub artist_id: ArtistId,
+    pub song_id: Uuid,
+    pub artist_id: Uuid,
     pub quality_score: QualityScore,
     pub started_at: DateTime<Utc>,
     pub metadata: EventMetadata,
@@ -24,8 +24,8 @@ impl ListenSessionStarted {
     pub fn new(
         session_id: ListenSessionId,
         user_id: Uuid,
-        song_id: SongId,
-        artist_id: ArtistId,
+        song_id: Uuid,
+        artist_id: Uuid,
         quality_score: QualityScore,
         started_at: DateTime<Utc>,
     ) -> Self {
@@ -72,8 +72,8 @@ impl DomainEvent for ListenSessionStarted {
 pub struct ListenSessionCompleted {
     pub session_id: ListenSessionId,
     pub user_id: Uuid,
-    pub song_id: SongId,
-    pub artist_id: ArtistId,
+    pub song_id: Uuid,
+    pub artist_id: Uuid,
     pub duration: ListenDuration,
     pub quality_score: QualityScore,
     pub completion_percentage: f64,
@@ -85,8 +85,8 @@ impl ListenSessionCompleted {
     pub fn new(
         session_id: ListenSessionId,
         user_id: Uuid,
-        song_id: SongId,
-        artist_id: ArtistId,
+        song_id: Uuid,
+        artist_id: Uuid,
         duration: ListenDuration,
         quality_score: QualityScore,
         completion_percentage: f64,
@@ -137,8 +137,8 @@ impl DomainEvent for ListenSessionCompleted {
 pub struct ZkProofVerificationFailed {
     pub session_id: ListenSessionId,
     pub user_id: Uuid,
-    pub song_id: SongId,
-    pub artist_id: ArtistId,
+    pub song_id: Uuid,
+    pub artist_id: Uuid,
     pub proof_hash: ZkProofHash,
     pub failure_reason: String,
     pub failed_at: DateTime<Utc>,
@@ -149,8 +149,8 @@ impl ZkProofVerificationFailed {
     pub fn new(
         session_id: ListenSessionId,
         user_id: Uuid,
-        song_id: SongId,
-        artist_id: ArtistId,
+        song_id: Uuid,
+        artist_id: Uuid,
         proof_hash: ZkProofHash,
         failure_reason: String,
         failed_at: DateTime<Utc>,
@@ -199,8 +199,8 @@ impl DomainEvent for ZkProofVerificationFailed {
 pub struct RewardCalculated {
     pub session_id: ListenSessionId,
     pub user_id: Uuid,
-    pub song_id: SongId,
-    pub artist_id: ArtistId,
+    pub song_id: Uuid,
+    pub artist_id: Uuid,
     pub base_reward: RewardAmount,
     pub final_reward: RewardAmount,
     pub calculated_at: DateTime<Utc>,
@@ -211,8 +211,8 @@ impl RewardCalculated {
     pub fn new(
         session_id: ListenSessionId,
         user_id: Uuid,
-        song_id: SongId,
-        artist_id: ArtistId,
+        song_id: Uuid,
+        artist_id: Uuid,
         base_reward: RewardAmount,
         final_reward: RewardAmount,
         calculated_at: DateTime<Utc>,
@@ -262,7 +262,7 @@ pub struct RewardDistributionCreated {
     pub distribution_id: Uuid,
     pub session_id: ListenSessionId,
     pub user_id: Uuid,
-    pub artist_id: ArtistId,
+    pub artist_id: Uuid,
     pub total_amount: RewardAmount,
     pub user_share: RewardAmount,
     pub artist_share: RewardAmount,
@@ -276,7 +276,7 @@ impl RewardDistributionCreated {
         distribution_id: Uuid,
         session_id: ListenSessionId,
         user_id: Uuid,
-        artist_id: ArtistId,
+        artist_id: Uuid,
         total_amount: RewardAmount,
         user_share: RewardAmount,
         artist_share: RewardAmount,
@@ -329,7 +329,7 @@ impl DomainEvent for RewardDistributionCreated {
 pub struct RewardDistributed {
     pub distribution_id: Uuid,
     pub user_id: Uuid,
-    pub artist_id: ArtistId,
+    pub artist_id: Uuid,
     pub amount: RewardAmount,
     pub recipient_type: String, // "user", "artist", "platform"
     pub distributed_at: DateTime<Utc>,
@@ -340,7 +340,7 @@ impl RewardDistributed {
     pub fn new(
         distribution_id: Uuid,
         user_id: Uuid,
-        artist_id: ArtistId,
+        artist_id: Uuid,
         amount: RewardAmount,
         recipient_type: String,
         distributed_at: DateTime<Utc>,
@@ -387,8 +387,8 @@ impl DomainEvent for RewardDistributed {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArtistRoyaltyPaid {
     pub payment_id: Uuid,
-    pub artist_id: ArtistId,
-    pub song_id: SongId,
+    pub artist_id: Uuid,
+    pub song_id: Uuid,
     pub amount: RewardAmount,
     pub period_start: DateTime<Utc>,
     pub period_end: DateTime<Utc>,
@@ -399,8 +399,8 @@ pub struct ArtistRoyaltyPaid {
 impl ArtistRoyaltyPaid {
     pub fn new(
         payment_id: Uuid,
-        artist_id: ArtistId,
-        song_id: SongId,
+        artist_id: Uuid,
+        song_id: Uuid,
         amount: RewardAmount,
         period_start: DateTime<Utc>,
         period_end: DateTime<Utc>,

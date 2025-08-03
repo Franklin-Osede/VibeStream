@@ -7,7 +7,7 @@ use super::entities::{Campaign, CampaignNFT};
 use super::value_objects::CampaignId;
 
 use crate::shared::domain::errors::AppError;
-use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
+use vibestream_types::{SongContract, ArtistContract};
 
 use super::events::*;
 use super::value_objects::*;
@@ -24,8 +24,8 @@ pub struct CampaignAggregate {
 impl CampaignAggregate {
     // Factory method to create new campaign
     pub fn create_campaign(
-        song_id: SongId,
-        artist_id: ArtistId,
+        song_contract: SongContract,
+        artist_contract: ArtistContract,
         name: String,
         description: String,
         start_date: DateTime<Utc>,
@@ -38,8 +38,8 @@ impl CampaignAggregate {
         let date_range = DateRange::new(start_date, end_date)?;
         
         let (campaign, event) = Campaign::create(
-            song_id,
-            artist_id,
+            song_contract,
+            artist_contract,
             name,
             description,
             date_range,
@@ -417,14 +417,41 @@ mod tests {
     use super::*;
 
     fn create_test_aggregate() -> Result<CampaignAggregate, AppError> {
-        let song_id = SongId::new();
-        let artist_id = ArtistId::new();
+        let song_contract = SongContract {
+            id: Uuid::new_v4(),
+            title: "Test Song".to_string(),
+            artist_id: Uuid::new_v4(),
+            artist_name: "Test Artist".to_string(),
+            duration_seconds: Some(180),
+            genre: Some("Pop".to_string()),
+            ipfs_hash: None,
+            metadata_url: None,
+            nft_contract_address: None,
+            nft_token_id: None,
+            royalty_percentage: None,
+            is_minted: false,
+            created_at: Utc::now(),
+        };
+        
+        let artist_contract = ArtistContract {
+            id: Uuid::new_v4(),
+            name: "Test Artist".to_string(),
+            verified: true,
+            bio: Some("Test bio".to_string()),
+            avatar_url: None,
+            social_links: None,
+            genres: vec!["Pop".to_string()],
+            total_streams: 0,
+            monthly_listeners: 0,
+            created_at: Utc::now(),
+        };
+        
         let start = Utc::now() + chrono::Duration::days(1);
         let end = start + chrono::Duration::days(30);
 
         CampaignAggregate::create_campaign(
-            song_id,
-            artist_id,
+            song_contract,
+            artist_contract,
             "Test Campaign".to_string(),
             "A test campaign".to_string(),
             start,

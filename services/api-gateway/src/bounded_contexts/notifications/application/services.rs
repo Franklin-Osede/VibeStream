@@ -11,6 +11,26 @@ use crate::bounded_contexts::notifications::domain::services::{
 use crate::bounded_contexts::notifications::domain::repositories::{
     NotificationRepository, NotificationPreferencesRepository, NotificationTemplateRepository,
 };
+use std::sync::Arc;
+use serde_json::Value;
+
+/// Mock application service for Notifications context
+#[derive(Clone)]
+pub struct MockNotificationApplicationService;
+
+impl MockNotificationApplicationService {
+    pub fn new() -> Self {
+        Self
+    }
+    
+    pub async fn create_notification(&self, _request: Value) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        Ok(())
+    }
+    
+    pub async fn get_all_notifications(&self) -> Result<Vec<()>, Box<dyn std::error::Error + Send + Sync>> {
+        Ok(vec![])
+    }
+}
 
 pub struct NotificationApplicationService<R, P, T>
 where

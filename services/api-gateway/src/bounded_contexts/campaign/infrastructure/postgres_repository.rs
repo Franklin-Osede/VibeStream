@@ -9,7 +9,7 @@ use crate::bounded_contexts::campaign::domain::{
     repository::CampaignRepository,
 };
 use crate::bounded_contexts::campaign::domain::value_objects::*;
-use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
+use vibestream_types::{SongContract, ArtistContract};
 use crate::shared::domain::repositories::RepoResult;
 
 #[derive(Debug, Clone)]
@@ -69,8 +69,8 @@ impl CampaignRepository for PostgresCampaignRepository {
             "#,
         )
         .bind(campaign.id().value())
-        .bind(campaign.song_id().value())
-        .bind(campaign.artist_id().value())
+        .bind(campaign.song_contract().id)
+        .bind(campaign.artist_contract().id)
         .bind(campaign.name())
         .bind(campaign.description())
         .bind(campaign.date_range().start())
@@ -294,11 +294,38 @@ impl CampaignRow {
         let id = CampaignId::from_string(&self.id)
             .map_err(|e| format!("Invalid campaign ID: {}", e))?;
         
-        let song_id = SongId::from_string(&self.song_id)
-            .map_err(|e| format!("Invalid song ID: {}", e))?;
+        // Create temporary contracts from database data
+        let song_contract = SongContract {
+            id: Uuid::parse_str(&self.song_id)
+                .map_err(|e| format!("Invalid song ID: {}", e))?,
+            title: "Unknown".to_string(), // Placeholder
+            artist_id: Uuid::parse_str(&self.artist_id)
+                .map_err(|e| format!("Invalid artist ID: {}", e))?,
+            artist_name: "Unknown".to_string(), // Placeholder
+            duration_seconds: None,
+            genre: None,
+            ipfs_hash: None,
+            metadata_url: None,
+            nft_contract_address: None,
+            nft_token_id: None,
+            royalty_percentage: None,
+            is_minted: false,
+            created_at: Utc::now(),
+        };
         
-        let artist_id = ArtistId::from_string(&self.artist_id)
-            .map_err(|e| format!("Invalid artist ID: {}", e))?;
+        let artist_contract = ArtistContract {
+            id: Uuid::parse_str(&self.artist_id)
+                .map_err(|e| format!("Invalid artist ID: {}", e))?,
+            name: "Unknown".to_string(), // Placeholder
+            verified: false,
+            bio: None,
+            avatar_url: None,
+            social_links: None,
+            genres: vec![],
+            total_streams: 0,
+            monthly_listeners: 0,
+            created_at: Utc::now(),
+        };
         
         let name = CampaignName::new(self.name)
             .map_err(|e| format!("Invalid campaign name: {}", e))?;
@@ -330,10 +357,10 @@ impl CampaignRow {
             None => None,
         };
 
-        // Create campaign using create method (simplified approach)
+        // Create campaign using create method with contracts
         let (campaign, _) = Campaign::create(
-            song_id,
-            artist_id,
+            song_contract,
+            artist_contract,
             name.value().to_string(),
             self.description,
             date_range,

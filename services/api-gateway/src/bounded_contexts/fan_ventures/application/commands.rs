@@ -12,7 +12,7 @@ use crate::bounded_contexts::fractional_ownership::domain::{
     value_objects::{OwnershipContractId, OwnershipPercentage, SharePrice, RevenueAmount, ShareId, VestingPeriod},
     events::TerminationReason,
 };
-use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
+use vibestream_types::{SongContract, ArtistContract};
 use crate::bounded_contexts::user::domain::value_objects::UserId;
 
 /// Command: Create a new ownership contract for a song
@@ -144,9 +144,36 @@ impl<R: OwnershipContractRepository + Send + Sync> CommandHandler<CreateOwnershi
     type Output = CreateOwnershipContractResult;
     
     async fn handle(&self, command: CreateOwnershipContract) -> Result<Self::Output, AppError> {
-        // Validate inputs
-        let song_id = SongId::from_uuid(command.song_id);
-        let artist_id = ArtistId::from_uuid(command.artist_id);
+        // Create temporary contracts from command data
+        let song_contract = SongContract {
+            id: command.song_id,
+            title: "Unknown".to_string(), // Placeholder
+            artist_id: command.artist_id,
+            artist_name: "Unknown".to_string(), // Placeholder
+            duration_seconds: None,
+            genre: None,
+            ipfs_hash: None,
+            metadata_url: None,
+            nft_contract_address: None,
+            nft_token_id: None,
+            royalty_percentage: None,
+            is_minted: false,
+            created_at: Utc::now(),
+        };
+        
+        let artist_contract = ArtistContract {
+            id: command.artist_id,
+            name: "Unknown".to_string(), // Placeholder
+            verified: false,
+            bio: None,
+            avatar_url: None,
+            social_links: None,
+            genres: vec![],
+            total_streams: 0,
+            monthly_listeners: 0,
+            created_at: Utc::now(),
+        };
+        
         let price_per_share = SharePrice::new(command.price_per_share)?;
         let artist_retained = OwnershipPercentage::new(command.artist_retained_percentage)?;
         
@@ -159,7 +186,7 @@ impl<R: OwnershipContractRepository + Send + Sync> CommandHandler<CreateOwnershi
             .transpose()?;
 
         // Check if contract already exists for this song
-        if self.repository.exists_for_song(&song_id).await? {
+        if self.repository.exists_for_song(&song_contract.id).await? {
             return Err(AppError::DomainRuleViolation(
                 "Ownership contract already exists for this song".to_string(),
             ));
@@ -167,8 +194,8 @@ impl<R: OwnershipContractRepository + Send + Sync> CommandHandler<CreateOwnershi
 
         // Create aggregate
         let aggregate = OwnershipContractAggregate::create_contract(
-            song_id,
-            artist_id,
+            song_contract,
+            artist_contract,
             command.total_shares,
             price_per_share.clone(),
             artist_retained,

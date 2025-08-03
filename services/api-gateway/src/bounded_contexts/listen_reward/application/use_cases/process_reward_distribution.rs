@@ -7,7 +7,7 @@ use crate::bounded_contexts::listen_reward::domain::{
     value_objects::{RewardAmount, ValidationPeriod}
 };
 use crate::shared::domain::events::DomainEvent;
-use crate::bounded_contexts::music::domain::value_objects::RoyaltyPercentage;
+use vibestream_types::RoyaltyPercentage;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProcessRewardDistributionCommand {
@@ -187,7 +187,7 @@ impl ProcessRewardDistributionUseCase {
 mod tests {
     use super::*;
     use crate::bounded_contexts::listen_reward::domain::{RewardTier, ListenDuration, QualityScore, ZkProofHash};
-    use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
+    use vibestream_types::{SongContract, ArtistContract};
 
     fn create_test_session() -> ListenSession {
         let (mut session, _) = ListenSession::new(

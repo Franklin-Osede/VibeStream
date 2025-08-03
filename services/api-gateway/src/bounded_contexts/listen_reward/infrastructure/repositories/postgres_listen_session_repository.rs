@@ -9,7 +9,7 @@ use crate::bounded_contexts::listen_reward::domain::{
         ListenSessionId, RewardAmount, RewardTier, ZkProofHash, ListenDuration, QualityScore
     },
 };
-use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
+// These imports are used in the file
 
 use super::{
     ListenSessionRepository, ListenSessionQueryRepository,
@@ -74,8 +74,8 @@ impl PostgresListenSessionRepository {
     fn row_to_entity(&self, row: &ListenSessionRow) -> RepositoryResult<ListenSession> {
         // Convertir value objects
         let session_id = ListenSessionId::from_uuid(row.id);
-        let song_id = SongId::from_uuid(row.song_id);
-        let artist_id = ArtistId::from_uuid(row.artist_id);
+        let song_id = row.song_id;
+        let artist_id = row.artist_id;
         
         // Convertir enums
         let user_tier = RewardTier::from_string(&row.user_tier)
@@ -111,12 +111,42 @@ impl PostgresListenSessionRepository {
             .transpose()
             .map_err(|e| format!("Invalid final reward: {}", e))?;
         
+        // Crear contratos temporales para la entidad
+        let song_contract = SongContract {
+            id: song_id,
+            title: "Unknown".to_string(), // Placeholder
+            artist_id,
+            artist_name: "Unknown".to_string(), // Placeholder
+            duration_seconds: None,
+            genre: None,
+            ipfs_hash: None,
+            metadata_url: None,
+            nft_contract_address: None,
+            nft_token_id: None,
+            royalty_percentage: None,
+            is_minted: false,
+            created_at: Utc::now(),
+        };
+        
+        let artist_contract = ArtistContract {
+            id: artist_id,
+            name: "Unknown".to_string(), // Placeholder
+            verified: false,
+            bio: None,
+            avatar_url: None,
+            social_links: None,
+            genres: vec![],
+            total_streams: 0,
+            monthly_listeners: 0,
+            created_at: Utc::now(),
+        };
+        
         // Crear la entidad usando el constructor from_parts
         let session = ListenSession::from_parts(
             session_id,
             row.user_id,
-            song_id,
-            artist_id,
+            song_contract,
+            artist_contract,
             user_tier,
             status,
             listen_duration,

@@ -10,7 +10,7 @@ use crate::bounded_contexts::listen_reward::domain::events::{
     ListenSessionStarted, ListenSessionCompleted, RewardCalculated, 
     ZkProofVerificationFailed
 };
-use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
+use vibestream_types::{SongContract, ArtistContract};
 use crate::shared::domain::errors::AppError;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -26,8 +26,8 @@ pub enum SessionStatus {
 pub struct ListenSession {
     id: ListenSessionId,
     user_id: Uuid,
-    song_id: SongId,
-    artist_id: ArtistId,
+    song_contract: SongContract,
+    artist_contract: ArtistContract,
     user_tier: RewardTier,
     status: SessionStatus,
     listen_duration: Option<ListenDuration>,
@@ -43,8 +43,8 @@ pub struct ListenSession {
 impl ListenSession {
     pub fn new(
         user_id: Uuid,
-        song_id: SongId,
-        artist_id: ArtistId,
+        song_contract: SongContract,
+        artist_contract: ArtistContract,
         user_tier: RewardTier,
     ) -> (Self, Box<dyn DomainEvent>) {
         let session_id = ListenSessionId::new();
@@ -53,8 +53,8 @@ impl ListenSession {
         let session = Self {
             id: session_id.clone(),
             user_id,
-            song_id: song_id.clone(),
-            artist_id: artist_id.clone(),
+            song_contract: song_contract.clone(),
+            artist_contract: artist_contract.clone(),
             user_tier: user_tier.clone(),
             status: SessionStatus::Active,
             listen_duration: None,
@@ -70,8 +70,8 @@ impl ListenSession {
         let event = Box::new(ListenSessionStarted::new(
             session_id,
             user_id,
-            song_id,
-            artist_id,
+            song_contract.id,
+            artist_contract.id,
             QualityScore::new(1.0).unwrap(), // Default perfect quality
             Utc::now(),
         ));
@@ -88,12 +88,12 @@ impl ListenSession {
         self.user_id
     }
 
-    pub fn song_id(&self) -> &SongId {
-        &self.song_id
+    pub fn song_contract(&self) -> &SongContract {
+        &self.song_contract
     }
 
-    pub fn artist_id(&self) -> &ArtistId {
-        &self.artist_id
+    pub fn artist_contract(&self) -> &ArtistContract {
+        &self.artist_contract
     }
 
     pub fn user_tier(&self) -> &RewardTier {
@@ -327,7 +327,7 @@ impl ListenSession {
         SessionAnalytics {
             session_id: self.id.clone(),
             user_id: self.user_id,
-            song_id: self.song_id.clone(),
+            song_id: self.song_contract.id,
             user_tier: self.user_tier.clone(),
             listen_duration_seconds: self.listen_duration.as_ref().map(|d| d.seconds()),
             quality_score: self.quality_score.as_ref().map(|q| q.score()),
@@ -343,8 +343,8 @@ impl ListenSession {
     pub fn from_parts(
         id: ListenSessionId,
         user_id: Uuid,
-        song_id: SongId,
-        artist_id: ArtistId,
+        song_contract: SongContract,
+        artist_contract: ArtistContract,
         user_tier: RewardTier,
         status: SessionStatus,
         listen_duration: Option<ListenDuration>,
@@ -359,8 +359,8 @@ impl ListenSession {
         Self {
             id,
             user_id,
-            song_id,
-            artist_id,
+            song_contract,
+            artist_contract,
             user_tier,
             status,
             listen_duration,
@@ -379,7 +379,7 @@ impl ListenSession {
 pub struct SessionAnalytics {
     pub session_id: ListenSessionId,
     pub user_id: Uuid,
-    pub song_id: SongId,
+    pub song_id: Uuid, // Using UUID directly for analytics
     pub user_tier: RewardTier,
     pub listen_duration_seconds: Option<u32>,
     pub quality_score: Option<f64>,
@@ -418,10 +418,39 @@ mod tests {
     use super::*;
 
     fn create_test_session() -> ListenSession {
+        let song_contract = SongContract {
+            id: Uuid::new_v4(),
+            title: "Test Song".to_string(),
+            artist_id: Uuid::new_v4(),
+            artist_name: "Test Artist".to_string(),
+            duration_seconds: Some(180),
+            genre: Some("Pop".to_string()),
+            ipfs_hash: None,
+            metadata_url: None,
+            nft_contract_address: None,
+            nft_token_id: None,
+            royalty_percentage: None,
+            is_minted: false,
+            created_at: Utc::now(),
+        };
+        
+        let artist_contract = ArtistContract {
+            id: Uuid::new_v4(),
+            name: "Test Artist".to_string(),
+            verified: true,
+            bio: Some("Test bio".to_string()),
+            avatar_url: None,
+            social_links: None,
+            genres: vec!["Pop".to_string()],
+            total_streams: 0,
+            monthly_listeners: 0,
+            created_at: Utc::now(),
+        };
+        
         let (session, _) = ListenSession::new(
             Uuid::new_v4(),
-            SongId::new(),
-            ArtistId::new(),
+            song_contract,
+            artist_contract,
             RewardTier::Basic,
         );
         session

@@ -3,7 +3,7 @@
 use crate::domain::value_objects::{SharePrice, RevenueAmount};
 use crate::domain::aggregates::FractionalOwnershipAggregate;
 use crate::domain::errors::FractionalOwnershipError;
-use crate::domain::entities::FractionalSong; // Agregado para tests
+// Removed unused import // Agregado para tests
 use uuid::Uuid;
 use chrono::Utc;
 use std::collections::HashMap;
