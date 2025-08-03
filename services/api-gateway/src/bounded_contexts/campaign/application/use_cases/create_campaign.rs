@@ -4,7 +4,7 @@
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
-use crate::bounded_contexts::music::domain::value_objects;
+use vibestream_types::{SongContract, ArtistContract};
 use crate::bounded_contexts::campaign::domain::aggregates::CampaignAggregate;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

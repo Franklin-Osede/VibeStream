@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::shared::domain::repositories::RepoResult;
 use crate::bounded_contexts::{
-    music::domain::value_objects::{SongId, ArtistId},
+            vibestream_types::{SongContract, ArtistContract},
     user::domain::value_objects::UserId,
     fractional_ownership::domain::{
         repository::{OwnershipContractRepository, ShareRepository},

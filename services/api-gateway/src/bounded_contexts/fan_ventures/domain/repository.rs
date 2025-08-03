@@ -342,14 +342,44 @@ pub mod tests {
     #[tokio::test]
     async fn test_mock_repository_save_and_find() {
         use crate::bounded_contexts::fractional_ownership::domain::value_objects::{SharePrice, OwnershipPercentage, RevenueAmount};
-        use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
+        use vibestream_types::{SongContract, ArtistContract};
 
         let repo = MockOwnershipContractRepository::new();
         
+        // Create test contracts
+        let song_contract = SongContract {
+            id: uuid::Uuid::new_v4(),
+            title: "Test Song".to_string(),
+            artist_id: uuid::Uuid::new_v4(),
+            artist_name: "Test Artist".to_string(),
+            duration_seconds: Some(180),
+            genre: Some("Pop".to_string()),
+            ipfs_hash: None,
+            metadata_url: None,
+            nft_contract_address: None,
+            nft_token_id: None,
+            royalty_percentage: None,
+            is_minted: false,
+            created_at: chrono::Utc::now(),
+        };
+        
+        let artist_contract = ArtistContract {
+            id: uuid::Uuid::new_v4(),
+            name: "Test Artist".to_string(),
+            verified: true,
+            bio: Some("Test bio".to_string()),
+            avatar_url: None,
+            social_links: None,
+            genres: vec!["Pop".to_string()],
+            total_streams: 0,
+            monthly_listeners: 0,
+            created_at: chrono::Utc::now(),
+        };
+        
         // Create test aggregate
         let aggregate = OwnershipContractAggregate::create_contract(
-            SongId::new(),
-            ArtistId::new(),
+            song_contract,
+            artist_contract,
             1000,
             SharePrice::new(10.0).unwrap(),
             OwnershipPercentage::new(51.0).unwrap(),
@@ -374,15 +404,44 @@ pub mod tests {
     #[tokio::test]
     async fn test_mock_repository_find_by_song() {
         use crate::bounded_contexts::fractional_ownership::domain::value_objects::{SharePrice, OwnershipPercentage, RevenueAmount};
-        use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
+        use vibestream_types::{SongContract, ArtistContract};
 
         let repo = MockOwnershipContractRepository::new();
-        let song_id = SongId::new();
+        
+        // Create test contracts
+        let song_contract = SongContract {
+            id: uuid::Uuid::new_v4(),
+            title: "Test Song".to_string(),
+            artist_id: uuid::Uuid::new_v4(),
+            artist_name: "Test Artist".to_string(),
+            duration_seconds: Some(180),
+            genre: Some("Pop".to_string()),
+            ipfs_hash: None,
+            metadata_url: None,
+            nft_contract_address: None,
+            nft_token_id: None,
+            royalty_percentage: None,
+            is_minted: false,
+            created_at: chrono::Utc::now(),
+        };
+        
+        let artist_contract = ArtistContract {
+            id: uuid::Uuid::new_v4(),
+            name: "Test Artist".to_string(),
+            verified: true,
+            bio: Some("Test bio".to_string()),
+            avatar_url: None,
+            social_links: None,
+            genres: vec!["Pop".to_string()],
+            total_streams: 0,
+            monthly_listeners: 0,
+            created_at: chrono::Utc::now(),
+        };
         
         // Create test aggregate
         let aggregate = OwnershipContractAggregate::create_contract(
-            song_id.clone(),
-            ArtistId::new(),
+            song_contract.clone(),
+            artist_contract,
             1000,
             SharePrice::new(10.0).unwrap(),
             OwnershipPercentage::new(51.0).unwrap(),
@@ -393,21 +452,51 @@ pub mod tests {
         repo.save(&aggregate).await.unwrap();
 
         // Test find by song
-        let contracts = repo.find_by_song_id(&song_id).await.unwrap();
+        let contracts = repo.find_by_song_id(&song_contract.id).await.unwrap();
         assert_eq!(contracts.len(), 1);
-        assert_eq!(contracts[0].contract().song_id().value(), song_id.value());
+        assert_eq!(contracts[0].contract().song_contract().id, song_contract.id);
     }
 
     #[tokio::test]
     async fn test_mock_repository_analytics() {
         use crate::bounded_contexts::fractional_ownership::domain::value_objects::{SharePrice, OwnershipPercentage, RevenueAmount};
-        use crate::bounded_contexts::music::domain::value_objects::{SongId, ArtistId};
+        use vibestream_types::{SongContract, ArtistContract};
 
         let repo = MockOwnershipContractRepository::new();
         
+        // Create test contracts
+        let song_contract = SongContract {
+            id: uuid::Uuid::new_v4(),
+            title: "Test Song".to_string(),
+            artist_id: uuid::Uuid::new_v4(),
+            artist_name: "Test Artist".to_string(),
+            duration_seconds: Some(180),
+            genre: Some("Pop".to_string()),
+            ipfs_hash: None,
+            metadata_url: None,
+            nft_contract_address: None,
+            nft_token_id: None,
+            royalty_percentage: None,
+            is_minted: false,
+            created_at: chrono::Utc::now(),
+        };
+        
+        let artist_contract = ArtistContract {
+            id: uuid::Uuid::new_v4(),
+            name: "Test Artist".to_string(),
+            verified: true,
+            bio: Some("Test bio".to_string()),
+            avatar_url: None,
+            social_links: None,
+            genres: vec!["Pop".to_string()],
+            total_streams: 0,
+            monthly_listeners: 0,
+            created_at: chrono::Utc::now(),
+        };
+        
         let aggregate = OwnershipContractAggregate::create_contract(
-            SongId::new(),
-            ArtistId::new(),
+            song_contract,
+            artist_contract,
             1000,
             SharePrice::new(10.0).unwrap(),
             OwnershipPercentage::new(51.0).unwrap(),

@@ -130,8 +130,8 @@ impl ListenRewardKafkaPublisher {
     pub async fn publish_artist_royalty_paid(
         &self,
         session_id: ListenSessionId,
-        artist_id: crate::bounded_contexts::music::domain::value_objects::ArtistId,
-        song_id: crate::bounded_contexts::music::domain::value_objects::SongId,
+        artist_id: Uuid,
+        song_id: Uuid,
         royalty_amount: RewardAmount,
         royalty_percentage: f64,
         transaction_hash: String,
@@ -139,8 +139,8 @@ impl ListenRewardKafkaPublisher {
     ) -> Result<(), AppError> {
         let payload = EventPayload::ArtistRoyaltyPaid(ArtistRoyaltyPaidPayload {
             session_id: session_id.value(),
-            artist_id: artist_id.value(),
-            song_id: song_id.value(),
+            artist_id,
+            song_id,
             royalty_amount: royalty_amount.amount(),
             royalty_percentage,
             transaction_hash,
@@ -409,8 +409,8 @@ impl CompleteFlowExample {
         let session_completed = ListenSessionCompleted {
             session_id: crate::bounded_contexts::listen_reward::domain::value_objects::ListenSessionId::new(),
             user_id: crate::bounded_contexts::listen_reward::domain::value_objects::UserId::new(),
-            song_id: crate::bounded_contexts::music::domain::value_objects::SongId::new(),
-            artist_id: crate::bounded_contexts::music::domain::value_objects::ArtistId::new(),
+            song_id: uuid::Uuid::new_v4(),
+            artist_id: uuid::Uuid::new_v4(),
             listen_duration: crate::bounded_contexts::listen_reward::domain::value_objects::ListenDuration::from_seconds(180),
             quality_score: crate::bounded_contexts::listen_reward::domain::value_objects::QualityScore::new(0.95),
             zk_proof_hash: crate::bounded_contexts::listen_reward::domain::value_objects::ZkProofHash::new("proof_hash_example".to_string()),

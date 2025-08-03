@@ -11,7 +11,7 @@ use crate::bounded_contexts::fractional_ownership::domain::{
     repository::{OwnershipContractRepository, MarketStatistics},
     value_objects::OwnershipContractId,
 };
-use crate::bounded_contexts::music::domain::value_objects::SongId;
+use vibestream_types::SongContract;
 use crate::bounded_contexts::user::domain::value_objects::UserId;
 
 /// Query: Get ownership contract by ID

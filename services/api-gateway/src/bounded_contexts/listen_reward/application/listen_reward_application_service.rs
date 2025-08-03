@@ -342,11 +342,41 @@ impl ListenRewardApplicationService {
         //     1000, // base_reward in cents
         //     chrono::Utc::now(),
         // );
+        // Create temporary contracts for the session
+        let song_contract = vibestream_types::SongContract {
+            id: uuid::Uuid::new_v4(),
+            title: "Unknown".to_string(),
+            artist_id: uuid::Uuid::new_v4(),
+            artist_name: "Unknown".to_string(),
+            duration_seconds: None,
+            genre: None,
+            ipfs_hash: None,
+            metadata_url: None,
+            nft_contract_address: None,
+            nft_token_id: None,
+            royalty_percentage: None,
+            is_minted: false,
+            created_at: chrono::Utc::now(),
+        };
+        
+        let artist_contract = vibestream_types::ArtistContract {
+            id: uuid::Uuid::new_v4(),
+            name: "Unknown".to_string(),
+            verified: false,
+            bio: None,
+            avatar_url: None,
+            social_links: None,
+            genres: vec![],
+            total_streams: 0,
+            monthly_listeners: 0,
+            created_at: chrono::Utc::now(),
+        };
+        
         let session = ListenSession::from_parts(
             crate::bounded_contexts::listen_reward::domain::value_objects::ListenSessionId::new(),
             command.session_id,
-            crate::bounded_contexts::music::domain::value_objects::SongId::from_uuid(uuid::Uuid::new_v4()),
-            crate::bounded_contexts::music::domain::value_objects::ArtistId::from_uuid(uuid::Uuid::new_v4()),
+            song_contract,
+            artist_contract,
             crate::bounded_contexts::listen_reward::domain::value_objects::RewardTier::Premium,
             crate::bounded_contexts::listen_reward::domain::entities::SessionStatus::Active,
             None,
