@@ -1,0 +1,3 @@
+-- Migration 009: Event Outbox Tables (SKIPPED - Already exists)
+-- This migration was skipped because the event_outbox table already exists
+-- with a different structure from the listen_reward_tables migration 

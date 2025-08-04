@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::shared::domain::errors::AppError;
+use crate::bounded_contexts::music::domain::{SongId, ArtistId};
 use super::super::domain::{
     aggregates::CampaignAggregate,
     entities::{Campaign, CampaignStatus},

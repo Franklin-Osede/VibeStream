@@ -7,6 +7,27 @@ use rust_decimal::Decimal;
 // SHARED CONTRACTS - Eliminan acoplamiento entre bounded contexts
 // =============================================================================
 
+/// Contrato compartido para porcentaje de regalías
+/// Usado por: Music, ListenReward, FanVentures contexts
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoyaltyPercentage {
+    pub value: Decimal,
+    pub currency: String,
+}
+
+impl RoyaltyPercentage {
+    pub fn new(value: Decimal, currency: String) -> Self {
+        Self { value, currency }
+    }
+    
+    pub fn from_decimal(value: Decimal) -> Self {
+        Self { 
+            value, 
+            currency: "USD".to_string() 
+        }
+    }
+}
+
 /// Contrato compartido para información de canción
 /// Usado por: Campaign, ListenReward, FanVentures contexts
 #[derive(Debug, Clone, Serialize, Deserialize)]

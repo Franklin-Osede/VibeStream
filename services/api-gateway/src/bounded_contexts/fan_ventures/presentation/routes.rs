@@ -40,7 +40,7 @@ async fn create_contract_handler(
     Extension(auth_user): Extension<AuthUser>,
     Json(request): Json<CreateContractRequest>,
 ) -> Result<Json<CreateContractResponse>, StatusCode> {
-    match crate::bounded_contexts::fractional_ownership::presentation::controllers::create_contract(
+            match crate::bounded_contexts::fan_ventures::presentation::controllers::create_contract(
         State(state), Extension(auth_user), Json(request)
     ).await {
         Ok(response) => Ok(response),
@@ -53,7 +53,7 @@ async fn activate_contract_handler(
     Extension(auth_user): Extension<AuthUser>,
     Path(contract_id): Path<Uuid>,
 ) -> Result<Json<CreateContractResponse>, StatusCode> {
-    match crate::bounded_contexts::fractional_ownership::presentation::controllers::activate_contract(
+    match crate::bounded_contexts::fan_ventures::presentation::controllers::activate_contract(
         State(state), Extension(auth_user), Path(contract_id)
     ).await {
         Ok(response) => Ok(response),
@@ -67,7 +67,7 @@ async fn purchase_shares_handler(
     Path(contract_id): Path<Uuid>,
     Json(request): Json<PurchaseSharesRequest>,
 ) -> Result<Json<PurchaseSharesResponse>, StatusCode> {
-    match crate::bounded_contexts::fractional_ownership::presentation::controllers::purchase_shares(
+    match crate::bounded_contexts::fan_ventures::presentation::controllers::purchase_shares(
         State(state), Extension(auth_user), Path(contract_id), Json(request)
     ).await {
         Ok(response) => Ok(response),
@@ -81,7 +81,7 @@ async fn trade_shares_handler(
     Path(share_id): Path<Uuid>,
     Json(request): Json<PurchaseSharesRequest>,
 ) -> Result<Json<PurchaseSharesResponse>, StatusCode> {
-    match crate::bounded_contexts::fractional_ownership::presentation::controllers::trade_shares(
+    match crate::bounded_contexts::fan_ventures::presentation::controllers::trade_shares(
         State(state), Extension(auth_user), Path(share_id), Json(request)
     ).await {
         Ok(response) => Ok(response),
@@ -95,7 +95,7 @@ async fn distribute_revenue_handler(
     Path(contract_id): Path<Uuid>,
     Json(request): Json<DistributeRevenueRequest>,
 ) -> Result<Json<DistributeRevenueResponse>, StatusCode> {
-    match crate::bounded_contexts::fractional_ownership::presentation::controllers::distribute_revenue(
+    match crate::bounded_contexts::fan_ventures::presentation::controllers::distribute_revenue(
         State(state), Extension(auth_user), Path(contract_id), Json(request)
     ).await {
         Ok(response) => Ok(response),
@@ -109,7 +109,7 @@ async fn terminate_contract_handler(
     Path(contract_id): Path<Uuid>,
     Json(request): Json<TerminateContractRequest>,
 ) -> Result<Json<TerminateContractResponse>, StatusCode> {
-    match crate::bounded_contexts::fractional_ownership::presentation::controllers::terminate_contract(
+    match crate::bounded_contexts::fan_ventures::presentation::controllers::terminate_contract(
         State(state), Extension(auth_user), Path(contract_id), Json(request)
     ).await {
         Ok(response) => Ok(response),
@@ -121,7 +121,7 @@ async fn get_contract_handler(
     State(state): State<AppState>,
     Path(contract_id): Path<Uuid>,
 ) -> Result<Json<ContractDetailsResponse>, StatusCode> {
-    match crate::bounded_contexts::fractional_ownership::presentation::controllers::get_contract(
+    match crate::bounded_contexts::fan_ventures::presentation::controllers::get_contract(
         State(state), Path(contract_id)
     ).await {
         Ok(response) => Ok(response),
@@ -134,7 +134,7 @@ async fn get_user_portfolio_handler(
     Extension(auth_user): Extension<AuthUser>,
     Path(user_id): Path<Uuid>,
 ) -> Result<Json<UserPortfolioResponse>, StatusCode> {
-    match crate::bounded_contexts::fractional_ownership::presentation::controllers::get_user_portfolio(
+    match crate::bounded_contexts::fan_ventures::presentation::controllers::get_user_portfolio(
         State(state), Extension(auth_user), Path(user_id)
     ).await {
         Ok(response) => Ok(response),
@@ -146,7 +146,7 @@ async fn get_contract_analytics_handler(
     State(state): State<AppState>,
     Path(contract_id): Path<Uuid>,
 ) -> Result<Json<ContractAnalyticsResponse>, StatusCode> {
-    match crate::bounded_contexts::fractional_ownership::presentation::controllers::get_contract_analytics(
+    match crate::bounded_contexts::fan_ventures::presentation::controllers::get_contract_analytics(
         State(state), Path(contract_id)
     ).await {
         Ok(response) => Ok(response),
@@ -158,7 +158,7 @@ async fn search_contracts_handler(
     State(state): State<AppState>,
     Query(params): Query<SearchContractsQuery>,
 ) -> Result<Json<SearchContractsResponse>, StatusCode> {
-    match crate::bounded_contexts::fractional_ownership::presentation::controllers::search_contracts(
+    match crate::bounded_contexts::fan_ventures::presentation::controllers::search_contracts(
         State(state), Query(params)
     ).await {
         Ok(response) => Ok(response),
@@ -170,7 +170,7 @@ async fn get_contracts_by_artist_handler(
     State(state): State<AppState>,
     Path(artist_id): Path<Uuid>,
 ) -> Result<Json<ArtistContractsResponse>, StatusCode> {
-    match crate::bounded_contexts::fractional_ownership::presentation::controllers::get_contracts_by_artist(
+    match crate::bounded_contexts::fan_ventures::presentation::controllers::get_contracts_by_artist(
         State(state), Path(artist_id)
     ).await {
         Ok(response) => Ok(response),
@@ -181,7 +181,7 @@ async fn get_contracts_by_artist_handler(
 async fn get_market_statistics_handler(
     State(state): State<AppState>,
 ) -> Result<Json<MarketStatisticsResponse>, StatusCode> {
-    match crate::bounded_contexts::fractional_ownership::presentation::controllers::get_market_statistics(
+    match crate::bounded_contexts::fan_ventures::presentation::controllers::get_market_statistics(
         State(state)
     ).await {
         Ok(response) => Ok(response),
@@ -392,8 +392,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_route_creation() {
-        let repository = Arc::new(crate::bounded_contexts::fractional_ownership::infrastructure::InMemoryOwnershipContractRepository::new());
-        let service = Arc::new(FractionalOwnershipApplicationService::<crate::bounded_contexts::fractional_ownership::infrastructure::InMemoryOwnershipContractRepository>::new(repository));
+        let repository = Arc::new(crate::bounded_contexts::fan_ventures::infrastructure::InMemoryOwnershipContractRepository::new());
+        let service = Arc::new(FractionalOwnershipApplicationService::<crate::bounded_contexts::fan_ventures::infrastructure::InMemoryOwnershipContractRepository>::new(repository));
         let router = create_routes(service);
         
         // Test that router is created successfully

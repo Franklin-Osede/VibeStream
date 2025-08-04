@@ -9,6 +9,7 @@ use crate::bounded_contexts::listen_reward::domain::{
         ListenSessionId, RewardAmount, RewardTier, ZkProofHash, ListenDuration, QualityScore
     },
 };
+use vibestream_types::{SongContract, ArtistContract};
 // These imports are used in the file
 
 use super::{

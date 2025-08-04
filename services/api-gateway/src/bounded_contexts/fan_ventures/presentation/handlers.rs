@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
-use crate::bounded_contexts::fractional_ownership::application::FractionalOwnershipApplicationService;
+use crate::bounded_contexts::fan_ventures::application::FractionalOwnershipApplicationService;
 use crate::auth::Claims;
 
 // ====== REQUEST/RESPONSE TYPES ======

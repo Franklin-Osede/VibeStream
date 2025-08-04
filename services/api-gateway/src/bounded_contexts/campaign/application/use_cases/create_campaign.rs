@@ -60,10 +60,10 @@ impl CreateCampaignUseCase {
         self.validate_command(&command)?;
 
         // Parse UUIDs
-        let song_id = value_objects::SongId::from_string(&command.song_id)
+        let song_id = crate::bounded_contexts::music::domain::SongId::from_string(&command.song_id)
             .map_err(|e| format!("Invalid song ID: {}", e))?;
         
-        let artist_id = value_objects::ArtistId::from_string(&command.artist_id)
+        let artist_id = crate::bounded_contexts::music::domain::ArtistId::from_string(&command.artist_id)
             .map_err(|e| format!("Invalid artist ID: {}", e))?;
 
         // Business rules validation
