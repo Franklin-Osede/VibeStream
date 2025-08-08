@@ -1,0 +1,9 @@
+{
+  "startTime": 1000,
+  "currentTime": 1030,
+  "endTime": 2000,
+  "songHash": 123456,
+  "userSignature": [111, 222, 333],
+  "userPublicKey": [444, 555],
+  "nonce": 789
+}

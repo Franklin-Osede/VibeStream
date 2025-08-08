@@ -23,7 +23,7 @@ use crate::bounded_contexts::listen_reward::{
             PostgresRewardAnalyticsRepository,
         },
         event_publishers::EventPublisherFactory,
-        external_services::MockZkProofVerificationService,
+        external_services::ProductionZkProofVerificationService,
     },
     presentation::controllers::{
         ListenSessionController,
@@ -184,7 +184,7 @@ pub struct ListenRewardInfrastructureConfig {
     pub listen_session_repository: Arc<PostgresListenSessionRepository>,
     pub reward_distribution_repository: Arc<PostgresRewardDistributionRepository>,
     pub analytics_repository: Arc<PostgresRewardAnalyticsRepository>,
-    pub zk_proof_service: Arc<MockZkProofVerificationService>,
+    pub zk_proof_service: Arc<ProductionZkProofVerificationService>,
     pub event_publisher: Arc<dyn crate::bounded_contexts::listen_reward::infrastructure::event_publishers::EventPublisher>,
     pub application_service: Arc<ListenRewardApplicationService>,
     pub listen_session_controller: Arc<ListenSessionController>,
@@ -203,8 +203,11 @@ impl ListenRewardInfrastructureConfig {
         let reward_distribution_repository = Arc::new(PostgresRewardDistributionRepository::new(db_pool.clone()));
         let analytics_repository = Arc::new(PostgresRewardAnalyticsRepository::new(db_pool.clone()));
 
-        // Crear servicios externos
-        let zk_proof_service = Arc::new(MockZkProofVerificationService::new_always_valid());
+        // Crear servicios externos - USANDO ZK PROOF REAL
+        let zk_proof_service = Arc::new(ProductionZkProofVerificationService::new(
+            "http://localhost:8003".to_string(),
+            30
+        ));
 
         // Crear event publisher
         let event_publisher_factory = EventPublisherFactory::new(db_pool.clone()).await?;

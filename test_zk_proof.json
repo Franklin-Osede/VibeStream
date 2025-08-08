@@ -1,0 +1,13 @@
+{
+  "proof_type": {
+    "Listen": {
+      "start_time": 1000,
+      "current_time": 1030,
+      "end_time": 2000,
+      "song_hash": "abc123",
+      "user_signature": ["sig1", "sig2", "sig3"],
+      "user_public_key": ["pub1", "pub2"],
+      "nonce": "nonce123"
+    }
+  }
+}
