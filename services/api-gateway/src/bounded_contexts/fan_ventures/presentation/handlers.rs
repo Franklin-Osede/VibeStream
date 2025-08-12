@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
-use crate::bounded_contexts::fan_ventures::application::FractionalOwnershipApplicationService;
 use crate::auth::Claims;
 
 // ====== REQUEST/RESPONSE TYPES ======
@@ -105,7 +104,7 @@ pub struct PerformanceMetrics {
 
 // ====== STATE TYPE ======
 
-pub type AppState = crate::services::AppState;
+pub type AppState = crate::shared::infrastructure::app_state::AppState;
 
 // ====== HANDLERS ======
 
@@ -254,44 +253,6 @@ pub async fn get_user_portfolio(
 
     tracing::info!("📈 Portfolio requested for user {}", user_id);
     Ok(ResponseJson(response))
-}
-
-/// GET /api/v1/ownership/contracts - List contracts with filtering
-pub async fn list_contracts(
-    State(_state): State<AppState>,
-    Query(params): Query<ListContractsQuery>,
-    _claims: Claims,
-) -> Result<ResponseJson<Vec<ContractSummary>>, StatusCode> {
-    // Mock contract list
-    let contracts = vec![
-        ContractSummary {
-            contract_id: Uuid::new_v4(),
-            song_title: "Trending Hit".to_string(),
-            artist_name: "Chart Topper".to_string(),
-            total_shares: 1000,
-            shares_available: 300,
-            price_per_share: 15.0,
-            roi_percentage: 18.5,
-            risk_level: "Medium".to_string(),
-            monthly_revenue: 600.0,
-            created_at: Utc::now() - chrono::Duration::days(30),
-        },
-        ContractSummary {
-            contract_id: Uuid::new_v4(),
-            song_title: "Underground Classic".to_string(),
-            artist_name: "Cult Artist".to_string(),
-            total_shares: 500,
-            shares_available: 150,
-            price_per_share: 8.0,
-            roi_percentage: 22.1,
-            risk_level: "High".to_string(),
-            monthly_revenue: 200.0,
-            created_at: Utc::now() - chrono::Duration::days(15),
-        },
-    ];
-
-    tracing::info!("📋 Contract list requested with params: {:?}", params);
-    Ok(ResponseJson(contracts))
 }
 
 #[derive(Debug, Deserialize)]

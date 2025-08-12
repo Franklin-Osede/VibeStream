@@ -9,6 +9,7 @@
 pub mod repositories;
 pub mod event_publishers;
 pub mod integration;
+pub mod mock_repository;
 
 pub use repositories::{
     PostgresListenSessionRepository, PostgresRewardDistributionRepository,
@@ -20,6 +21,7 @@ pub use integration::{
     // TODO: Add back when fan ventures is fully integrated
     // FractionalOwnershipIntegrationHandler, RevenueDistributionTriggered,
 };
+pub use mock_repository::*;
 
 // Health check utilities
 use serde::{Deserialize, Serialize};

@@ -218,9 +218,32 @@ impl CampaignController {
         Self::validate_create_campaign_request(&request)?;
 
         // Create campaign aggregate
+        let song_contract = vibestream_types::SongContract {
+            id: request.song_id,
+            title: "Campaign Song".to_string(),
+            artist_id: request.artist_id,
+            artist_name: "Campaign Artist".to_string(),
+            duration_seconds: None,
+            genre: None,
+            ipfs_hash: None,
+            metadata_url: None,
+            nft_contract_address: None,
+            nft_token_id: None,
+            royalty_percentage: None,
+            is_minted: false,
+            created_at: chrono::Utc::now(),
+        };
+        
+        let artist_contract = vibestream_types::ArtistContract {
+            id: request.artist_id,
+            user_id: request.artist_id,
+            stage_name: "Campaign Artist".to_string(),
+            profile_image_url: None,
+        };
+        
         let campaign_aggregate = CampaignAggregate::create_campaign(
-            SongId::from_uuid(request.song_id),
-            ArtistId::from_uuid(request.artist_id),
+            song_contract,
+            artist_contract,
             request.name.clone(),
             request.description.clone(),
             request.start_date,
@@ -242,8 +265,8 @@ impl CampaignController {
         let response = CreateCampaignResponse {
             campaign_id: campaign.id().value().clone(),
             name: campaign.name().to_string(),
-            song_id: campaign.song_id().value().clone(),
-            artist_id: campaign.artist_id().value().clone(),
+            song_id: campaign.song_contract().id,
+            artist_id: campaign.artist_contract().id,
             status: format!("{:?}", campaign.status()),
             start_date: campaign.date_range().start(),
             end_date: campaign.date_range().end(),

@@ -2,15 +2,22 @@ use std::sync::Arc;
 use sqlx::PgPool;
 use crate::services::{MessageQueue, DatabasePool};
 
+// Importar el registry de adapters
+use crate::shared::infrastructure::adapters::AdapterRegistry;
+
+// Importar feature flags
+use crate::shared::infrastructure::feature_flags::FeatureFlagManager;
+
 // Domain Repositories (Core Business Logic)
 use crate::bounded_contexts::{
     music::domain::repositories::SongRepository,
-    user::domain::repositories::UserRepository,
-    campaign::domain::repositories::CampaignRepository,
+    // user::domain::repositories::UserRepository,
+    // campaign::domain::repositories::CampaignRepository,
     listen_reward::infrastructure::repositories::repository_traits::ListenSessionRepository,
-    fan_ventures::domain::repositories::ArtistVentureRepository,
     notifications::domain::repositories::{NotificationRepository, NotificationTemplateRepository},
 };
+
+use crate::bounded_contexts::fan_ventures::infrastructure::PostgresFanVenturesRepository;
 
 // Application Services (Use Cases) - Using mock implementations for now
 use crate::bounded_contexts::fan_ventures::application::services::MockFanVenturesApplicationService;
@@ -46,11 +53,11 @@ pub struct AppState {
     // =============================================================================
     // DOMAIN REPOSITORIES (Core Business Logic)
     // =============================================================================
-    pub music_repository: Arc<dyn SongRepository + Send + Sync>,
-    pub user_repository: Arc<dyn UserRepository + Send + Sync>,
-    pub campaign_repository: Arc<dyn CampaignRepository + Send + Sync>,
+    pub music_repository: Arc<dyn crate::bounded_contexts::music::domain::repositories::song_repository::SongRepository + Send + Sync>,
+    // pub user_repository: Arc<dyn UserRepository + Send + Sync>,
+    // pub campaign_repository: Arc<dyn CampaignRepository + Send + Sync>,
     pub listen_session_repository: Arc<dyn ListenSessionRepository + Send + Sync>,
-    pub artist_venture_repository: Arc<dyn ArtistVentureRepository + Send + Sync>,
+    pub artist_venture_repository: Arc<PostgresFanVenturesRepository>,
     pub notification_repository: Arc<dyn NotificationRepository + Send + Sync>,
     pub notification_template_repository: Arc<dyn NotificationTemplateRepository + Send + Sync>,
     
@@ -65,6 +72,16 @@ pub struct AppState {
     pub cdn_service: Arc<MockCloudCDNService>,
     pub websocket_service: Arc<MockWebSocketService>,
     pub discovery_service: Arc<MockDiscoveryService>,
+    
+    // =============================================================================
+    // ANTI-CORRUPTION LAYER (Adapters)
+    // =============================================================================
+    pub adapter_registry: Arc<AdapterRegistry>,
+    
+    // =============================================================================
+    // FEATURE FLAGS
+    // =============================================================================
+    pub feature_flags: Arc<FeatureFlagManager>,
 }
 
 impl AppState {
@@ -83,8 +100,6 @@ impl AppState {
         database_url: &str,
         redis_url: &str,
         repositories: DomainRepositories,
-        _services: ApplicationServices,
-        _infrastructure: InfrastructureServices,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         // Inicializar servicios compartidos
         let message_queue = MessageQueue::new(redis_url).await?;
@@ -99,8 +114,8 @@ impl AppState {
             
             // Domain Repositories
             music_repository: repositories.music,
-            user_repository: repositories.user,
-            campaign_repository: repositories.campaign,
+            // user_repository: repositories.user,
+            // campaign_repository: repositories.campaign,
             listen_session_repository: repositories.listen_session,
             artist_venture_repository: repositories.artist_venture,
             notification_repository: repositories.notification,
@@ -113,6 +128,12 @@ impl AppState {
             cdn_service: Arc::new(MockCloudCDNService),
             websocket_service: Arc::new(MockWebSocketService),
             discovery_service: Arc::new(MockDiscoveryService),
+            
+            // Anti-Corruption Layer
+            adapter_registry: Arc::new(AdapterRegistry::default()),
+            
+            // Feature Flags
+            feature_flags: Arc::new(FeatureFlagManager::from_env()),
         })
     }
     
@@ -128,33 +149,33 @@ impl AppState {
             
         // Crear repositorios mock para testing
         let repositories = DomainRepositories {
-            music: Arc::new(crate::bounded_contexts::music::infrastructure::mock_repository::MockMusicRepository),
-            user: Arc::new(crate::bounded_contexts::user::infrastructure::mock_repository::MockUserRepository),
-            campaign: Arc::new(crate::bounded_contexts::campaign::infrastructure::mock_repository::MockCampaignRepository),
+            music: Arc::new(crate::bounded_contexts::music::infrastructure::postgres_repository::PostgresSongRepository::new(DatabasePool::new(&database_url).await?.get_pool().clone())),
+            // user: Arc::new(crate::bounded_contexts::user::infrastructure::mock_repository::MockUserRepository),
+            // campaign: Arc::new(crate::bounded_contexts::campaign::infrastructure::mock_repository::MockCampaignRepository),
             listen_session: Arc::new(crate::bounded_contexts::listen_reward::infrastructure::mock_repository::MockListenSessionRepository),
-            artist_venture: Arc::new(crate::bounded_contexts::fan_ventures::infrastructure::mock_repository::MockArtistVentureRepository),
+            artist_venture: Arc::new(PostgresFanVenturesRepository::new(DatabasePool::new(&database_url).await?.get_pool().clone())),
             notification: Arc::new(crate::bounded_contexts::notifications::infrastructure::mock_repository::MockNotificationRepository),
             notification_template: Arc::new(crate::bounded_contexts::notifications::infrastructure::mock_repository::MockNotificationTemplateRepository),
         };
         
         // Crear servicios de aplicación mock
-        let services = ApplicationServices {
-            music: Arc::new(crate::bounded_contexts::music::application::services::MockMusicApplicationService),
-            user: Arc::new(crate::bounded_contexts::user::application::services::MockUserApplicationService),
-            campaign: Arc::new(crate::bounded_contexts::campaign::application::services::MockCampaignApplicationService),
-            listen_reward: Arc::new(crate::bounded_contexts::listen_reward::application::services::MockListenRewardApplicationService),
-            fan_ventures: Arc::new(MockFanVenturesApplicationService::new()),
-            notification: Arc::new(crate::bounded_contexts::notifications::application::services::MockNotificationApplicationService),
-        };
+        // let services = ApplicationServices {
+        //     music: Arc::new(crate::bounded_contexts::music::application::services::MockMusicApplicationService),
+        //     user: Arc::new(crate::bounded_contexts::user::application::services::MockUserApplicationService),
+        //     campaign: Arc::new(crate::bounded_contexts::campaign::application::services::MockCampaignApplicationService),
+        //     listen_reward: Arc::new(crate::bounded_contexts::listen_reward::application::services::MockListenRewardApplicationService),
+        //     fan_ventures: Arc::new(MockFanVenturesApplicationService::new()),
+        //     notification: Arc::new(crate::bounded_contexts::notifications::application::services::MockNotificationApplicationService),
+        // };
         
         // Crear servicios de infraestructura mock
-        let infrastructure = InfrastructureServices {
-            cdn: Arc::new(MockCloudCDNService),
-            websocket: Arc::new(MockWebSocketService),
-            discovery: Arc::new(MockDiscoveryService),
-        };
+        // let infrastructure = InfrastructureServices {
+        //     cdn: Arc::new(MockCloudCDNService),
+        //     websocket: Arc::new(MockWebSocketService),
+        //     discovery: Arc::new(MockDiscoveryService),
+        // };
         
-        Self::new(&database_url, &redis_url, repositories, services, infrastructure).await
+        Self::new(&database_url, &redis_url, repositories).await
     }
     
     /// Obtener la conexión a la base de datos
@@ -197,10 +218,10 @@ impl AppState {
 #[derive(Clone)]
 pub struct DomainRepositories {
     pub music: Arc<dyn SongRepository + Send + Sync>,
-    pub user: Arc<dyn UserRepository + Send + Sync>,
-    pub campaign: Arc<dyn CampaignRepository + Send + Sync>,
+    // pub user: Arc<dyn UserRepository + Send + Sync>,
+    // pub campaign: Arc<dyn CampaignRepository + Send + Sync>,
     pub listen_session: Arc<dyn ListenSessionRepository + Send + Sync>,
-    pub artist_venture: Arc<dyn ArtistVentureRepository + Send + Sync>,
+    pub artist_venture: Arc<PostgresFanVenturesRepository>,
     pub notification: Arc<dyn NotificationRepository + Send + Sync>,
     pub notification_template: Arc<dyn NotificationTemplateRepository + Send + Sync>,
 }

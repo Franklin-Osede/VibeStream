@@ -86,8 +86,8 @@ impl ListenSessionController {
         // Convert request to command
         let command = StartListenSessionCommand {
             user_id: request.user_id,
-            song_id: request.song_id,
-            artist_id: request.artist_id,
+            song_contract: request.song_contract.clone(),
+            artist_contract: request.artist_contract.clone(),
             user_tier: request.user_tier,
         };
 

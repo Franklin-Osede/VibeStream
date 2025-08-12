@@ -266,10 +266,6 @@ impl MessageQueue {
     }
 }
 
-#[derive(Clone)]
-pub struct AppState {
-    pub message_queue: MessageQueue,
-    pub database_pool: DatabasePool,
-    // pub command_bus: Arc<InMemoryCommandBus>,  // Comentado temporalmente
-    // pub blockchain_clients: crate::blockchain::BlockchainClients, // Comentado temporalmente
-} 
+// AppState unificado movido a shared::infrastructure::app_state
+// Re-export para compatibilidad temporal
+pub use crate::shared::infrastructure::app_state::AppState; 

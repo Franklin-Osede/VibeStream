@@ -3,8 +3,10 @@ pub mod routes;
 pub mod handlers;
 pub mod ownership_routes;
 
+use crate::bounded_contexts::fan_ventures::application::services::MockFanVenturesApplicationService;
+
 // Type alias for compatibility
-pub type ConcreteApplicationService = crate::bounded_contexts::fan_ventures::application::services::MockFanVenturesApplicationService;
+pub type ConcreteApplicationService = MockFanVenturesApplicationService;
 
 // Re-export principal: AppState y rutas básicas
 pub use controllers::{

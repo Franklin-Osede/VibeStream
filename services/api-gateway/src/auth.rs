@@ -15,14 +15,14 @@ const JWT_SECRET: &[u8] = b"your-secret-key-change-in-production";
 const TOKEN_EXPIRY_HOURS: i64 = 24;
 const REFRESH_TOKEN_EXPIRY_DAYS: i64 = 30;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: String,  // User ID
     pub username: String,
     pub email: String,
     pub role: String,
-    pub exp: usize,   // Expiration time
-    pub iat: usize,   // Issued at
+    pub exp: i64,   // Expiration time
+    pub iat: i64,   // Issued at
     pub token_type: String, // "access" or "refresh"
 }
 
@@ -75,8 +75,8 @@ impl Claims {
             username,
             email,
             role,
-            exp: (now + chrono::Duration::hours(24)).timestamp() as usize,
-            iat: now.timestamp() as usize,
+            exp: (now + chrono::Duration::hours(24)).timestamp(),
+            iat: now.timestamp(),
             token_type,
         }
     }

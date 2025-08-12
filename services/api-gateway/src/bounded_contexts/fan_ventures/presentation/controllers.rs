@@ -3,17 +3,16 @@
 // Este módulo contiene funciones handler independientes para Axum que manejan
 // todas las operaciones HTTP relacionadas con Fan Ventures (anteriormente Fractional Ownership).
 
-use crate::shared::infrastructure::AppState;
 use axum::{
-    extract::{Path, State},
+    extract::{Path, State, Json},
     http::StatusCode,
-    response::Json,
+    response::Json as ResponseJson,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use crate::shared::infrastructure::app_state::AppState;
 
-// Request/Response types
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize)]
 pub struct CreateVentureRequest {
     pub artist_id: Uuid,
     pub title: String,
@@ -22,7 +21,7 @@ pub struct CreateVentureRequest {
     pub benefits: Option<Vec<BenefitRequest>>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize)]
 pub struct BenefitRequest {
     pub title: String,
     pub description: String,
@@ -57,7 +56,7 @@ impl<T> ApiResponse<T> {
             errors: None,
         }
     }
-    
+
     pub fn error(message: String) -> Self {
         Self {
             success: false,
@@ -68,20 +67,16 @@ impl<T> ApiResponse<T> {
     }
 }
 
-// Controller functions using unified AppState
 pub async fn create_venture(
     State(app_state): State<AppState>,
     Json(request): Json<CreateVentureRequest>,
 ) -> Result<Json<ApiResponse<VentureResponse>>, StatusCode> {
-    let request_json = serde_json::to_value(request)
-        .map_err(|_| StatusCode::BAD_REQUEST)?;
-    
-    match app_state.fan_ventures_service.create_venture(request_json).await {
+    match app_state.fan_ventures_service.create_venture(request).await {
         Ok(venture) => {
             let response = VentureResponse {
-                venture_id: venture.venture_id,
+                venture_id: venture.id,
                 title: venture.title,
-                description: venture.description,
+                description: venture.description.unwrap_or_default(),
                 funding_goal: venture.funding_goal,
                 current_funding: venture.current_funding,
                 status: format!("{:?}", venture.status),
@@ -101,9 +96,9 @@ pub async fn get_ventures(
         Ok(ventures) => {
             let responses: Vec<VentureResponse> = ventures.into_iter().map(|venture| {
                 VentureResponse {
-                    venture_id: venture.venture_id,
+                    venture_id: venture.id,
                     title: venture.title,
-                    description: venture.description,
+                    description: venture.description.unwrap_or_default(),
                     funding_goal: venture.funding_goal,
                     current_funding: venture.current_funding,
                     status: format!("{:?}", venture.status),
@@ -124,9 +119,9 @@ pub async fn get_venture_by_id(
     match app_state.fan_ventures_service.get_venture_by_id(&venture_id).await {
         Ok(Some(venture)) => {
             let response = VentureResponse {
-                venture_id: venture.venture_id,
+                venture_id: venture.id,
                 title: venture.title,
-                description: venture.description,
+                description: venture.description.unwrap_or_default(),
                 funding_goal: venture.funding_goal,
                 current_funding: venture.current_funding,
                 status: format!("{:?}", venture.status),
@@ -150,9 +145,9 @@ pub async fn get_ventures_by_artist(
         Ok(ventures) => {
             let responses: Vec<VentureResponse> = ventures.into_iter().map(|venture| {
                 VentureResponse {
-                    venture_id: venture.venture_id,
+                    venture_id: venture.id,
                     title: venture.title,
-                    description: venture.description,
+                    description: venture.description.unwrap_or_default(),
                     funding_goal: venture.funding_goal,
                     current_funding: venture.current_funding,
                     status: format!("{:?}", venture.status),

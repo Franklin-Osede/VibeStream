@@ -282,8 +282,8 @@ impl ListenRewardApplicationService {
         // Crear comando para el caso de uso (conversión a String donde corresponde)
         let use_case_command = crate::bounded_contexts::listen_reward::application::use_cases::StartListenSessionCommand {
             user_id: command.user_id,
-            song_id: command.song_id.to_string(),
-            artist_id: command.artist_id.to_string(),
+            song_contract: command.song_contract.clone(),
+            artist_contract: command.artist_contract.clone(),
             user_tier: reward_tier.to_string(),
         };
 
@@ -361,15 +361,9 @@ impl ListenRewardApplicationService {
         
         let artist_contract = vibestream_types::ArtistContract {
             id: uuid::Uuid::new_v4(),
-            name: "Unknown".to_string(),
-            verified: false,
-            bio: None,
-            avatar_url: None,
-            social_links: None,
-            genres: vec![],
-            total_streams: 0,
-            monthly_listeners: 0,
-            created_at: chrono::Utc::now(),
+            user_id: uuid::Uuid::new_v4(),
+            stage_name: "Unknown".to_string(),
+            profile_image_url: None,
         };
         
         let session = ListenSession::from_parts(

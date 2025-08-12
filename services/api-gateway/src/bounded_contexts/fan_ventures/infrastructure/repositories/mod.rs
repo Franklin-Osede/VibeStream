@@ -1,6 +1,6 @@
 // Re-export implementations from parent directory
 pub use super::postgres_repository;
-pub use super::in_memory_repository;
+// pub use super::in_memory_repository;
 
 use std::sync::Arc;
 use async_trait::async_trait;
@@ -12,6 +12,10 @@ use crate::bounded_contexts::fractional_ownership::domain::{
 use vibestream_types::{SongContract, ArtistContract};
 use crate::bounded_contexts::user::domain::value_objects::UserId;
 use crate::shared::domain::repositories::RepoResult;
+
+// Placeholder type aliases for missing IDs
+type SongId = uuid::Uuid;
+type ArtistId = uuid::Uuid;
 
 // Implementaciones para Arc<T> para resolver problemas de trait bounds
 #[async_trait]
