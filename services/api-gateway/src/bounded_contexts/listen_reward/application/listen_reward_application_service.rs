@@ -363,7 +363,10 @@ impl ListenRewardApplicationService {
             id: uuid::Uuid::new_v4(),
             user_id: uuid::Uuid::new_v4(),
             stage_name: "Unknown".to_string(),
+            bio: Some("Unknown Artist".to_string()),
             profile_image_url: None,
+            verified: false,
+            created_at: chrono::Utc::now(),
         };
         
         let session = ListenSession::from_parts(

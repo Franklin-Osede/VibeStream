@@ -518,6 +518,7 @@ pub struct DistributionAnalytics {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bounded_contexts::music::domain::{SongId, ArtistId};
     use crate::bounded_contexts::listen_reward::domain::value_objects::RewardTier;
 
     fn create_test_pool() -> RewardPool {

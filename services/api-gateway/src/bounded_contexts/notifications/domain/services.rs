@@ -70,7 +70,7 @@ where
     }
 
     /// Marcar todas las notificaciones como leídas
-    pub async fn mark_all_as_read(&self, user_id: Uuid) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn mark_all_as_read(&self, _user_id: Uuid) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         // TODO: Implementar lógica para marcar todas como leídas
         Ok(())
     }

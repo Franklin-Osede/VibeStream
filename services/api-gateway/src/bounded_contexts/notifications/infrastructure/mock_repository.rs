@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use uuid::Uuid;
 use crate::bounded_contexts::notifications::domain::entities::{
     Notification, NotificationTemplate, NotificationFilters
@@ -10,6 +11,7 @@ use crate::bounded_contexts::notifications::domain::repositories::{
 #[derive(Clone)]
 pub struct MockNotificationRepository;
 
+#[async_trait]
 impl NotificationRepository for MockNotificationRepository {
     async fn get_by_id(&self, _id: Uuid) -> Result<Option<Notification>, Box<dyn std::error::Error + Send + Sync>> {
         Ok(None)
@@ -60,6 +62,7 @@ impl NotificationRepository for MockNotificationRepository {
 #[derive(Clone)]
 pub struct MockNotificationTemplateRepository;
 
+#[async_trait]
 impl NotificationTemplateRepository for MockNotificationTemplateRepository {
     async fn get_by_id(&self, _id: Uuid) -> Result<Option<NotificationTemplate>, Box<dyn std::error::Error + Send + Sync>> {
         Ok(None)

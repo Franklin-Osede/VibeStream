@@ -416,6 +416,7 @@ impl SessionStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bounded_contexts::music::domain::{SongId, ArtistId};
 
     fn create_test_session() -> ListenSession {
         let song_contract = SongContract {

@@ -11,8 +11,8 @@ pub mod complete_router;
 // Solo el music context sin dependencias problemáticas
 pub mod music_simple;
 
-// Re-export the services AppState
-pub use services::AppState;
+// Re-export the unified AppState
+pub use shared::infrastructure::app_state::AppState;
 
 // Simple module that works
 pub mod simple {
@@ -25,19 +25,13 @@ pub mod simple {
     use serde::{Deserialize, Serialize};
     use serde_json::json;
     
-    use crate::services::{AppState, DatabasePool, MessageQueue};
+    use crate::shared::infrastructure::app_state::AppState;
     
     pub async fn create_router() -> Result<Router, Box<dyn std::error::Error>> {
-        // Initialize real services
-        let database_pool = DatabasePool::new("postgres://vibestream:vibestream@localhost:5432/vibestream").await?;
-        let message_queue = MessageQueue::new("redis://localhost:6379").await?;
+        // Initialize unified AppState
+        let app_state = AppState::default().await.map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
         
-        let app_state = AppState {
-            database_pool,
-            message_queue,
-        };
-        
-        // Use the complete router with P2P analytics
+        // Use the complete router with unified AppState
         let router = crate::complete_router::create_app_router(app_state.database_pool.get_pool().clone()).await?;
             
         Ok(router)
@@ -64,7 +58,10 @@ pub mod simple {
             "services": {
                 "database": db_status,
                 "message_queue": redis_status,
-                "music_context": "enabled"
+                "music_context": "enabled",
+                "zk_service": "enabled",
+                "ethereum_service": "enabled",
+                "solana_service": "enabled"
             }
         }))
     }

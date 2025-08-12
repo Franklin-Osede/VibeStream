@@ -238,7 +238,10 @@ impl CampaignController {
             id: request.artist_id,
             user_id: request.artist_id,
             stage_name: "Campaign Artist".to_string(),
+            bio: Some("Campaign Artist Bio".to_string()),
             profile_image_url: None,
+            verified: false,
+            created_at: chrono::Utc::now(),
         };
         
         let campaign_aggregate = CampaignAggregate::create_campaign(

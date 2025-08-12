@@ -186,6 +186,7 @@ impl ProcessRewardDistributionUseCase {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bounded_contexts::music::domain::{SongId, ArtistId};
     use crate::bounded_contexts::listen_reward::domain::{RewardTier, ListenDuration, QualityScore, ZkProofHash};
     use vibestream_types::{SongContract, ArtistContract};
 
