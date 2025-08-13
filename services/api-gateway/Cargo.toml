@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 # Core dependencies
 tokio = { version = "1.25", features = ["full"] }
-axum = "0.7"
+axum = { version = "0.7", features = ["multipart", "ws"] }
 tower = "0.4"
 tower-http = { version = "0.5", features = ["cors", "trace"] }
 
@@ -54,6 +54,10 @@ reqwest = { version = "0.11", features = ["json"] }
 # Crypto
 sha2 = "0.10"
 hex = "0.4"
+
+# Regex and utilities
+regex = "1.0"
+lazy_static = "1.4"
 
 # Database - Comentado temporalmente para compilación rápida
 # sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "json"] }

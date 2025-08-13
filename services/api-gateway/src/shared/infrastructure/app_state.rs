@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use sqlx::PgPool;
+// use sqlx::PgPool; // Comentado temporalmente
 use crate::services::{MessageQueue, DatabasePool};
 
 // Domain Repositories (Core Business Logic)

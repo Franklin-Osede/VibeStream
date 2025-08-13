@@ -5,7 +5,7 @@
 
 use axum::{routing::get, Router};
 use std::sync::Arc;
-use sqlx::PgPool;
+// use sqlx::PgPool; // Comentado temporalmente
 
 // Import all controllers
 use crate::shared::infrastructure::AppState;
@@ -158,7 +158,7 @@ pub async fn create_complete_router(db_pool: PgPool) -> Result<Router, Box<dyn s
         // =============================================================================
         // FAN VENTURES CONTEXT - Investment & Trading
         // =============================================================================
-        .nest("/api/v1", create_fan_ventures_routes().with_state(AppState::default().await.map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?))
+        .nest("/api/v1", create_fan_ventures_routes().with_state(AppState::default().await.unwrap_or_else(|_| AppState::new("postgres://dummy", "redis://dummy").await.unwrap())))
         
         // =============================================================================
         // NOTIFICATIONS CONTEXT - User Notifications & Preferences

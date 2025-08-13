@@ -1,7 +1,7 @@
 use redis::{AsyncCommands, Client, Connection};
 use vibestream_types::*;
 use async_trait::async_trait;
-use sqlx::{PgPool, postgres::PgPoolOptions};
+// use sqlx::{PgPool, postgres::PgPoolOptions}; // Comentado temporalmente
 // use crate::shared::application::bus::InMemoryCommandBus;  // Comentado temporalmente
 
 // Nuevo struct para manejar la base de datos
