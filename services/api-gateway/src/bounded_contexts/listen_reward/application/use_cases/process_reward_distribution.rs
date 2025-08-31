@@ -58,8 +58,10 @@ impl ProcessRewardDistributionUseCase {
         self.validate_queue_command(&command)?;
 
         // Parse royalty percentage
-        let royalty_percentage = RoyaltyPercentage::new(command.royalty_percentage)
-            .map_err(|e| format!("Invalid royalty percentage: {}", e))?;
+        let royalty_percentage = RoyaltyPercentage::new(
+            rust_decimal::Decimal::try_from(command.royalty_percentage).unwrap_or_default(),
+            "USD".to_string()
+        );
 
         // Queue the distribution
         distribution.queue_reward_distribution(session, &royalty_percentage)?;

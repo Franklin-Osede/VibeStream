@@ -100,6 +100,22 @@ impl ListenSession {
         &self.user_tier
     }
 
+    pub fn song_id(&self) -> Uuid {
+        self.song_contract.id
+    }
+
+    pub fn artist_id(&self) -> Uuid {
+        self.artist_contract.id
+    }
+
+    pub fn song_id_value(&self) -> Uuid {
+        self.song_contract.id
+    }
+
+    pub fn artist_id_value(&self) -> Uuid {
+        self.artist_contract.id
+    }
+
     pub fn status(&self) -> &SessionStatus {
         &self.status
     }
@@ -177,8 +193,8 @@ impl ListenSession {
         Ok(Box::new(ListenSessionCompleted::new(
             self.id.clone(),
             self.user_id,
-            self.song_id.clone(),
-            self.artist_id.clone(),
+            self.song_id(),
+            self.artist_id(),
             listen_duration,
             quality_score,
             self.quality_score.as_ref().map(|q| q.score()).unwrap_or(0.0),
@@ -199,8 +215,8 @@ impl ListenSession {
             Ok(Box::new(ListenSessionCompleted::new(
                 self.id.clone(),
                 self.user_id,
-                self.song_id.clone(),
-                self.artist_id.clone(),
+                self.song_id(),
+                self.artist_id(),
                 duration.clone(),
                 quality.clone(),
                 quality.score(),
@@ -211,8 +227,8 @@ impl ListenSession {
             return Ok(Box::new(ZkProofVerificationFailed::new(
                 self.id.clone(),
                 self.user_id,
-                self.song_id.clone(),
-                self.artist_id.clone(),
+                self.song_id(),
+                self.artist_id(),
                 zk_proof,
                 "ZK proof verification failed".to_string(),
                 failed_at,
@@ -252,8 +268,8 @@ impl ListenSession {
         Ok(Box::new(RewardCalculated::new(
             self.id.clone(),
             self.user_id,
-            self.song_id.clone(),
-            self.artist_id.clone(),
+            self.song_id(),
+            self.artist_id(),
             base_reward,
             final_reward,
             calculated_at,
@@ -293,8 +309,8 @@ impl ListenSession {
             Ok(Box::new(ZkProofVerificationFailed::new(
                 self.id.clone(),
                 self.user_id,
-                self.song_id.clone(),
-                self.artist_id.clone(),
+                self.song_id(),
+                self.artist_id(),
                 proof_hash,
                 "ZK proof verification failed".to_string(),
                 failed_at,

@@ -53,8 +53,8 @@ impl PostgresListenSessionRepository {
         ListenSessionRow {
             id: session.id().value(),
             user_id: session.user_id(),
-            song_id: *session.song_id().value(),
-            artist_id: *session.artist_id().value(),
+            song_id: session.song_id(),
+            artist_id: session.artist_id(),
             user_tier: session.user_tier().to_string(),
             status: session.status().to_string(),
             listen_duration_seconds: session.listen_duration().map(|d| d.seconds() as i32),
@@ -131,14 +131,11 @@ impl PostgresListenSessionRepository {
         
         let artist_contract = ArtistContract {
             id: artist_id,
-            name: "Unknown".to_string(), // Placeholder
-            verified: false,
+            user_id: Uuid::new_v4(), // Placeholder
+            stage_name: "Unknown".to_string(), // Placeholder
             bio: None,
-            avatar_url: None,
-            social_links: None,
-            genres: vec![],
-            total_streams: 0,
-            monthly_listeners: 0,
+            profile_image_url: None,
+            verified: false,
             created_at: Utc::now(),
         };
         

@@ -56,3 +56,12 @@ pub struct NotificationListResponse {
     pub total_count: u64,
     pub unread_count: u64,
 }
+
+
+
+
+
+
+
+
+

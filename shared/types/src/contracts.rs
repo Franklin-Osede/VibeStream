@@ -26,6 +26,10 @@ impl RoyaltyPercentage {
             currency: "USD".to_string() 
         }
     }
+
+    pub fn percentage(&self) -> Decimal {
+        self.value
+    }
 }
 
 /// Contrato compartido para información de canción

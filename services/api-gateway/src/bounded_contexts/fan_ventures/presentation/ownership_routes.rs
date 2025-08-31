@@ -4,7 +4,7 @@ use axum::{
     middleware,
 };
 
-use crate::services::AppState;
+use crate::shared::infrastructure::app_state::AppState;
 use crate::auth::Claims;
 use super::handlers::{
     create_ownership_contract,

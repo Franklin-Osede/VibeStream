@@ -3,6 +3,7 @@
 // =============================================================================
 
 pub mod entities;
+pub mod repositories;
 
 // Re-export the fan ventures entities
 pub use entities::{

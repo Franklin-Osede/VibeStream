@@ -1,9 +1,17 @@
 pub mod upload_controller;
 pub mod video_upload_controller;
+pub mod song_controller;
+pub mod album_controller;
+pub mod playlist_controller;
+pub mod artist_controller;
 
 // Re-export controllers for easy access
 pub use upload_controller::*;
 pub use video_upload_controller::*;
+pub use song_controller::SongController;
+pub use album_controller::AlbumController;
+pub use playlist_controller::PlaylistController;
+pub use artist_controller::ArtistController;
 
 // Import required dependencies
 use axum::{

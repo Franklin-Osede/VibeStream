@@ -10,7 +10,7 @@ pub type ConcreteApplicationService = MockFanVenturesApplicationService;
 
 // Re-export principal: AppState y rutas básicas
 pub use controllers::{
-    create_fan_ventures_routes, 
+    // create_fan_ventures_routes, 
 };
 pub use routes::{
     create_routes,

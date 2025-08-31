@@ -83,11 +83,37 @@ impl ListenSessionController {
     ) -> Result<Json<ApiResponse<StartListenSessionResponse>>, StatusCode> {
         let use_case = StartListenSessionUseCase::new();
         
-        // Convert request to command
+        // Convert request to command - create mock contracts for now
+        let song_contract = crate::shared::types::contracts::SongContract {
+            id: Uuid::parse_str(&request.song_id).unwrap_or_else(|_| Uuid::new_v4()),
+            title: "Unknown Song".to_string(),
+            artist_id: Uuid::parse_str(&request.artist_id).unwrap_or_else(|_| Uuid::new_v4()),
+            artist_name: "Unknown Artist".to_string(),
+            duration_seconds: None,
+            genre: None,
+            ipfs_hash: None,
+            metadata_url: None,
+            nft_contract_address: None,
+            nft_token_id: None,
+            royalty_percentage: None,
+            is_minted: false,
+            created_at: chrono::Utc::now(),
+        };
+
+        let artist_contract = crate::shared::types::contracts::ArtistContract {
+            id: Uuid::parse_str(&request.artist_id).unwrap_or_else(|_| Uuid::new_v4()),
+            user_id: Uuid::new_v4(),
+            stage_name: "Unknown Artist".to_string(),
+            bio: None,
+            profile_image_url: None,
+            verified: false,
+            created_at: chrono::Utc::now(),
+        };
+
         let command = StartListenSessionCommand {
             user_id: request.user_id,
-            song_contract: request.song_contract.clone(),
-            artist_contract: request.artist_contract.clone(),
+            song_contract,
+            artist_contract,
             user_tier: request.user_tier,
         };
 

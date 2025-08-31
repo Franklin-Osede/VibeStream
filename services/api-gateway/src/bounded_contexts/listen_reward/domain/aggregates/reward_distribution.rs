@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
+use num_traits::ToPrimitive;
 use std::collections::HashMap;
 
 use crate::bounded_contexts::listen_reward::domain::value_objects::{
@@ -304,7 +305,7 @@ impl RewardDistribution {
             artist_id: session.artist_id().clone(),
             song_id: session.song_id().clone(),
             reward_amount,
-            royalty_percentage: royalty_percentage.percentage(),
+            royalty_percentage: royalty_percentage.percentage().to_f64().unwrap_or(0.0),
             created_at: Utc::now(),
         };
 

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
-use crate::services::AppState;
+use crate::shared::infrastructure::app_state::AppState;
 
 use super::application::commands::{CreateCampaign, CreateCampaignResult};
 

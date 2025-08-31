@@ -70,9 +70,35 @@ impl CreateCampaignUseCase {
         self.validate_business_rules(&command)?;
 
         // Create campaign aggregate
+        let song_contract = SongContract {
+            id: song_id.to_uuid(),
+            title: "Unknown".to_string(),
+            artist_id: artist_id.to_uuid(),
+            artist_name: "Unknown".to_string(),
+            duration_seconds: None,
+            genre: None,
+            ipfs_hash: None,
+            metadata_url: None,
+            nft_contract_address: None,
+            nft_token_id: None,
+            royalty_percentage: None,
+            is_minted: false,
+            created_at: Utc::now(),
+        };
+
+        let artist_contract = ArtistContract {
+            id: artist_id.to_uuid(),
+            user_id: Uuid::new_v4(),
+            stage_name: "Unknown".to_string(),
+            bio: None,
+            profile_image_url: None,
+            verified: false,
+            created_at: Utc::now(),
+        };
+
         let campaign_aggregate = CampaignAggregate::create_campaign(
-            song_id,
-            artist_id,
+            song_contract,
+            artist_contract,
             command.name.clone(),
             command.description.clone(),
             command.start_date,

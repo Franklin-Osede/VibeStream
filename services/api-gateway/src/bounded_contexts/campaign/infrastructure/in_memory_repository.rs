@@ -37,7 +37,7 @@ impl CampaignRepository for InMemoryCampaignRepository {
     async fn find_by_artist_id(&self, artist_id: Uuid) -> RepoResult<Vec<Campaign>> {
         let data = self.data.read().await;
         Ok(data.values()
-            .filter(|c| *c.artist_id().value() == artist_id)
+            .filter(|c| c.artist_id() == artist_id)
             .cloned()
             .collect())
     }

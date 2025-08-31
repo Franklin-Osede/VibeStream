@@ -12,7 +12,7 @@ use super::controllers::CampaignController;
 /// - Campaign lifecycle management (activate, pause, resume, end)
 /// - NFT purchasing
 /// - Analytics and trending
-pub fn create_campaign_routes() -> Router {
+pub fn create_campaign_routes() -> Router<CampaignAppState> {
     Router::new()
         // Campaign CRUD
         .route("/campaigns", post(CampaignController::create_campaign))

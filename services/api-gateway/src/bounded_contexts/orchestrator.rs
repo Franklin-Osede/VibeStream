@@ -1,300 +1,384 @@
-/// Bounded Context Orchestrator
-/// 
-/// This module coordinates interactions between different bounded contexts,
-/// ensuring proper event flow and maintaining consistency across the domain.
+// =============================================================================
+// DOMAIN EVENTS SYSTEM - Reemplazando el Orchestrator Centralizado
+// =============================================================================
+// 
+// Este módulo implementa un sistema de eventos de dominio para comunicación
+// entre bounded contexts, eliminando el acoplamiento directo.
 
 use std::sync::Arc;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 use crate::shared::domain::errors::AppError;
-use crate::bounded_contexts::{
-    user::{
-        application::UserApplicationService,
-    },
-    music::{
-        infrastructure::repositories::{
-            PostgresSongRepository, PostgresAlbumRepository, PostgresPlaylistRepository,
-        },
-    },
-    campaign::{
-        // TODO: Add CampaignApplicationService when implemented
-        // application::CampaignApplicationService,
-        infrastructure::PostgresCampaignRepository,
-    },
-    listen_reward::{
-        application::ListenRewardApplicationService,
-        infrastructure::repositories::{
-            PostgresListenSessionRepository,
-            PostgresRewardDistributionRepository,
-            PostgresRewardAnalyticsRepository,
-        },
-        infrastructure::event_publishers::InMemoryEventPublisher,
-    },
-    // TODO: Update these imports when fan ventures is fully integrated
-    // fan_ventures::{
-    //     PostgresFractionalOwnershipBoundedContext,
-    //     infrastructure::PostgresOwnershipContractRepository,
-    //     application::FractionalOwnershipApplicationService,
-    // },
-};
-use crate::shared::infrastructure::{
-    database::postgres::PostgresUserRepository,
-    cdn::CDNService,
-    websocket::service::WebSocketService,
-};
-use sqlx::PgPool;
-use crate::bounded_contexts::music::infrastructure::messaging::event_bus::EventBus;
 
 // =============================================================================
-// BOUNDED CONTEXT ORCHESTRATOR
+// DOMAIN EVENTS
 // =============================================================================
 
-/// Orchestrates all bounded contexts and their interactions
-pub struct BoundedContextOrchestrator {
-    // Core contexts
-    pub user_context: UserApplicationService<PostgresUserRepository>,
-    pub music_repositories: MusicRepositories,
-    // TODO: Add campaign context when CampaignApplicationService is implemented
-    // pub campaign_context: CampaignApplicationService,
-    pub listen_reward_context: ListenRewardApplicationService,
-    
-    // TODO: Add fan ventures context when fully integrated
-    // pub fan_ventures_context: FanVenturesApplicationService,
-    
-    // Shared infrastructure
-    pub event_bus: Arc<dyn EventBus>,
-    pub cdn_service: Arc<dyn CDNService>,
-    pub websocket_service: Arc<WebSocketService>,
-    
-    // Health status
-    pub health_status: SystemHealthStatus,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum DomainEvent {
+    // User Events
+    UserRegistered {
+        user_id: Uuid,
+        email: String,
+        username: String,
+        occurred_at: DateTime<Utc>,
+    },
+    UserAuthenticated {
+        user_id: Uuid,
+        occurred_at: DateTime<Utc>,
+    },
+    UserProfileUpdated {
+        user_id: Uuid,
+        occurred_at: DateTime<Utc>,
+    },
+
+    // Music Events
+    SongListened {
+        user_id: Uuid,
+        song_id: Uuid,
+        artist_id: Uuid,
+        duration_seconds: u32,
+        occurred_at: DateTime<Utc>,
+    },
+    SongLiked {
+        user_id: Uuid,
+        song_id: Uuid,
+        occurred_at: DateTime<Utc>,
+    },
+    SongShared {
+        user_id: Uuid,
+        song_id: Uuid,
+        platform: String,
+        occurred_at: DateTime<Utc>,
+    },
+
+    // Campaign Events
+    CampaignCreated {
+        campaign_id: Uuid,
+        artist_id: Uuid,
+        song_id: Uuid,
+        occurred_at: DateTime<Utc>,
+    },
+    CampaignActivated {
+        campaign_id: Uuid,
+        nft_contract_address: String,
+        occurred_at: DateTime<Utc>,
+    },
+    NFTPurchased {
+        campaign_id: Uuid,
+        buyer_id: Uuid,
+        quantity: u32,
+        amount: f64,
+        occurred_at: DateTime<Utc>,
+    },
+
+    // Listen Reward Events
+    ListenSessionStarted {
+        session_id: Uuid,
+        user_id: Uuid,
+        song_id: Uuid,
+        occurred_at: DateTime<Utc>,
+    },
+    ListenSessionCompleted {
+        session_id: Uuid,
+        user_id: Uuid,
+        song_id: Uuid,
+        reward_amount: f64,
+        zk_proof_hash: String,
+        occurred_at: DateTime<Utc>,
+    },
+
+    // Fan Ventures Events
+    VentureCreated {
+        venture_id: Uuid,
+        artist_id: Uuid,
+        occurred_at: DateTime<Utc>,
+    },
+    InvestmentMade {
+        venture_id: Uuid,
+        investor_id: Uuid,
+        amount: f64,
+        occurred_at: DateTime<Utc>,
+    },
+    BenefitDelivered {
+        venture_id: Uuid,
+        investor_id: Uuid,
+        benefit_type: String,
+        occurred_at: DateTime<Utc>,
+    },
 }
 
-/// Music repositories wrapper
-pub struct MusicRepositories {
-    pub song_repository: Arc<PostgresSongRepository>,
-    pub album_repository: Arc<PostgresAlbumRepository>,
-    pub playlist_repository: Arc<PostgresPlaylistRepository>,
-}
-
-impl BoundedContextOrchestrator {
-    pub async fn new(
-        postgres_pool: PgPool,
-        event_bus: Arc<dyn EventBus>,
-        cdn_service: Arc<dyn CDNService>,
-        websocket_service: Arc<WebSocketService>,
-    ) -> Result<Self, AppError> {
-        // Initialize repositories
-        let user_repository = Arc::new(PostgresUserRepository::new(Arc::new(postgres_pool.clone())));
-        let song_repository = Arc::new(PostgresSongRepository::new(postgres_pool.clone()));
-        let album_repository = Arc::new(PostgresAlbumRepository::new(postgres_pool.clone()));
-        let playlist_repository = Arc::new(PostgresPlaylistRepository::new(postgres_pool.clone()));
-        let campaign_repository = Arc::new(PostgresCampaignRepository::new(postgres_pool.clone()));
-        let listen_session_repository = Arc::new(PostgresListenSessionRepository::new(postgres_pool.clone()));
-        let reward_distribution_repository = Arc::new(PostgresRewardDistributionRepository::new(postgres_pool.clone()));
-        let reward_analytics_repository = Arc::new(PostgresRewardAnalyticsRepository::new(postgres_pool.clone()));
-        
-        // TODO: Add fan ventures repository when fully integrated
-        // let fan_ventures_repository = Arc::new(PostgresFanVenturesRepository::new(postgres_connection.pool.clone()));
-
-        // Initialize application services
-        let user_context = UserApplicationService::new(user_repository);
-        let music_repositories = MusicRepositories {
-            song_repository,
-            album_repository,
-            playlist_repository,
-        };
-        // TODO: Add campaign context when CampaignApplicationService is implemented
-        // let campaign_context = CampaignApplicationService::new(campaign_repository);
-        let listen_reward_context = ListenRewardApplicationService::new_simple(
-            listen_session_repository,
-            reward_distribution_repository,
-            reward_analytics_repository,
-            Arc::new(InMemoryEventPublisher::new()),
-        );
-        
-        // TODO: Add fan ventures service when fully integrated
-        // let fan_ventures_context = FanVenturesApplicationService::new(fan_ventures_repository);
-
-        // Initialize health status
-        let health_status = SystemHealthStatus {
-            user_context: BoundedContextHealth::Healthy,
-            music_context: BoundedContextHealth::Healthy,
-            // TODO: Add campaign health when CampaignApplicationService is implemented
-            // campaign_context: BoundedContextHealth::Healthy,
-            listen_reward_context: BoundedContextHealth::Healthy,
-            // TODO: Add fan ventures health when fully integrated
-            // fan_ventures_context: BoundedContextHealth::Healthy,
-            last_updated: Utc::now(),
-        };
-
-        Ok(Self {
-            user_context,
-            music_repositories,
-            // TODO: Add campaign context when CampaignApplicationService is implemented
-            // campaign_context,
-            listen_reward_context,
-            // TODO: Add fan ventures context when fully integrated
-            // fan_ventures_context,
-            event_bus,
-            cdn_service,
-            websocket_service,
-            health_status,
-        })
-    }
-
-    /// Get the user context
-    pub fn user_context(&self) -> &UserApplicationService<PostgresUserRepository> {
-        &self.user_context
-    }
-
-    /// Get the music repositories
-    pub fn music_repositories(&self) -> &MusicRepositories {
-        &self.music_repositories
-    }
-
-    // TODO: Add campaign context getter when CampaignApplicationService is implemented
-    // pub fn campaign_context(&self) -> &CampaignApplicationService {
-    //     &self.campaign_context
-    // }
-
-    /// Get the listen reward context
-    pub fn listen_reward_context(&self) -> &ListenRewardApplicationService {
-        &self.listen_reward_context
-    }
-
-    // TODO: Add fan ventures context getter when fully integrated
-    // pub fn fan_ventures_context(&self) -> &FanVenturesApplicationService {
-    //     &self.fan_ventures_context
-    // }
-
-    /// Get the event bus
-    pub fn event_bus(&self) -> &Arc<dyn EventBus> {
-        &self.event_bus
-    }
-
-    /// Get the CDN service
-    pub fn cdn_service(&self) -> &Arc<dyn CDNService> {
-        &self.cdn_service
-    }
-
-    /// Get the WebSocket service
-    pub fn websocket_service(&self) -> &Arc<WebSocketService> {
-        &self.websocket_service
-    }
-
-    /// Get system health status
-    pub fn health_status(&self) -> &SystemHealthStatus {
-        &self.health_status
-    }
-
-    /// Update health status for a specific context
-    pub fn update_context_health(&mut self, context: &str, health: BoundedContextHealth) {
-        match context {
-            "user" => self.health_status.user_context = health,
-            "music" => self.health_status.music_context = health,
-            // TODO: Add campaign health update when CampaignApplicationService is implemented
-            // "campaign" => self.health_status.campaign_context = health,
-            "listen_reward" => self.health_status.listen_reward_context = health,
-            // TODO: Add fan ventures health update when fully integrated
-            // "fan_ventures" => self.health_status.fan_ventures_context = health,
-            _ => tracing::warn!("Unknown context: {}", context),
-        }
-        self.health_status.last_updated = Utc::now();
-    }
-
-    /// Perform cross-context operations
-    pub async fn cross_context_operation(&self, operation: CrossContextOperation) -> Result<(), AppError> {
-        match operation {
-            CrossContextOperation::UserMusicInteraction { user_id, song_id, action } => {
-                // Handle user-music interaction
-                tracing::info!("User {} performed action {:?} on song {}", user_id, action, song_id);
-                
-                // This could trigger events in multiple contexts
-                // For example, a listen could trigger:
-                // 1. Listen reward distribution
-                // 2. Music analytics update
-                // 3. User preference learning
-                // 4. Fan ventures revenue distribution (when implemented)
-                
-                Ok(())
-            },
-            CrossContextOperation::CampaignRewardDistribution { campaign_id, user_id, amount } => {
-                // Handle campaign reward distribution
-                tracing::info!("Distributing reward {} to user {} for campaign {}", amount, user_id, campaign_id);
-                
-                // This could trigger:
-                // 1. User balance update
-                // 2. Campaign analytics update
-                // 3. Event publishing
-                
-                Ok(())
-            },
+impl DomainEvent {
+    pub fn event_type(&self) -> &'static str {
+        match self {
+            DomainEvent::UserRegistered { .. } => "UserRegistered",
+            DomainEvent::UserAuthenticated { .. } => "UserAuthenticated",
+            DomainEvent::UserProfileUpdated { .. } => "UserProfileUpdated",
+            DomainEvent::SongListened { .. } => "SongListened",
+            DomainEvent::SongLiked { .. } => "SongLiked",
+            DomainEvent::SongShared { .. } => "SongShared",
+            DomainEvent::CampaignCreated { .. } => "CampaignCreated",
+            DomainEvent::CampaignActivated { .. } => "CampaignActivated",
+            DomainEvent::NFTPurchased { .. } => "NFTPurchased",
+            DomainEvent::ListenSessionStarted { .. } => "ListenSessionStarted",
+            DomainEvent::ListenSessionCompleted { .. } => "ListenSessionCompleted",
+            DomainEvent::VentureCreated { .. } => "VentureCreated",
+            DomainEvent::InvestmentMade { .. } => "InvestmentMade",
+            DomainEvent::BenefitDelivered { .. } => "BenefitDelivered",
         }
     }
 
-    /// Shutdown all contexts gracefully
-    pub async fn shutdown(&self) -> Result<(), AppError> {
-        tracing::info!("Shutting down bounded context orchestrator");
+    pub fn occurred_at(&self) -> DateTime<Utc> {
+        match self {
+            DomainEvent::UserRegistered { occurred_at, .. } => *occurred_at,
+            DomainEvent::UserAuthenticated { occurred_at, .. } => *occurred_at,
+            DomainEvent::UserProfileUpdated { occurred_at, .. } => *occurred_at,
+            DomainEvent::SongListened { occurred_at, .. } => *occurred_at,
+            DomainEvent::SongLiked { occurred_at, .. } => *occurred_at,
+            DomainEvent::SongShared { occurred_at, .. } => *occurred_at,
+            DomainEvent::CampaignCreated { occurred_at, .. } => *occurred_at,
+            DomainEvent::CampaignActivated { occurred_at, .. } => *occurred_at,
+            DomainEvent::NFTPurchased { occurred_at, .. } => *occurred_at,
+            DomainEvent::ListenSessionStarted { occurred_at, .. } => *occurred_at,
+            DomainEvent::ListenSessionCompleted { occurred_at, .. } => *occurred_at,
+            DomainEvent::VentureCreated { occurred_at, .. } => *occurred_at,
+            DomainEvent::InvestmentMade { occurred_at, .. } => *occurred_at,
+            DomainEvent::BenefitDelivered { occurred_at, .. } => *occurred_at,
+        }
+    }
+}
+
+// =============================================================================
+// EVENT HANDLER TRAIT
+// =============================================================================
+
+#[async_trait::async_trait]
+pub trait EventHandler: Send + Sync {
+    async fn handle(&self, event: &DomainEvent) -> Result<(), AppError>;
+}
+
+// =============================================================================
+// EVENT BUS
+// =============================================================================
+
+#[async_trait::async_trait]
+pub trait EventBus: Send + Sync {
+    async fn publish(&self, event: DomainEvent) -> Result<(), AppError>;
+    async fn subscribe(&self, event_type: &str, handler: Arc<dyn EventHandler>) -> Result<(), AppError>;
+}
+
+// =============================================================================
+// IN-MEMORY EVENT BUS IMPLEMENTATION
+// =============================================================================
+
+pub struct InMemoryEventBus {
+    handlers: std::collections::HashMap<String, Vec<Arc<dyn EventHandler>>>,
+}
+
+impl InMemoryEventBus {
+    pub fn new() -> Self {
+        Self {
+            handlers: std::collections::HashMap::new(),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl EventBus for InMemoryEventBus {
+    async fn publish(&self, event: DomainEvent) -> Result<(), AppError> {
+        let event_type = event.event_type();
         
-        // TODO: Implement graceful shutdown for all contexts
-        // This could include:
-        // 1. Saving state
-        // 2. Closing database connections
-        // 3. Publishing final events
-        // 4. Cleaning up resources
+        if let Some(handlers) = self.handlers.get(event_type) {
+            for handler in handlers {
+                if let Err(e) = handler.handle(&event).await {
+                    tracing::error!("Error handling event {}: {:?}", event_type, e);
+                }
+            }
+        }
         
+        Ok(())
+    }
+
+    async fn subscribe(&self, event_type: &str, handler: Arc<dyn EventHandler>) -> Result<(), AppError> {
+        // Note: This is a simplified implementation
+        // In a real system, you'd want thread-safe mutable access
+        tracing::info!("Subscribing handler to event type: {}", event_type);
         Ok(())
     }
 }
 
 // =============================================================================
-// HEALTH STATUS STRUCTURES
+// EVENT HANDLERS FOR EACH CONTEXT
 // =============================================================================
 
-#[derive(Debug, Clone)]
-pub enum BoundedContextHealth {
-    Healthy,
-    Degraded(String),
-    Unhealthy(String),
+// User Context Event Handlers
+pub struct UserEventHandlers;
+
+#[async_trait::async_trait]
+impl EventHandler for UserEventHandlers {
+    async fn handle(&self, event: &DomainEvent) -> Result<(), AppError> {
+        match event {
+            DomainEvent::UserRegistered { user_id, email, username, .. } => {
+                tracing::info!("User registered: {} ({})", username, user_id);
+                // TODO: Send welcome email, create default preferences, etc.
+            },
+            DomainEvent::UserAuthenticated { user_id, .. } => {
+                tracing::info!("User authenticated: {}", user_id);
+                // TODO: Update last login time, track login analytics
+            },
+            DomainEvent::UserProfileUpdated { user_id, .. } => {
+                tracing::info!("User profile updated: {}", user_id);
+                // TODO: Update search index, notify followers
+            },
+            _ => {}
+        }
+        Ok(())
+    }
 }
 
-#[derive(Debug, Clone)]
-pub struct SystemHealthStatus {
-    pub user_context: BoundedContextHealth,
-    pub music_context: BoundedContextHealth,
-    // TODO: Add campaign health when CampaignApplicationService is implemented
-    // pub campaign_context: BoundedContextHealth,
-    pub listen_reward_context: BoundedContextHealth,
-    // TODO: Add fan ventures health when fully integrated
-    // pub fan_ventures_context: BoundedContextHealth,
-    pub last_updated: DateTime<Utc>,
+// Music Context Event Handlers
+pub struct MusicEventHandlers;
+
+#[async_trait::async_trait]
+impl EventHandler for MusicEventHandlers {
+    async fn handle(&self, event: &DomainEvent) -> Result<(), AppError> {
+        match event {
+            DomainEvent::SongListened { user_id, song_id, duration_seconds, .. } => {
+                tracing::info!("Song listened: user={}, song={}, duration={}s", user_id, song_id, duration_seconds);
+                // TODO: Update play count, calculate royalties, update recommendations
+            },
+            DomainEvent::SongLiked { user_id, song_id, .. } => {
+                tracing::info!("Song liked: user={}, song={}", user_id, song_id);
+                // TODO: Update like count, update user preferences
+            },
+            DomainEvent::SongShared { user_id, song_id, platform, .. } => {
+                tracing::info!("Song shared: user={}, song={}, platform={}", user_id, song_id, platform);
+                // TODO: Track social sharing, update viral coefficient
+            },
+            _ => {}
+        }
+        Ok(())
+    }
+}
+
+// Campaign Context Event Handlers
+pub struct CampaignEventHandlers;
+
+#[async_trait::async_trait]
+impl EventHandler for CampaignEventHandlers {
+    async fn handle(&self, event: &DomainEvent) -> Result<(), AppError> {
+        match event {
+            DomainEvent::CampaignCreated { campaign_id, artist_id, song_id, .. } => {
+                tracing::info!("Campaign created: campaign={}, artist={}, song={}", campaign_id, artist_id, song_id);
+                // TODO: Notify followers, update artist stats
+            },
+            DomainEvent::CampaignActivated { campaign_id, nft_contract_address, .. } => {
+                tracing::info!("Campaign activated: campaign={}, contract={}", campaign_id, nft_contract_address);
+                // TODO: Deploy smart contract, notify subscribers
+            },
+            DomainEvent::NFTPurchased { campaign_id, buyer_id, quantity, amount, .. } => {
+                tracing::info!("NFT purchased: campaign={}, buyer={}, qty={}, amount=${}", campaign_id, buyer_id, quantity, amount);
+                // TODO: Update campaign stats, distribute royalties, notify artist
+            },
+            _ => {}
+        }
+        Ok(())
+    }
+}
+
+// Listen Reward Context Event Handlers
+pub struct ListenRewardEventHandlers;
+
+#[async_trait::async_trait]
+impl EventHandler for ListenRewardEventHandlers {
+    async fn handle(&self, event: &DomainEvent) -> Result<(), AppError> {
+        match event {
+            DomainEvent::ListenSessionStarted { session_id, user_id, song_id, .. } => {
+                tracing::info!("Listen session started: session={}, user={}, song={}", session_id, user_id, song_id);
+                // TODO: Create session record, start tracking
+            },
+            DomainEvent::ListenSessionCompleted { session_id, user_id, song_id, reward_amount, zk_proof_hash, .. } => {
+                tracing::info!("Listen session completed: session={}, user={}, song={}, reward=${}, proof={}", 
+                    session_id, user_id, song_id, reward_amount, zk_proof_hash);
+                // TODO: Verify ZK proof, distribute rewards, update analytics
+            },
+            _ => {}
+        }
+        Ok(())
+    }
+}
+
+// Fan Ventures Context Event Handlers
+pub struct FanVenturesEventHandlers;
+
+#[async_trait::async_trait]
+impl EventHandler for FanVenturesEventHandlers {
+    async fn handle(&self, event: &DomainEvent) -> Result<(), AppError> {
+        match event {
+            DomainEvent::VentureCreated { venture_id, artist_id, .. } => {
+                tracing::info!("Venture created: venture={}, artist={}", venture_id, artist_id);
+                // TODO: Notify followers, update artist portfolio
+            },
+            DomainEvent::InvestmentMade { venture_id, investor_id, amount, .. } => {
+                tracing::info!("Investment made: venture={}, investor={}, amount=${}", venture_id, investor_id, amount);
+                // TODO: Update venture funding, notify artist, process payment
+            },
+            DomainEvent::BenefitDelivered { venture_id, investor_id, benefit_type, .. } => {
+                tracing::info!("Benefit delivered: venture={}, investor={}, type={}", venture_id, investor_id, benefit_type);
+                // TODO: Update delivery status, notify investor
+            },
+            _ => {}
+        }
+        Ok(())
+    }
 }
 
 // =============================================================================
-// CROSS-CONTEXT OPERATIONS
+// EVENT BUS FACTORY
 // =============================================================================
 
-#[derive(Debug)]
-pub enum CrossContextOperation {
-    UserMusicInteraction {
-        user_id: Uuid,
-        song_id: Uuid,
-        action: UserMusicAction,
-    },
-    CampaignRewardDistribution {
-        campaign_id: Uuid,
-        user_id: Uuid,
-        amount: f64,
-    },
+pub struct EventBusFactory;
+
+impl EventBusFactory {
+    pub fn create_event_bus() -> Arc<dyn EventBus> {
+        let event_bus = Arc::new(InMemoryEventBus::new());
+        
+        // Register event handlers
+        let user_handlers = Arc::new(UserEventHandlers);
+        let music_handlers = Arc::new(MusicEventHandlers);
+        let campaign_handlers = Arc::new(CampaignEventHandlers);
+        let listen_reward_handlers = Arc::new(ListenRewardEventHandlers);
+        let fan_ventures_handlers = Arc::new(FanVenturesEventHandlers);
+        
+        // Note: In a real implementation, you'd register these handlers
+        // For now, we'll just log that they would be registered
+        tracing::info!("Event handlers would be registered for all contexts");
+        
+        event_bus
+    }
 }
 
-#[derive(Debug)]
-pub enum UserMusicAction {
-    Listen,
-    Like,
-    Share,
-    Purchase,
-    Invest, // For fan ventures
+// =============================================================================
+// DEPRECATED ORCHESTRATOR (MANTENIDO PARA COMPATIBILIDAD)
+// =============================================================================
+
+/// @deprecated Use DomainEvent system instead
+pub struct BoundedContextOrchestrator {
+    pub event_bus: Arc<dyn EventBus>,
+}
+
+impl BoundedContextOrchestrator {
+    pub async fn new() -> Result<Self, AppError> {
+        let event_bus = EventBusFactory::create_event_bus();
+        
+        Ok(Self {
+            event_bus,
+        })
+    }
+
+    pub async fn publish_event(&self, event: DomainEvent) -> Result<(), AppError> {
+        self.event_bus.publish(event).await
+    }
 } 

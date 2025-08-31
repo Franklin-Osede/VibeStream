@@ -5,7 +5,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use vibestream_types::{ApiMessage, Blockchain, WalletAddress, ServiceMessage, MessageBroker};
-use crate::services::AppState;
+use crate::shared::infrastructure::app_state::AppState;
 use crate::auth::{Claims, LoginRequest, LoginResponse, UserInfo, hash_password, verify_password};
 use sqlx::Row;
 use uuid::Uuid;
@@ -598,7 +598,7 @@ pub async fn get_profile(claims: Claims) -> Result<Json<UserInfo>, StatusCode> {
 // GET /api/v1/wallet/balance/:blockchain/:address - Obtener balance de wallet (SIMPLIFICADO)
 pub async fn get_wallet_balance(
     Path((blockchain, address)): Path<(String, String)>,
-    State(_state): State<crate::services::AppState>,
+    State(_state): State<AppState>,
 ) -> Json<serde_json::Value> {
     tracing::info!("🔍 Balance solicitado para {} en {}", address, blockchain);
 
@@ -623,7 +623,7 @@ pub async fn get_wallet_balance(
 // POST /api/v1/songs/:song_id/purchase - Comprar/pagar una canción (ULTRA SIMPLIFICADO)
 pub async fn purchase_song(
     Path(song_id): Path<Uuid>,
-    State(state): State<crate::services::AppState>,
+    State(state): State<AppState>,
     user_claims: Claims,
     Json(payment_data): Json<serde_json::Value>,
 ) -> Json<serde_json::Value> {
@@ -662,7 +662,7 @@ pub async fn purchase_song(
 
 // GET /api/v1/blockchain/health - Health check de servicios blockchain (SIMPLIFICADO)
 pub async fn blockchain_health_check(
-    State(_state): State<crate::services::AppState>,
+    State(_state): State<AppState>,
 ) -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "blockchain_services": {
@@ -681,7 +681,7 @@ pub async fn blockchain_health_check(
 
 // GET /api/v1/user/transactions - Obtener historial de transacciones del usuario (SIMPLIFICADO)
 pub async fn get_user_transactions(
-    State(_state): State<crate::services::AppState>,
+    State(_state): State<AppState>,
     user_claims: Claims,
 ) -> Json<Vec<serde_json::Value>> {
     let user_id_str = &user_claims.sub;

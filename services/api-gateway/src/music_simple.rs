@@ -7,7 +7,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use crate::services::AppState;
+use crate::shared::infrastructure::app_state::AppState;
 
 // DTOs for API requests/responses
 #[derive(Debug, Deserialize)]

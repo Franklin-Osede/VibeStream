@@ -198,3 +198,11 @@ if command -v grcov &> /dev/null; then
     grcov . -s . --binary-path ./target/debug/ -t html --branch --ignore-not-existing -o ./coverage/
     log_success "Reporte de cobertura generado en ./coverage/"
 fi
+
+
+
+
+
+
+
+

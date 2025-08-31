@@ -377,3 +377,12 @@ mod tests {
         assert_eq!(venture.artist_id, artist_id);
     }
 }
+
+
+
+
+
+
+
+
+

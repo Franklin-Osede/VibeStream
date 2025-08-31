@@ -29,7 +29,10 @@ pub mod simple {
     
     pub async fn create_router() -> Result<Router, Box<dyn std::error::Error>> {
         // Initialize unified AppState
-        let app_state = AppState::default().await.unwrap_or_else(|_| AppState::new("postgres://dummy", "redis://dummy").await.unwrap());
+        let app_state = match AppState::default().await {
+            Ok(state) => state,
+            Err(_) => AppState::new("postgres://dummy", "redis://dummy").await.unwrap(),
+        };
         
         // Use the complete router with unified AppState
         let router = crate::complete_router::create_app_router(app_state.database_pool.get_pool().clone()).await?;

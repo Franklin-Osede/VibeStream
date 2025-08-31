@@ -73,6 +73,7 @@ pub fn validate_api_coverage() -> Result<(), Vec<String>> {
 // Utilidades para generar documentación
 pub mod utils {
     use super::*;
+    use serde::Serialize;
     
     /// Genera un ejemplo de request para testing
     pub fn generate_request_example<T: Serialize>(data: &T) -> String {

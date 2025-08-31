@@ -159,7 +159,7 @@ impl HybridEventBus {
         // Also store in Redis for caching if needed
         if routing.store_in_redis {
             let key = format!("vibestream:event:{}:{}", event.metadata.event_type, event.metadata.event_id);
-            let _: () = conn.set_ex(&key, &serialized, routing.redis_ttl_seconds.unwrap_or(3600) as u64).await
+            let _: () = conn.set_ex(&key, &serialized, routing.redis_ttl_seconds.unwrap_or(3600) as usize).await
                 .map_err(|e| AppError::InternalError(format!("Redis store failed: {}", e)))?;
         }
 
@@ -231,7 +231,7 @@ impl HybridEventBus {
             .map_err(|e| AppError::InternalError(format!("Redis connection failed: {}", e)))?;
 
         if let Some(ttl) = ttl_seconds {
-            let _: () = conn.set_ex(key, value, ttl as u64).await
+            let _: () = conn.set_ex(key, value, ttl as usize).await
                 .map_err(|e| AppError::InternalError(format!("Redis setex failed: {}", e)))?;
         } else {
             let _: () = conn.set(key, value).await

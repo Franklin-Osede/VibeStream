@@ -316,14 +316,11 @@ impl CampaignRow {
         let artist_contract = ArtistContract {
             id: Uuid::parse_str(&self.artist_id)
                 .map_err(|e| format!("Invalid artist ID: {}", e))?,
-            name: "Unknown".to_string(), // Placeholder
-            verified: false,
+            user_id: Uuid::new_v4(), // Placeholder
+            stage_name: "Unknown".to_string(), // Placeholder
             bio: None,
-            avatar_url: None,
-            social_links: None,
-            genres: vec![],
-            total_streams: 0,
-            monthly_listeners: 0,
+            profile_image_url: None,
+            verified: false,
             created_at: Utc::now(),
         };
         

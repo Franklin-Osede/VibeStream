@@ -43,6 +43,9 @@ impl StartListenSessionUseCase {
             .map_err(|e| format!("Invalid user tier: {}", e))?;
 
         // Create listen session
+        let song_id = command.song_contract.id;
+        let artist_id = command.artist_contract.id;
+        
         let (session, event) = ListenSession::new(
             command.user_id,
             command.song_contract,
@@ -54,8 +57,8 @@ impl StartListenSessionUseCase {
         let response = StartListenSessionResponse {
             session_id: session.id().to_string(),
             user_id: session.user_id(),
-            song_id: command.song_contract.id.to_string(),
-            artist_id: command.artist_contract.id.to_string(),
+            song_id: song_id.to_string(),
+            artist_id: artist_id.to_string(),
             user_tier: user_tier.to_string(),
             started_at: session.started_at().to_rfc3339(),
         };

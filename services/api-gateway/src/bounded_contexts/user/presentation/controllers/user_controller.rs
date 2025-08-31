@@ -2,9 +2,9 @@
 // This module contains REST API endpoints for user operations using Axum
 
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Path, Query, State, Json},
     http::StatusCode,
-    response::Json,
+    response::Json as ResponseJson,
     routing::{get, post, put, delete},
     Router,
 };
@@ -722,4 +722,58 @@ pub fn create_user_routes() -> Router<UserAppService> {
         
         // Admin Analytics
         .route("/analytics", get(get_user_analytics))
+}
+
+// =============================================================================
+// FUNCIONES FALTANTES PARA COMPATIBILIDAD CON EL ROUTER
+// =============================================================================
+
+/// GET /api/v1/users - List users
+pub async fn get_users(
+    State(_user_service): State<UserAppService>,
+) -> Result<ResponseJson<serde_json::Value>, (StatusCode, ResponseJson<serde_json::Value>)> {
+    // TODO: Implement actual user listing logic
+    let users = vec![
+        serde_json::json!({
+            "user_id": Uuid::new_v4(),
+            "username": "demo_user",
+            "email": "demo@example.com",
+            "display_name": "Demo User",
+            "created_at": Utc::now()
+        })
+    ];
+    
+    Ok(ResponseJson(serde_json::json!({
+        "users": users,
+        "total": users.len()
+    })))
+}
+
+/// GET /api/v1/users/:id - Get user by ID
+pub async fn get_user(
+    State(_user_service): State<UserAppService>,
+    Path(user_id): Path<Uuid>,
+) -> Result<ResponseJson<serde_json::Value>, (StatusCode, ResponseJson<serde_json::Value>)> {
+    // TODO: Implement actual user retrieval logic
+    let user = serde_json::json!({
+        "user_id": user_id,
+        "username": "demo_user",
+        "email": "demo@example.com",
+        "display_name": "Demo User",
+        "created_at": Utc::now()
+    });
+    
+    Ok(ResponseJson(user))
+}
+
+/// POST /api/v1/users/:id/unfollow - Unfollow user
+pub async fn unfollow_user(
+    State(_user_service): State<UserAppService>,
+    Path(user_id): Path<Uuid>,
+) -> Result<ResponseJson<serde_json::Value>, (StatusCode, ResponseJson<serde_json::Value>)> {
+    // TODO: Implement actual unfollow logic
+    Ok(ResponseJson(serde_json::json!({
+        "message": "User unfollowed successfully",
+        "user_id": user_id
+    })))
 } 

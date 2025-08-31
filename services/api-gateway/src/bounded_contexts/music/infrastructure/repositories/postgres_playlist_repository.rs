@@ -4,44 +4,22 @@ use sqlx::{PgPool, FromRow};
 use uuid::Uuid;
 
 use crate::bounded_contexts::music::domain::{
-    entities::{Playlist, PlaylistTrack},
-    value_objects::{PlaylistId, PlaylistName, SongId, SongDuration},
-    repositories::{RepositoryResult, RepositoryError},
+    repositories::{playlist_repository::{Playlist, PlaylistRepository as DomainPlaylistRepository}},
+    value_objects::{PlaylistId, PlaylistName, UserId},
 };
+use crate::shared::domain::errors::AppError;
 
-// Internal structs for database mapping
+// Internal struct for database mapping
 #[derive(FromRow)]
 struct PlaylistRow {
     id: Uuid,
     name: String,
-    creator_id: Uuid,
     description: Option<String>,
     is_public: bool,
-    is_collaborative: bool,
-    cover_image_url: Option<String>,
-    follower_count: i32,
-    like_count: i32,
-    listen_count: i64,
+    song_count: i32,
+    created_by: Uuid,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
-}
-
-#[derive(FromRow)]
-struct PlaylistTrackRow {
-    song_id: Uuid,
-    position: i32,
-    added_at: DateTime<Utc>,
-    added_by: Uuid,
-}
-
-#[async_trait]
-pub trait PlaylistRepository: Send + Sync {
-    async fn save(&self, playlist: &Playlist) -> RepositoryResult<()>;
-    async fn find_by_id(&self, id: &PlaylistId) -> RepositoryResult<Option<Playlist>>;
-    async fn find_by_user(&self, user_id: Uuid) -> RepositoryResult<Vec<Playlist>>;
-    async fn find_public_playlists(&self, limit: Option<usize>) -> RepositoryResult<Vec<Playlist>>;
-    async fn search_by_name(&self, query: &str, limit: Option<usize>) -> RepositoryResult<Vec<Playlist>>;
-    async fn get_trending_playlists(&self, limit: Option<usize>) -> RepositoryResult<Vec<Playlist>>;
 }
 
 pub struct PostgresPlaylistRepository {
@@ -53,212 +31,232 @@ impl PostgresPlaylistRepository {
         Self { pool }
     }
 
-    fn row_to_playlist(&self, row: PlaylistRow, tracks: Vec<PlaylistTrack>) -> RepositoryResult<Playlist> {
-        let playlist = Playlist::from_persistence(
-            PlaylistId::from_uuid(row.id),
-            PlaylistName::new(row.name).map_err(|e| RepositoryError::SerializationError(e))?,
-            row.creator_id,
+    fn row_to_playlist(&self, row: PlaylistRow) -> Result<Playlist, AppError> {
+        Ok(Playlist::new(
+            row.id,
+            row.name,
             row.description,
             row.is_public,
-            None, // cover_image_ipfs: Option<IpfsHash> - placeholder
-            None, // total_duration: Option<SongDuration> - calculated later
-            row.listen_count as u64,
-            row.created_at,
-            row.updated_at,
-        );
-        
-        // Set additional properties not in from_persistence
-        // These would be set via domain methods in a real implementation
-        // playlist.set_collaborative(row.is_collaborative);
-        // playlist.set_follower_count(row.follower_count as u64);
-        // playlist.set_like_count(row.like_count as u64);
-        
-        Ok(playlist)
+            row.created_by,
+        ))
     }
 }
 
 #[async_trait]
-impl PlaylistRepository for PostgresPlaylistRepository {
-    async fn save(&self, playlist: &Playlist) -> RepositoryResult<()> {
-        let mut tx = self.pool.begin()
-            .await
-            .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
-
-        // Save playlist
+impl DomainPlaylistRepository for PostgresPlaylistRepository {
+    async fn save(&self, playlist: &Playlist) -> Result<(), AppError> {
         sqlx::query(
-            r#"INSERT INTO playlists (id, name, creator_id, description, is_public, is_collaborative, 
-                                     cover_image_url, follower_count, like_count, listen_count, created_at, updated_at)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            r#"INSERT INTO playlists (id, name, description, is_public, song_count, created_by, created_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                ON CONFLICT (id) DO UPDATE SET
-               name = EXCLUDED.name, description = EXCLUDED.description, 
-               is_public = EXCLUDED.is_public, updated_at = EXCLUDED.updated_at"#
+               name = EXCLUDED.name, description = EXCLUDED.description, is_public = EXCLUDED.is_public, updated_at = EXCLUDED.updated_at"#
         )
-        .bind(playlist.id().value())
-        .bind(playlist.name().value())
-        .bind(playlist.creator_id())
-        .bind(playlist.description())
-        .bind(playlist.is_public())
-        .bind(playlist.is_collaborative())
-        .bind(playlist.cover_image_url())
-        .bind(playlist.follower_count() as i32)
-        .bind(playlist.like_count() as i32)
-        .bind(playlist.listen_count() as i64)
-        .bind(playlist.created_at())
-        .bind(playlist.updated_at())
-        .execute(&mut *tx)
+        .bind(playlist.id)
+        .bind(&playlist.name)
+        .bind(&playlist.description)
+        .bind(playlist.is_public)
+        .bind(playlist.song_count as i32)
+        .bind(playlist.created_by)
+        .bind(playlist.created_at)
+        .bind(playlist.updated_at)
+        .execute(&self.pool)
         .await
-        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
-
-        // Save playlist tracks
-        sqlx::query("DELETE FROM playlist_tracks WHERE playlist_id = $1")
-        .bind(playlist.id().value())
-        .execute(&mut *tx)
-        .await
-        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
-
-        for track in playlist.tracks() {
-            sqlx::query(
-                r#"INSERT INTO playlist_tracks (playlist_id, song_id, position, added_at, added_by)
-                   VALUES ($1, $2, $3, $4, $5)"#
-            )
-            .bind(playlist.id().value())
-            .bind(track.song_id().value())
-            .bind(track.position() as i32)
-            .bind(track.added_at())
-            .bind(track.added_by())
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
-        }
-
-        tx.commit()
-            .await
-            .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
-
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        
         Ok(())
     }
 
-    async fn find_by_id(&self, id: &PlaylistId) -> RepositoryResult<Option<Playlist>> {
+    async fn find_by_id(&self, id: &Uuid) -> Result<Option<Playlist>, AppError> {
         let row: Option<PlaylistRow> = sqlx::query_as(
-            r#"SELECT id, name, creator_id, description, is_public, is_collaborative, 
-                      cover_image_url, follower_count, like_count, listen_count, created_at, updated_at
-               FROM playlists WHERE id = $1"#
+            "SELECT id, name, description, is_public, song_count, created_by, created_at, updated_at FROM playlists WHERE id = $1"
         )
-        .bind(id.value())
+        .bind(id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
         if let Some(row) = row {
-            // Get playlist tracks
-            let track_rows: Vec<PlaylistTrackRow> = sqlx::query_as(
-                r#"SELECT song_id, position, added_at, added_by 
-                   FROM playlist_tracks WHERE playlist_id = $1 ORDER BY position"#
-            )
-            .bind(id.value())
-            .fetch_all(&self.pool)
-            .await
-            .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
-
-            let tracks: Result<Vec<_>, _> = track_rows.into_iter().map(|track_row| {
-                // In a real implementation, you'd join with songs table to get title, artist_name, and duration
-                // For now, using placeholder values
-                Ok(PlaylistTrack::new(
-                    SongId::from_uuid(track_row.song_id),
-                    "Unknown Title".to_string(), // title: String - placeholder
-                    "Unknown Artist".to_string(), // artist_name: String - placeholder  
-                    SongDuration::new(180).unwrap(), // duration: SongDuration - default 3 minutes
-                    track_row.position as u32, // track_order: u32
-                ))
-            }).collect();
-
-            Ok(Some(self.row_to_playlist(row, tracks?)?))
+            Ok(Some(self.row_to_playlist(row)?))
         } else {
             Ok(None)
         }
     }
 
-    async fn find_by_user(&self, user_id: Uuid) -> RepositoryResult<Vec<Playlist>> {
+    async fn find_by_creator(&self, creator_id: &Uuid) -> Result<Vec<Playlist>, AppError> {
         let rows: Vec<PlaylistRow> = sqlx::query_as(
-            r#"SELECT id, name, creator_id, description, is_public, is_collaborative, 
-                      cover_image_url, follower_count, like_count, listen_count, created_at, updated_at
-               FROM playlists WHERE creator_id = $1 ORDER BY created_at DESC"#
+            "SELECT id, name, description, is_public, song_count, created_by, created_at, updated_at FROM playlists WHERE created_by = $1"
         )
-        .bind(user_id)
+        .bind(creator_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-        let mut playlists = Vec::new();
-        for row in rows {
-            let playlist = self.row_to_playlist(row, Vec::new())?; // Load tracks separately if needed
-            playlists.push(playlist);
-        }
-        Ok(playlists)
+        let playlists: Result<Vec<Playlist>, AppError> = rows.into_iter()
+            .map(|row| self.row_to_playlist(row))
+            .collect();
+        
+        playlists
     }
 
-    async fn find_public_playlists(&self, limit: Option<usize>) -> RepositoryResult<Vec<Playlist>> {
-        let limit = limit.unwrap_or(50) as i64;
-        
+    async fn find_public_playlists(&self, page: u32, page_size: u32) -> Result<Vec<Playlist>, AppError> {
+        let offset = (page - 1) * page_size;
         let rows: Vec<PlaylistRow> = sqlx::query_as(
-            r#"SELECT id, name, creator_id, description, is_public, is_collaborative, 
-                      cover_image_url, follower_count, like_count, listen_count, created_at, updated_at
-               FROM playlists WHERE is_public = true ORDER BY follower_count DESC LIMIT $1"#
+            "SELECT id, name, description, is_public, song_count, created_by, created_at, updated_at FROM playlists WHERE is_public = true ORDER BY created_at DESC LIMIT $1 OFFSET $2"
         )
-        .bind(limit)
+        .bind(page_size as i64)
+        .bind(offset as i64)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-        let mut playlists = Vec::new();
-        for row in rows {
-            let playlist = self.row_to_playlist(row, Vec::new())?;
-            playlists.push(playlist);
-        }
-        Ok(playlists)
+        let playlists: Result<Vec<Playlist>, AppError> = rows.into_iter()
+            .map(|row| self.row_to_playlist(row))
+            .collect();
+        
+        playlists
     }
 
-    async fn search_by_name(&self, query: &str, limit: Option<usize>) -> RepositoryResult<Vec<Playlist>> {
-        let limit = limit.unwrap_or(50) as i64;
-        let search_pattern = format!("%{}%", query);
-        
+    async fn find_all(&self, page: u32, page_size: u32) -> Result<Vec<Playlist>, AppError> {
+        let offset = (page - 1) * page_size;
         let rows: Vec<PlaylistRow> = sqlx::query_as(
-            r#"SELECT id, name, creator_id, description, is_public, is_collaborative, 
-                      cover_image_url, follower_count, like_count, listen_count, created_at, updated_at
-               FROM playlists WHERE name ILIKE $1 AND is_public = true LIMIT $2"#
+            "SELECT id, name, description, is_public, song_count, created_by, created_at, updated_at FROM playlists ORDER BY created_at DESC LIMIT $1 OFFSET $2"
         )
-        .bind(search_pattern)
-        .bind(limit)
+        .bind(page_size as i64)
+        .bind(offset as i64)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-        let mut playlists = Vec::new();
-        for row in rows {
-            let playlist = self.row_to_playlist(row, Vec::new())?;
-            playlists.push(playlist);
-        }
-        Ok(playlists)
+        let playlists: Result<Vec<Playlist>, AppError> = rows.into_iter()
+            .map(|row| self.row_to_playlist(row))
+            .collect();
+        
+        playlists
     }
 
-    async fn get_trending_playlists(&self, limit: Option<usize>) -> RepositoryResult<Vec<Playlist>> {
-        let limit = limit.unwrap_or(20) as i64;
-        
-        let rows: Vec<PlaylistRow> = sqlx::query_as(
-            r#"SELECT id, name, creator_id, description, is_public, is_collaborative, 
-                      cover_image_url, follower_count, like_count, listen_count, created_at, updated_at
-               FROM playlists WHERE is_public = true ORDER BY like_count DESC, follower_count DESC LIMIT $1"#
+    async fn update(&self, playlist: &Playlist) -> Result<(), AppError> {
+        sqlx::query(
+            r#"UPDATE playlists SET name = $2, description = $3, is_public = $4, song_count = $5, updated_at = $6 WHERE id = $1"#
         )
-        .bind(limit)
+        .bind(playlist.id)
+        .bind(&playlist.name)
+        .bind(&playlist.description)
+        .bind(playlist.is_public)
+        .bind(playlist.song_count as i32)
+        .bind(playlist.updated_at)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        
+        Ok(())
+    }
+
+    async fn delete(&self, id: &Uuid) -> Result<(), AppError> {
+        sqlx::query("DELETE FROM playlists WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        
+        Ok(())
+    }
+
+    async fn count(&self) -> Result<u64, AppError> {
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM playlists")
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        
+        Ok(count as u64)
+    }
+
+    async fn search_by_name(&self, name: &str) -> Result<Vec<Playlist>, AppError> {
+        let rows: Vec<PlaylistRow> = sqlx::query_as(
+            "SELECT id, name, description, is_public, song_count, created_by, created_at, updated_at FROM playlists WHERE name ILIKE $1"
+        )
+        .bind(format!("%{}%", name))
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
-        let mut playlists = Vec::new();
-        for row in rows {
-            let playlist = self.row_to_playlist(row, Vec::new())?;
-            playlists.push(playlist);
-        }
-        Ok(playlists)
+        let playlists: Result<Vec<Playlist>, AppError> = rows.into_iter()
+            .map(|row| self.row_to_playlist(row))
+            .collect();
+        
+        playlists
+    }
+
+    async fn add_song(&self, playlist_id: &Uuid, song_id: &Uuid) -> Result<(), AppError> {
+        let mut tx = self.pool.begin().await
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        // Add song to playlist
+        sqlx::query(
+            "INSERT INTO playlist_songs (playlist_id, song_id, added_at) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING"
+        )
+        .bind(playlist_id)
+        .bind(song_id)
+        .bind(Utc::now())
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        // Update song count
+        sqlx::query(
+            "UPDATE playlists SET song_count = song_count + 1, updated_at = $2 WHERE id = $1"
+        )
+        .bind(playlist_id)
+        .bind(Utc::now())
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        tx.commit().await
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        
+        Ok(())
+    }
+
+    async fn remove_song(&self, playlist_id: &Uuid, song_id: &Uuid) -> Result<(), AppError> {
+        let mut tx = self.pool.begin().await
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        // Remove song from playlist
+        sqlx::query(
+            "DELETE FROM playlist_songs WHERE playlist_id = $1 AND song_id = $2"
+        )
+        .bind(playlist_id)
+        .bind(song_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        // Update song count
+        sqlx::query(
+            "UPDATE playlists SET song_count = GREATEST(song_count - 1, 0), updated_at = $2 WHERE id = $1"
+        )
+        .bind(playlist_id)
+        .bind(Utc::now())
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        tx.commit().await
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        
+        Ok(())
+    }
+
+    async fn get_songs(&self, playlist_id: &Uuid) -> Result<Vec<Uuid>, AppError> {
+        let rows: Vec<(Uuid,)> = sqlx::query_as(
+            "SELECT song_id FROM playlist_songs WHERE playlist_id = $1 ORDER BY added_at ASC"
+        )
+        .bind(playlist_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        let song_ids: Vec<Uuid> = rows.into_iter().map(|(song_id,)| song_id).collect();
+        Ok(song_ids)
     }
 } 

@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::bounded_contexts::music::domain::{
     entities::Album,
     value_objects::{AlbumId, AlbumTitle, ArtistId, Genre, ReleaseType},
-    repositories::{RepositoryResult, RepositoryError},
+    repositories::{RepositoryResult, RepositoryError, album_repository::AlbumRepository as DomainAlbumRepository},
 };
 
 // Internal struct for database mapping
@@ -19,16 +19,6 @@ struct AlbumRow {
     is_published: bool,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
-}
-
-#[async_trait]
-pub trait AlbumRepository: Send + Sync {
-    async fn save(&self, album: &Album) -> RepositoryResult<()>;
-    async fn find_by_id(&self, id: &AlbumId) -> RepositoryResult<Option<Album>>;
-    async fn find_by_artist(&self, artist_id: &ArtistId) -> RepositoryResult<Vec<Album>>;
-    async fn find_by_genre(&self, genre: &str) -> RepositoryResult<Vec<Album>>;
-    async fn search_by_title(&self, query: &str, limit: Option<usize>) -> RepositoryResult<Vec<Album>>;
-    async fn get_top_albums(&self, limit: Option<usize>) -> RepositoryResult<Vec<Album>>;
 }
 
 pub struct PostgresAlbumRepository {
@@ -62,7 +52,7 @@ impl PostgresAlbumRepository {
 }
 
 #[async_trait]
-impl AlbumRepository for PostgresAlbumRepository {
+impl DomainAlbumRepository for PostgresAlbumRepository {
     async fn save(&self, album: &Album) -> RepositoryResult<()> {
         sqlx::query(
             r#"INSERT INTO albums (id, title, artist_id, genre, is_published, created_at, updated_at)
@@ -84,11 +74,11 @@ impl AlbumRepository for PostgresAlbumRepository {
         Ok(())
     }
 
-    async fn find_by_id(&self, id: &AlbumId) -> RepositoryResult<Option<Album>> {
+    async fn find_by_id(&self, id: &Uuid) -> RepositoryResult<Option<Album>> {
         let row: Option<AlbumRow> = sqlx::query_as(
             "SELECT id, title, artist_id, genre, is_published, created_at, updated_at FROM albums WHERE id = $1"
         )
-        .bind(id.value())
+        .bind(id)
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
@@ -100,73 +90,89 @@ impl AlbumRepository for PostgresAlbumRepository {
         }
     }
 
-    async fn find_by_artist(&self, artist_id: &ArtistId) -> RepositoryResult<Vec<Album>> {
+    async fn find_by_artist_id(&self, artist_id: &Uuid) -> RepositoryResult<Vec<Album>> {
         let rows: Vec<AlbumRow> = sqlx::query_as(
-            "SELECT id, title, artist_id, genre, is_published, created_at, updated_at FROM albums WHERE artist_id = $1 ORDER BY created_at DESC"
+            "SELECT id, title, artist_id, genre, is_published, created_at, updated_at FROM albums WHERE artist_id = $1"
         )
-        .bind(artist_id.value())
+        .bind(artist_id)
         .fetch_all(&self.pool)
         .await
         .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
-        let mut albums = Vec::new();
-        for row in rows {
-            albums.push(self.row_to_album(row)?);
-        }
-        Ok(albums)
-    }
-
-    async fn find_by_genre(&self, genre: &str) -> RepositoryResult<Vec<Album>> {
-        let rows: Vec<AlbumRow> = sqlx::query_as(
-            "SELECT id, title, artist_id, genre, is_published, created_at, updated_at FROM albums WHERE genre = $1 AND is_published = true"
-        )
-        .bind(genre)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
-
-        let mut albums = Vec::new();
-        for row in rows {
-            albums.push(self.row_to_album(row)?);
-        }
-        Ok(albums)
-    }
-
-    async fn search_by_title(&self, query: &str, limit: Option<usize>) -> RepositoryResult<Vec<Album>> {
-        let limit = limit.unwrap_or(50) as i64;
-        let search_pattern = format!("%{}%", query);
+        let albums: RepositoryResult<Vec<Album>> = rows.into_iter()
+            .map(|row| self.row_to_album(row))
+            .collect();
         
-        let rows: Vec<AlbumRow> = sqlx::query_as(
-            "SELECT id, title, artist_id, genre, is_published, created_at, updated_at FROM albums WHERE title ILIKE $1 LIMIT $2"
-        )
-        .bind(search_pattern)
-        .bind(limit)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
-
-        let mut albums = Vec::new();
-        for row in rows {
-            albums.push(self.row_to_album(row)?);
-        }
-        Ok(albums)
+        albums
     }
 
-    async fn get_top_albums(&self, limit: Option<usize>) -> RepositoryResult<Vec<Album>> {
-        let limit = limit.unwrap_or(20) as i64;
-        
+    async fn find_all(&self, page: u32, page_size: u32) -> RepositoryResult<Vec<Album>> {
+        let offset = (page - 1) * page_size;
         let rows: Vec<AlbumRow> = sqlx::query_as(
-            "SELECT id, title, artist_id, genre, is_published, created_at, updated_at FROM albums WHERE is_published = true ORDER BY created_at DESC LIMIT $1"
+            "SELECT id, title, artist_id, genre, is_published, created_at, updated_at FROM albums ORDER BY created_at DESC LIMIT $1 OFFSET $2"
         )
-        .bind(limit)
+        .bind(page_size as i64)
+        .bind(offset as i64)
         .fetch_all(&self.pool)
         .await
         .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
 
-        let mut albums = Vec::new();
-        for row in rows {
-            albums.push(self.row_to_album(row)?);
-        }
-        Ok(albums)
+        let albums: RepositoryResult<Vec<Album>> = rows.into_iter()
+            .map(|row| self.row_to_album(row))
+            .collect();
+        
+        albums
+    }
+
+    async fn update(&self, album: &Album) -> RepositoryResult<()> {
+        sqlx::query(
+            r#"UPDATE albums SET title = $2, artist_id = $3, genre = $4, is_published = $5, updated_at = $6 WHERE id = $1"#
+        )
+        .bind(album.id().value())
+        .bind(album.title().value())
+        .bind(album.artist_id().value())
+        .bind(album.genre().value())
+        .bind(album.is_published())
+        .bind(album.updated_at())
+        .execute(&self.pool)
+        .await
+        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
+        
+        Ok(())
+    }
+
+    async fn delete(&self, id: &Uuid) -> RepositoryResult<()> {
+        sqlx::query("DELETE FROM albums WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
+        
+        Ok(())
+    }
+
+    async fn count(&self) -> RepositoryResult<u64> {
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM albums")
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
+        
+        Ok(count as u64)
+    }
+
+    async fn search_by_title(&self, title: &str) -> RepositoryResult<Vec<Album>> {
+        let rows: Vec<AlbumRow> = sqlx::query_as(
+            "SELECT id, title, artist_id, genre, is_published, created_at, updated_at FROM albums WHERE title ILIKE $1"
+        )
+        .bind(format!("%{}%", title))
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
+
+        let albums: RepositoryResult<Vec<Album>> = rows.into_iter()
+            .map(|row| self.row_to_album(row))
+            .collect();
+        
+        albums
     }
 } 

@@ -312,6 +312,48 @@ impl ListenRewardController {
         Ok(Json(SuccessResponse::new(mock_response)))
     }
 
+    /// GET /api/v1/listen-reward/users/{user_id}/sessions
+    /// Get user sessions
+    pub async fn get_user_sessions(
+        State(controller): State<Arc<Self>>,
+        Path(user_id): Path<String>,
+    ) -> Result<Json<SuccessResponse<Vec<SessionDetailsResponse>>>, ErrorResponse> {
+        // Validate user_id
+        let user_id = validate_uuid(&user_id, "user_id")?;
+
+        // For now, return a mock response since we don't have the query implemented
+        let mock_sessions = vec![
+            SessionDetailsResponse {
+                session_id: Uuid::new_v4(),
+                user_id,
+                song_id: Uuid::new_v4(),
+                artist_id: Uuid::new_v4(),
+                status: "Completed".to_string(),
+                user_tier: "Premium".to_string(),
+                listen_duration_seconds: Some(180),
+                quality_score: Some(0.95),
+                final_reward: Some(2.5),
+                started_at: Utc::now() - chrono::Duration::minutes(5),
+                completed_at: Some(Utc::now()),
+            },
+            SessionDetailsResponse {
+                session_id: Uuid::new_v4(),
+                user_id,
+                song_id: Uuid::new_v4(),
+                artist_id: Uuid::new_v4(),
+                status: "Completed".to_string(),
+                user_tier: "Premium".to_string(),
+                listen_duration_seconds: Some(240),
+                quality_score: Some(0.88),
+                final_reward: Some(3.2),
+                started_at: Utc::now() - chrono::Duration::minutes(10),
+                completed_at: Some(Utc::now() - chrono::Duration::minutes(6)),
+            }
+        ];
+
+        Ok(Json(SuccessResponse::new(mock_sessions)))
+    }
+
     /// GET /api/v1/listen-reward/health
     /// Health check endpoint
     pub async fn health_check(
