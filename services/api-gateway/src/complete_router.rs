@@ -152,7 +152,7 @@ async fn create_listen_reward_routes(app_state: AppState) -> Result<Router, Box<
         .route("/sessions/:session_id/complete", axum::routing::post(crate::bounded_contexts::listen_reward::presentation::controllers::listen_reward_controller::ListenRewardController::complete_session))
         .route("/sessions/:session_id", get(crate::bounded_contexts::listen_reward::presentation::controllers::listen_reward_controller::ListenRewardController::get_session_details))
         .route("/sessions/user/:user_id", get(crate::bounded_contexts::listen_reward::presentation::controllers::listen_reward_controller::ListenRewardController::get_user_sessions))
-        .with_state(listen_reward_state);
+        .with_state(listen_reward_state.session_repository);
     
     Ok(router)
 }

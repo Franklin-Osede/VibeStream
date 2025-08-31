@@ -52,22 +52,22 @@ impl MessageQueue {
     pub async fn new(redis_url: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let client = RedisClient::open(redis_url)?;
         
-        // Test connection
-        let mut conn = client.get_async_connection().await?;
-        redis::cmd("PING").execute(&mut conn)?;
+        // Test connection using sync connection
+        let mut conn = client.get_connection()?;
+        let _: () = redis::cmd("PING").execute(&mut conn)?;
         
         Ok(Self { client })
     }
     
     pub async fn ping(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let mut conn = self.client.get_async_connection().await?;
-        redis::cmd("PING").execute(&mut conn)?;
+        let mut conn = self.client.get_connection()?;
+        let _: () = redis::cmd("PING").execute(&mut conn)?;
         Ok(())
     }
 
     pub async fn send_message(&self, queue_name: &str, message: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let mut conn = self.client.get_async_connection().await?;
-        redis::cmd("LPUSH")
+        let mut conn = self.client.get_connection()?;
+        let _: () = redis::cmd("LPUSH")
             .arg(queue_name)
             .arg(message)
             .execute(&mut conn)?;

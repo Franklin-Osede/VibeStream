@@ -243,7 +243,7 @@ impl FanVenturesController {
     /// GET /api/v1/fan-ventures/analytics/venture/:id - Get venture analytics
     pub async fn get_venture_analytics(
         State(_state): State<FanVenturesAppState>,
-        Path(venture_id): Path<Uuid>,
+    Path(venture_id): Path<Uuid>,
     ) -> Result<ResponseJson<serde_json::Value>, (StatusCode, ResponseJson<serde_json::Value>)> {
         // TODO: Implement actual analytics logic
         let analytics = serde_json::json!({
