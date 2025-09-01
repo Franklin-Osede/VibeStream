@@ -3,7 +3,4 @@ pub mod application;
 pub mod infrastructure;
 pub mod presentation;
 
-pub use domain::*;
-pub use application::*;
-pub use infrastructure::*;
-pub use presentation::*; 
+// Intentionally avoid glob re-exports to prevent name collisions.

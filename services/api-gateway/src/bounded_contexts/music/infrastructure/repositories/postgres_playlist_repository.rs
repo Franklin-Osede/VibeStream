@@ -5,8 +5,9 @@ use uuid::Uuid;
 
 use crate::bounded_contexts::music::domain::{
     repositories::{playlist_repository::{Playlist, PlaylistRepository as DomainPlaylistRepository}},
-    value_objects::{PlaylistId, PlaylistName, UserId},
+    value_objects::{PlaylistId, PlaylistName},
 };
+use crate::bounded_contexts::user::domain::UserId;
 use crate::shared::domain::errors::AppError;
 
 // Internal struct for database mapping

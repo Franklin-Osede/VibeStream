@@ -14,13 +14,18 @@ use crate::shared::infrastructure::app_state::{AppState, AppStateFactory};
 use crate::bounded_contexts::music::presentation::controllers::{
     SongController, AlbumController, PlaylistController, ArtistController
 };
+use crate::bounded_contexts::user::application::services::UserApplicationService;
+use crate::bounded_contexts::listen_reward::application::services::ListenRewardApplicationService;
+use crate::bounded_contexts::listen_reward::infrastructure::zk::MockZkProofVerificationService;
+use crate::bounded_contexts::campaign::application::services::CampaignService;
+use crate::bounded_contexts::campaign::application::services::MockEventPublisher;
 
 // =============================================================================
 // MAIN ROUTER CREATION
 // =============================================================================
 
 /// Crear el router principal simplificado
-pub async fn create_app_router(db_pool: PgPool) -> Result<Router, Box<dyn std::error::Error>> {
+pub async fn create_app_router(_db_pool: PgPool) -> Result<Router, Box<dyn std::error::Error>> {
     // Crear AppState base
     let app_state = AppState::new(
         "postgresql://vibestream:vibestream@localhost:5433/vibestream",
@@ -28,7 +33,6 @@ pub async fn create_app_router(db_pool: PgPool) -> Result<Router, Box<dyn std::e
     ).await
         .map_err(|e| Box::new(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())) as Box<dyn std::error::Error>)?;
 
-    // Crear router base con middleware
     let router = Router::new()
         // =============================================================================
         // HEALTH & INFO ENDPOINTS
@@ -72,6 +76,9 @@ async fn create_user_routes(app_state: AppState) -> Result<Router, Box<dyn std::
     let user_state = AppStateFactory::create_user_state(app_state).await
         .map_err(|e| Box::new(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())) as Box<dyn std::error::Error>)?;
     
+    // Create UserApplicationService with concrete type
+    let user_service = UserApplicationService::new(user_state.user_repository);
+    
     let router = Router::new()
         .route("/", get(crate::bounded_contexts::user::presentation::controllers::user_controller::get_users))
         .route("/:id", get(crate::bounded_contexts::user::presentation::controllers::user_controller::get_user))
@@ -83,7 +90,7 @@ async fn create_user_routes(app_state: AppState) -> Result<Router, Box<dyn std::
         .route("/:id/followers", get(crate::bounded_contexts::user::presentation::controllers::user_controller::get_user_followers))
         .route("/:id/following", get(crate::bounded_contexts::user::presentation::controllers::user_controller::get_user_following))
         .route("/search", get(crate::bounded_contexts::user::presentation::controllers::user_controller::search_users))
-        .with_state(user_state.user_repository);
+        .with_state(user_service);
     
     Ok(router)
 }
@@ -126,6 +133,12 @@ async fn create_campaign_routes(app_state: AppState) -> Result<Router, Box<dyn s
     let campaign_state = AppStateFactory::create_campaign_state(app_state).await
         .map_err(|e| Box::new(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())) as Box<dyn std::error::Error>)?;
     
+    // Create CampaignService with available fields
+    let campaign_service = CampaignService::new(
+        campaign_state.campaign_repository,
+        Arc::new(MockEventPublisher::new()),
+    );
+    
     let router = Router::new()
         .route("/", axum::routing::post(crate::bounded_contexts::campaign::presentation::controllers::CampaignController::create_campaign))
         .route("/", get(crate::bounded_contexts::campaign::presentation::controllers::CampaignController::list_campaigns))
@@ -137,7 +150,7 @@ async fn create_campaign_routes(app_state: AppState) -> Result<Router, Box<dyn s
         .route("/:id/purchase", axum::routing::post(crate::bounded_contexts::campaign::presentation::controllers::CampaignController::purchase_nft))
         .route("/:id/analytics", get(crate::bounded_contexts::campaign::presentation::controllers::CampaignController::get_campaign_analytics))
         .route("/trending", get(crate::bounded_contexts::campaign::presentation::controllers::CampaignController::get_trending_campaigns))
-        .with_state(campaign_state);
+        .with_state(campaign_service);
     
     Ok(router)
 }
@@ -147,12 +160,19 @@ async fn create_listen_reward_routes(app_state: AppState) -> Result<Router, Box<
     let listen_reward_state = AppStateFactory::create_listen_reward_state(app_state).await
         .map_err(|e| Box::new(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())) as Box<dyn std::error::Error>)?;
     
+    // Create ListenRewardApplicationService with available fields
+    let listen_reward_service = ListenRewardApplicationService::new(
+        listen_reward_state.session_repository,
+        listen_reward_state.distribution_repository,
+        Arc::new(MockZkProofVerificationService::new()),
+    );
+    
     let router = Router::new()
         .route("/sessions/start", axum::routing::post(crate::bounded_contexts::listen_reward::presentation::controllers::listen_reward_controller::ListenRewardController::start_session))
         .route("/sessions/:session_id/complete", axum::routing::post(crate::bounded_contexts::listen_reward::presentation::controllers::listen_reward_controller::ListenRewardController::complete_session))
         .route("/sessions/:session_id", get(crate::bounded_contexts::listen_reward::presentation::controllers::listen_reward_controller::ListenRewardController::get_session_details))
         .route("/sessions/user/:user_id", get(crate::bounded_contexts::listen_reward::presentation::controllers::listen_reward_controller::ListenRewardController::get_user_sessions))
-        .with_state(listen_reward_state.session_repository);
+        .with_state(listen_reward_service);
     
     Ok(router)
 }

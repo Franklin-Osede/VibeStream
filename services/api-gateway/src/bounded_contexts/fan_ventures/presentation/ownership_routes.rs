@@ -36,8 +36,8 @@ pub fn create_ownership_routes() -> Router<AppState> {
 }
 
 /// Authentication middleware to ensure all routes require valid JWT
-async fn auth_middleware<B>(
-    mut req: axum::http::Request<B>,
+async fn auth_middleware(
+    mut req: axum::http::Request<axum::body::Body>,
     next: axum::middleware::Next,
 ) -> Result<axum::response::Response, axum::http::StatusCode> {
     // Extract and validate JWT claims

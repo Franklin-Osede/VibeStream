@@ -280,10 +280,33 @@ impl ListenRewardApplicationService {
         let reward_tier = "premium"; // Temporary mock
 
         // Crear comando para el caso de uso (conversión a String donde corresponde)
+        // Crear contratos mínimos a partir de IDs (temporal)
+        let song_contract = vibestream_types::SongContract {
+            id: command.song_id,
+            title: "Unknown".to_string(),
+            artist_id: command.artist_id,
+            artist_name: "Unknown".to_string(),
+            duration_seconds: None,
+            genre: None,
+            ipfs_hash: None,
+            metadata_url: None,
+            nft_contract_address: None,
+            nft_token_id: None,
+            royalty_percentage: None,
+            is_minted: false,
+            created_at: chrono::Utc::now(),
+        };
+
+        let artist_contract = vibestream_types::ArtistContract::new(
+            command.artist_id,
+            uuid::Uuid::new_v4(),
+            "Unknown".to_string(),
+        );
+
         let use_case_command = crate::bounded_contexts::listen_reward::application::use_cases::StartListenSessionCommand {
             user_id: command.user_id,
-            song_contract: command.song_contract.clone(),
-            artist_contract: command.artist_contract.clone(),
+            song_contract,
+            artist_contract,
             user_tier: reward_tier.to_string(),
         };
 

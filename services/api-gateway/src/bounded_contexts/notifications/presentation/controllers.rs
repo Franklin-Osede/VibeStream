@@ -46,7 +46,7 @@ impl NotificationController {
     /// POST /api/v1/notifications - Create a new notification
     pub async fn create_notification(
         State(_state): State<NotificationAppState>,
-        _request: serde_json::Value,
+        axum::extract::Json(_request): axum::extract::Json<serde_json::Value>,
     ) -> Result<ResponseJson<NotificationResponse>, (StatusCode, ResponseJson<serde_json::Value>)> {
         // TODO: Implement actual notification creation logic
         let response = NotificationResponse {
@@ -194,7 +194,7 @@ impl NotificationController {
     pub async fn update_preferences(
         State(_state): State<NotificationAppState>,
         Path(user_id): Path<Uuid>,
-        _request: serde_json::Value,
+        axum::extract::Json(_request): axum::extract::Json<serde_json::Value>,
     ) -> Result<ResponseJson<serde_json::Value>, (StatusCode, ResponseJson<serde_json::Value>)> {
         // TODO: Implement actual preferences update logic
         Ok(ResponseJson(serde_json::json!({

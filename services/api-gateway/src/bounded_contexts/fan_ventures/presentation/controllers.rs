@@ -58,7 +58,7 @@ impl FanVenturesController {
     /// POST /api/v1/fan-ventures/ventures - Create a new venture
     pub async fn create_venture(
         State(state): State<FanVenturesAppState>,
-        _request: serde_json::Value,
+        axum::extract::Json(_request): axum::extract::Json<serde_json::Value>,
     ) -> Result<ResponseJson<VentureResponse>, (StatusCode, ResponseJson<serde_json::Value>)> {
         // TODO: Implement actual venture creation logic
         let venture_id = Uuid::new_v4();
@@ -142,7 +142,7 @@ impl FanVenturesController {
     pub async fn invest_in_venture(
         State(state): State<FanVenturesAppState>,
         Path(venture_id): Path<Uuid>,
-        _request: serde_json::Value,
+        axum::extract::Json(_request): axum::extract::Json<serde_json::Value>,
     ) -> Result<ResponseJson<serde_json::Value>, (StatusCode, ResponseJson<serde_json::Value>)> {
         // TODO: Implement actual investment logic
         let investor_id = Uuid::new_v4();

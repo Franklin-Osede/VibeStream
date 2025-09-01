@@ -157,13 +157,13 @@ async fn get_market_statistics_handler(
     Err(StatusCode::NOT_IMPLEMENTED)
 }
 
-pub fn create_routes(
+pub async fn create_routes(
     _service: Arc<ConcreteApplicationService>,
 ) -> Router {
     // TODO: Create proper AppState with database and redis connections
     let state = AppState {
-        message_queue: Arc::new(MessageQueue::new("redis://localhost").await.unwrap()),
-        database_pool: Arc::new(DatabasePool::new("postgres://localhost").await.unwrap()),
+        message_queue: MessageQueue::new("redis://localhost").await.unwrap(),
+        database_pool: DatabasePool::new("postgres://localhost").await.unwrap(),
         event_bus: Arc::new(InMemoryEventBus::new()),
     };
     
@@ -173,13 +173,13 @@ pub fn create_routes(
 }
 
 /// Admin routes for internal operations
-pub fn admin_routes(
+pub async fn admin_routes(
     _service: Arc<ConcreteApplicationService>,
 ) -> Router {
     // TODO: Create proper AppState with database and redis connections
     let state = AppState {
-        message_queue: Arc::new(MessageQueue::new("redis://localhost").await.unwrap()),
-        database_pool: Arc::new(DatabasePool::new("postgres://localhost").await.unwrap()),
+        message_queue: MessageQueue::new("redis://localhost").await.unwrap(),
+        database_pool: DatabasePool::new("postgres://localhost").await.unwrap(),
         event_bus: Arc::new(InMemoryEventBus::new()),
     };
     
@@ -235,11 +235,11 @@ impl FractionalOwnershipRoutes {
     }
 
     /// Compose all route groups into a single router
-    pub fn compose_all(service: Arc<ConcreteApplicationService>) -> Router {
+    pub async fn compose_all(service: Arc<ConcreteApplicationService>) -> Router {
         // TODO: Create proper AppState with database and redis connections
         let state = AppState {
-            message_queue: Arc::new(MessageQueue::new("redis://localhost").await.unwrap()),
-            database_pool: Arc::new(DatabasePool::new("postgres://localhost").await.unwrap()),
+            message_queue: MessageQueue::new("redis://localhost").await.unwrap(),
+            database_pool: DatabasePool::new("postgres://localhost").await.unwrap(),
             event_bus: Arc::new(InMemoryEventBus::new()),
         };
         

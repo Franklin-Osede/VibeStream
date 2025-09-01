@@ -65,7 +65,7 @@ impl AlbumController {
     /// POST /api/v1/music/albums - Create a new album
     pub async fn create_album(
         State(_state): State<MusicAppState>,
-        _request: serde_json::Value,
+        axum::extract::Json(_request): axum::extract::Json<serde_json::Value>,
     ) -> Result<ResponseJson<AlbumResponse>, (StatusCode, ResponseJson<serde_json::Value>)> {
         // TODO: Implement actual album creation logic
         let response = AlbumResponse {

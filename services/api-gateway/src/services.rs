@@ -14,7 +14,7 @@ pub struct DatabasePool {
 
 impl DatabasePool {
     pub async fn new(database_url: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        let pool = sqlx::PgPoolOptions::new()
+        let pool = sqlx::postgres::PgPoolOptions::new()
             .max_connections(5)
             .connect(database_url)
             .await?;
@@ -54,23 +54,23 @@ impl MessageQueue {
         
         // Test connection using sync connection
         let mut conn = client.get_connection()?;
-        let _: () = redis::cmd("PING").execute(&mut conn)?;
+        let _: String = redis::cmd("PING").query(&mut conn)?;
         
         Ok(Self { client })
     }
     
     pub async fn ping(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut conn = self.client.get_connection()?;
-        let _: () = redis::cmd("PING").execute(&mut conn)?;
+        let _: String = redis::cmd("PING").query(&mut conn)?;
         Ok(())
     }
 
     pub async fn send_message(&self, queue_name: &str, message: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut conn = self.client.get_connection()?;
-        let _: () = redis::cmd("LPUSH")
+        let _: i64 = redis::cmd("LPUSH")
             .arg(queue_name)
             .arg(message)
-            .execute(&mut conn)?;
+            .query(&mut conn)?;
         Ok(())
     }
 } 

@@ -2,8 +2,8 @@ use axum::{
     routing::{get, post, put},
     Router,
 };
-
-use super::controllers::CampaignController;
+use crate::bounded_contexts::campaign::presentation::controllers::CampaignController;
+use crate::shared::infrastructure::app_state::CampaignAppState;
 
 /// Create the campaign routes for the API
 /// 

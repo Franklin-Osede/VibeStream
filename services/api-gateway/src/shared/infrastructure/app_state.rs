@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use crate::services::{MessageQueue, DatabasePool};
 use crate::bounded_contexts::orchestrator::{EventBus, DomainEvent};
-use crate::bounded_contexts::music::domain::repositories::{SongRepository, AlbumRepository, PlaylistRepository};
+use crate::bounded_contexts::music::domain::repositories::{AlbumRepository, PlaylistRepository};
 
 // =============================================================================
 // SIMPLIFIED APP STATE - Separado por contexto para reducir acoplamiento
@@ -339,8 +339,8 @@ impl AppStateFactory {
         let pool = app_state.get_db_pool();
         
         let notification_repository = Arc::new(crate::bounded_contexts::notifications::infrastructure::PostgresNotificationRepository::new(pool.clone()));
-        let preferences_repository = Arc::new(crate::bounded_contexts::notifications::infrastructure::PostgresNotificationPreferencesRepository::new(pool.clone()));
-        let template_repository = Arc::new(crate::bounded_contexts::notifications::infrastructure::PostgresNotificationTemplateRepository::new(pool.clone()));
+        let preferences_repository = Arc::new(crate::bounded_contexts::notifications::infrastructure::MockNotificationPreferencesRepository::new());
+        let template_repository = Arc::new(crate::bounded_contexts::notifications::infrastructure::MockNotificationTemplateRepository::new());
         
         Ok(NotificationAppState::new(
             app_state,

@@ -7,8 +7,37 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
+use crate::bounded_contexts::campaign::domain::{
+    entities::{Campaign, CampaignStatus},
+    value_objects::{CampaignId, CampaignName, DateRange, BoostMultiplier, NFTPrice, NFTSupply},
+    repository::CampaignRepository,
+};
+use crate::bounded_contexts::campaign::domain::value_objects::*;
+use vibestream_types::{SongContract, ArtistContract};
 use crate::shared::infrastructure::app_state::CampaignAppState;
 use crate::bounded_contexts::orchestrator::DomainEvent;
+use crate::bounded_contexts::campaign::application::{
+    CreateCampaignCommand,
+    ListCampaignsQuery,
+    GetCampaignQuery,
+    ActivateCampaignCommand,
+    PauseCampaignCommand,
+    ResumeCampaignCommand,
+    EndCampaignCommand,
+    PurchaseNFTCommand,
+    GetCampaignAnalyticsQuery,
+    GetTrendingCampaignsQuery,
+};
+use crate::bounded_contexts::campaign::application::CampaignService;
+use crate::bounded_contexts::campaign::application::CampaignId;
+use crate::bounded_contexts::campaign::application::SongContract;
+use crate::bounded_contexts::campaign::application::ArtistContract;
+use crate::bounded_contexts::campaign::application::CampaignName;
+use crate::bounded_contexts::campaign::application::DateRange;
+use crate::bounded_contexts::campaign::application::BoostMultiplier;
+use crate::bounded_contexts::campaign::application::NFTPrice;
+use crate::bounded_contexts::campaign::application::NFTSupply;
+use crate::bounded_contexts::campaign::application::Campaign;
 
 // =============================================================================
 // REQUEST/RESPONSE DTOs
@@ -111,13 +140,77 @@ impl CampaignController {
             ));
         }
         
-        // Create campaign entity (simplified for now)
+        // Create campaign entity using domain logic
         let campaign_id = Uuid::new_v4();
         let now = Utc::now();
         
+        // Save to repository using real implementation
+        let campaign = Campaign::new(
+            CampaignId::new(campaign_id),
+            SongContract::new(request.song_id, "Unknown Song".to_string(), request.artist_id, "Unknown Artist".to_string()),
+            ArtistContract::new(request.artist_id, Uuid::new_v4(), "Unknown Artist".to_string()),
+            CampaignName::new(request.title.clone()).map_err(|e| {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    ResponseJson(serde_json::json!({
+                        "error": format!("Invalid campaign name: {}", e)
+                    }))
+                ));
+            })?,
+            request.description.clone(),
+            DateRange::new(now, now + chrono::Duration::days(30)).map_err(|e| {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    ResponseJson(serde_json::json!({
+                        "error": format!("Invalid date range: {}", e)
+                    }))
+                ));
+            })?,
+            BoostMultiplier::new(1.0).map_err(|e| {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    ResponseJson(serde_json::json!({
+                        "error": format!("Invalid boost multiplier: {}", e)
+                    }))
+                ));
+            })?,
+            NFTPrice::new(request.nft_price).map_err(|e| {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    ResponseJson(serde_json::json!({
+                        "error": format!("Invalid NFT price: {}", e)
+                    }))
+                ));
+            })?,
+            NFTSupply::new(request.max_nfts, 0).map_err(|e| {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    ResponseJson(serde_json::json!({
+                        "error": format!("Invalid NFT supply: {}", e)
+                    }))
+                ));
+            })?,
+            CampaignStatus::Draft,
+            None,
+        ).map_err(|e| {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                ResponseJson(serde_json::json!({
+                    "error": format!("Failed to create campaign: {}", e)
+                }))
+            ));
+        })?;
+        
         // Save to repository
-        // TODO: Implement actual campaign creation logic
-        tracing::info!("Creating campaign: {} for artist: {}", request.title, request.artist_id);
+        if let Err(e) = state.campaign_repository.save(&campaign).await {
+            tracing::error!("Failed to save campaign: {:?}", e);
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                ResponseJson(serde_json::json!({
+                    "error": "Failed to save campaign to database"
+                }))
+            ));
+        }
         
         // Publish domain event
         let event = DomainEvent::CampaignCreated {
@@ -149,53 +242,100 @@ impl CampaignController {
     
     /// GET /api/v1/campaigns - List campaigns
     pub async fn list_campaigns(
-        State(_state): State<CampaignAppState>,
+        State(state): State<CampaignAppState>,
     ) -> Result<ResponseJson<serde_json::Value>, (StatusCode, ResponseJson<serde_json::Value>)> {
-        // TODO: Implement actual campaign listing logic
-        let campaigns = vec![
+        // Get campaigns from repository using real implementation
+        let campaigns = match state.campaign_repository.find_all().await {
+            Ok(campaigns) => campaigns,
+            Err(e) => {
+                tracing::error!("Failed to fetch campaigns: {:?}", e);
+                return Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    ResponseJson(serde_json::json!({
+                        "error": "Failed to fetch campaigns from database"
+                    }))
+                ));
+            }
+        };
+        
+        let campaign_data: Vec<serde_json::Value> = campaigns.into_iter().map(|campaign| {
             serde_json::json!({
-                "campaign_id": Uuid::new_v4(),
-                "artist_id": Uuid::new_v4(),
-                "song_id": Uuid::new_v4(),
-                "title": "Demo Campaign",
-                "description": "A demo campaign for testing",
-                "target_amount": 10000.0,
-                "nft_price": 100.0,
-                "max_nfts": 100,
-                "sold_nfts": 0,
-                "total_raised": 0.0,
-                "status": "active",
-                "created_at": Utc::now()
+                "campaign_id": campaign.id().value(),
+                "artist_id": campaign.artist_contract().id,
+                "song_id": campaign.song_contract().id,
+                "title": campaign.name(),
+                "description": campaign.description(),
+                "target_amount": campaign.target().map(|t| t.value()).unwrap_or(0.0),
+                "nft_price": campaign.nft_price().value(),
+                "max_nfts": campaign.nft_supply().max_nfts(),
+                "sold_nfts": campaign.nft_supply().current_sold(),
+                "status": match campaign.status() {
+                    CampaignStatus::Draft => "draft",
+                    CampaignStatus::Active => "active",
+                    CampaignStatus::Paused => "paused",
+                    CampaignStatus::Completed => "completed",
+                    CampaignStatus::Cancelled => "cancelled",
+                    CampaignStatus::Failed => "failed",
+                },
+                "created_at": campaign.created_at()
             })
-        ];
+        }).collect();
         
         Ok(ResponseJson(serde_json::json!({
-            "campaigns": campaigns,
-            "total": campaigns.len()
+            "campaigns": campaign_data,
+            "total": campaign_data.len()
         })))
     }
     
     /// GET /api/v1/campaigns/:id - Get campaign by ID
     pub async fn get_campaign(
-        State(_state): State<CampaignAppState>,
+        State(state): State<CampaignAppState>,
         Path(campaign_id): Path<Uuid>,
     ) -> Result<ResponseJson<CampaignResponse>, (StatusCode, ResponseJson<serde_json::Value>)> {
-        // TODO: Implement actual campaign retrieval logic
+        // Get campaign from repository using real implementation
+        let campaign = match state.campaign_repository.find_by_id(&CampaignId::new(campaign_id)).await {
+            Ok(Some(campaign)) => campaign,
+            Ok(None) => {
+                return Err((
+                    StatusCode::NOT_FOUND,
+                    ResponseJson(serde_json::json!({
+                        "error": "Campaign not found"
+                    }))
+                ));
+            }
+            Err(e) => {
+                tracing::error!("Failed to fetch campaign: {:?}", e);
+                return Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    ResponseJson(serde_json::json!({
+                        "error": "Failed to fetch campaign from database"
+                    }))
+                ));
+            }
+        };
+        
         let response = CampaignResponse {
             campaign_id,
-            artist_id: Uuid::new_v4(),
-            song_id: Uuid::new_v4(),
-            title: "Demo Campaign".to_string(),
-            description: "A demo campaign for testing".to_string(),
-            target_amount: 10000.0,
-            nft_price: 100.0,
-            max_nfts: 100,
-            sold_nfts: 0,
-            total_raised: 0.0,
-            status: "active".to_string(),
-            nft_contract_address: None,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+            artist_id: campaign.artist_contract().id,
+            song_id: campaign.song_contract().id,
+            title: campaign.name(),
+            description: campaign.description(),
+            target_amount: campaign.target().map(|t| t.value()).unwrap_or(0.0),
+            nft_price: campaign.nft_price().value(),
+            max_nfts: campaign.nft_supply().max_nfts(),
+            sold_nfts: campaign.nft_supply().current_sold(),
+            total_raised: campaign.nft_supply().current_sold() as f64 * campaign.nft_price().value(),
+            status: match campaign.status() {
+                CampaignStatus::Draft => "draft",
+                CampaignStatus::Active => "active",
+                CampaignStatus::Paused => "paused",
+                CampaignStatus::Completed => "completed",
+                CampaignStatus::Cancelled => "cancelled",
+                CampaignStatus::Failed => "failed",
+            },
+            nft_contract_address: campaign.nft_contract_address(),
+            created_at: campaign.created_at(),
+            updated_at: campaign.updated_at(),
         };
         
         Ok(ResponseJson(response))

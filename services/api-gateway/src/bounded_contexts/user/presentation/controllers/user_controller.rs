@@ -22,6 +22,7 @@ use crate::bounded_contexts::user::application::{
     services::UserApplicationService,
 };
 use crate::shared::infrastructure::database::postgres::PostgresUserRepository;
+use crate::shared::infrastructure::auth::{JwtService, PasswordService};
 
 // Type alias para simplificar el estado
 type UserAppService = UserApplicationService<PostgresUserRepository>;
@@ -233,12 +234,25 @@ pub async fn register_user(
 
     match user_service.handle_create_user(command).await {
         Ok(result) => {
+            // Generate real JWT token
+            let jwt_service = JwtService::new(
+                std::env::var("JWT_SECRET").unwrap_or_else(|_| "default_secret_change_in_production".to_string()).as_str()
+            ).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            
+            let token_pair = jwt_service.generate_token_pair(
+                result.id,
+                &result.username,
+                &result.email,
+                "user", // Default role
+                "bronze", // Default tier
+            ).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
             let response = RegisterUserResponse {
                 user_id: result.id,
                 username: result.username,
                 email: result.email,
                 display_name: result.display_name,
-                token: "mock_jwt_token".to_string(), // TODO: Generate real JWT
+                token: token_pair.access_token,
                 created_at: result.created_at,
             };
 
@@ -262,25 +276,63 @@ pub async fn register_user(
 /// User login
 #[axum::debug_handler]
 pub async fn login_user(
-    State(_user_service): State<UserAppService>,
-    Json(_request): Json<LoginRequest>,
+    State(user_service): State<UserAppService>,
+    Json(request): Json<LoginRequest>,
 ) -> Result<Json<ApiResponse<LoginResponse>>, StatusCode> {
-    // TODO: Implement authentication logic
-    let mock_response = LoginResponse {
-        user_id: Uuid::new_v4(),
-        username: "user123".to_string(),
-        email: "user@example.com".to_string(),
-        display_name: Some("Usuario Demo".to_string()),
-        token: "mock_jwt_token".to_string(),
-        refresh_token: Some("mock_refresh_token".to_string()),
-        expires_in: 3600,
+    // Find user by email or username
+    let user = if request.credential.contains('@') {
+        // Search by email
+        user_service.find_user_by_email(&request.credential).await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+    } else {
+        // Search by username
+        user_service.find_user_by_username(&request.credential).await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+    };
+
+    let user = user.ok_or(StatusCode::UNAUTHORIZED)?;
+    
+    // Verify password
+    let is_valid = PasswordService::verify_password(&request.password, &user.password_hash.value())
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    
+    if !is_valid {
+        return Ok(Json(ApiResponse {
+            success: false,
+            data: None,
+            message: Some("Credenciales inválidas".to_string()),
+            errors: None,
+        }));
+    }
+
+    // Generate real JWT tokens
+    let jwt_service = JwtService::new(
+        std::env::var("JWT_SECRET").unwrap_or_else(|_| "default_secret_change_in_production".to_string()).as_str()
+    ).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    
+    let token_pair = jwt_service.generate_token_pair(
+        user.id,
+        &user.username.value(),
+        &user.email.value(),
+        "user", // Default role for now
+        "bronze", // Default tier for now
+    ).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let response = LoginResponse {
+        user_id: user.id,
+        username: user.username.value(),
+        email: user.email.value(),
+        display_name: user.display_name.as_ref().map(|n| n.value()),
+        token: token_pair.access_token,
+        refresh_token: Some(token_pair.refresh_token),
+        expires_in: 3600, // 1 hour
         user_role: "user".to_string(),
         tier: "bronze".to_string(),
     };
 
     Ok(Json(ApiResponse {
         success: true,
-        data: Some(mock_response),
+        data: Some(response),
         message: Some("Login exitoso".to_string()),
         errors: None,
     }))

@@ -1,15 +1,21 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 use crate::bounded_contexts::notifications::domain::entities::{
-    Notification, NotificationTemplate, NotificationFilters
+    Notification, NotificationTemplate, NotificationFilters, NotificationPreferences
 };
 use crate::bounded_contexts::notifications::domain::repositories::{
-    NotificationRepository, NotificationTemplateRepository
+    NotificationRepository, NotificationTemplateRepository, NotificationPreferencesRepository
 };
 
 /// Mock implementation of NotificationRepository for testing
 #[derive(Clone)]
 pub struct MockNotificationRepository;
+
+impl MockNotificationRepository {
+    pub fn new() -> Self {
+        Self
+    }
+}
 
 #[async_trait]
 impl NotificationRepository for MockNotificationRepository {
@@ -58,9 +64,44 @@ impl NotificationRepository for MockNotificationRepository {
     }
 }
 
+/// Mock implementation of NotificationPreferencesRepository for testing
+#[derive(Clone)]
+pub struct MockNotificationPreferencesRepository;
+
+impl MockNotificationPreferencesRepository {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+#[async_trait]
+impl NotificationPreferencesRepository for MockNotificationPreferencesRepository {
+    async fn get_by_user_id(&self, _user_id: Uuid) -> Result<Option<NotificationPreferences>, Box<dyn std::error::Error + Send + Sync>> {
+        Ok(None)
+    }
+
+    async fn create(&self, _preferences: &NotificationPreferences) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        Ok(())
+    }
+
+    async fn update(&self, _preferences: &NotificationPreferences) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        Ok(())
+    }
+
+    async fn delete(&self, _user_id: Uuid) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        Ok(())
+    }
+}
+
 /// Mock implementation of NotificationTemplateRepository for testing
 #[derive(Clone)]
 pub struct MockNotificationTemplateRepository;
+
+impl MockNotificationTemplateRepository {
+    pub fn new() -> Self {
+        Self
+    }
+}
 
 #[async_trait]
 impl NotificationTemplateRepository for MockNotificationTemplateRepository {

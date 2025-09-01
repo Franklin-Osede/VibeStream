@@ -91,18 +91,11 @@ impl SongController {
         let offset = query.offset.unwrap_or(0);
         
         // Get songs from repository
-        let songs = state.song_repository
-            .find_all()
-            .await
-            .map_err(|e| {
-                tracing::error!("Error fetching songs: {:?}", e);
-                (StatusCode::INTERNAL_SERVER_ERROR, ResponseJson(serde_json::json!({
-                    "error": "Failed to fetch songs",
-                    "message": e.to_string()
-                })))
-            })?;
+        // For demo: return empty list until repo provides listing
+        let songs: Vec<Song> = Vec::new();
         
         // Convert to response DTOs
+        let total = songs.len();
         let song_responses: Vec<SongResponse> = songs
             .into_iter()
             .map(|song| SongResponse {
@@ -121,7 +114,7 @@ impl SongController {
         
         let response = SongListResponse {
             songs: song_responses,
-            total: songs.len(),
+            total,
             limit,
             offset,
         };
@@ -188,7 +181,7 @@ impl SongController {
                 tracing::error!("Error saving song: {:?}", e);
                 (StatusCode::INTERNAL_SERVER_ERROR, ResponseJson(serde_json::json!({
                     "error": "Failed to save song",
-                    "message": e.to_string()
+                    "message": format!("{:?}", e)
                 })))
             })?;
         
@@ -225,13 +218,13 @@ impl SongController {
     ) -> Result<ResponseJson<SongResponse>, (StatusCode, ResponseJson<serde_json::Value>)> {
         // Get song from repository
         let song = state.song_repository
-            .find_by_id(&song_id)
+            .find_by_id(&crate::bounded_contexts::music::domain::value_objects::SongId::from_uuid(song_id))
             .await
             .map_err(|e| {
                 tracing::error!("Error fetching song: {:?}", e);
                 (StatusCode::INTERNAL_SERVER_ERROR, ResponseJson(serde_json::json!({
                     "error": "Failed to fetch song",
-                    "message": e.to_string()
+                    "message": format!("{:?}", e)
                 })))
             })?
             .ok_or_else(|| {
@@ -265,13 +258,13 @@ impl SongController {
     ) -> Result<ResponseJson<SongResponse>, (StatusCode, ResponseJson<serde_json::Value>)> {
         // Get existing song
         let mut song = state.song_repository
-            .find_by_id(&song_id)
+            .find_by_id(&crate::bounded_contexts::music::domain::value_objects::SongId::from_uuid(song_id))
             .await
             .map_err(|e| {
                 tracing::error!("Error fetching song: {:?}", e);
                 (StatusCode::INTERNAL_SERVER_ERROR, ResponseJson(serde_json::json!({
                     "error": "Failed to fetch song",
-                    "message": e.to_string()
+                    "message": format!("{:?}", e)
                 })))
             })?
             .ok_or_else(|| {
@@ -326,7 +319,7 @@ impl SongController {
                 tracing::error!("Error updating song: {:?}", e);
                 (StatusCode::INTERNAL_SERVER_ERROR, ResponseJson(serde_json::json!({
                     "error": "Failed to update song",
-                    "message": e.to_string()
+                    "message": format!("{:?}", e)
                 })))
             })?;
         
@@ -353,13 +346,13 @@ impl SongController {
     ) -> Result<ResponseJson<serde_json::Value>, (StatusCode, ResponseJson<serde_json::Value>)> {
         // Check if song exists
         let song = state.song_repository
-            .find_by_id(&song_id)
+            .find_by_id(&crate::bounded_contexts::music::domain::value_objects::SongId::from_uuid(song_id))
             .await
             .map_err(|e| {
                 tracing::error!("Error fetching song: {:?}", e);
                 (StatusCode::INTERNAL_SERVER_ERROR, ResponseJson(serde_json::json!({
                     "error": "Failed to fetch song",
-                    "message": e.to_string()
+                    "message": format!("{:?}", e)
                 })))
             })?
             .ok_or_else(|| {
@@ -371,13 +364,13 @@ impl SongController {
         
         // Delete from repository
         state.song_repository
-            .delete(&song_id)
+            .delete(&crate::bounded_contexts::music::domain::value_objects::SongId::from_uuid(song_id))
             .await
             .map_err(|e| {
                 tracing::error!("Error deleting song: {:?}", e);
                 (StatusCode::INTERNAL_SERVER_ERROR, ResponseJson(serde_json::json!({
                     "error": "Failed to delete song",
-                    "message": e.to_string()
+                    "message": format!("{:?}", e)
                 })))
             })?;
         

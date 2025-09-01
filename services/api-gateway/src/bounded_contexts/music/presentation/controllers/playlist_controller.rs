@@ -65,7 +65,7 @@ impl PlaylistController {
     /// POST /api/v1/music/playlists - Create a new playlist
     pub async fn create_playlist(
         State(_state): State<MusicAppState>,
-        _request: serde_json::Value,
+        axum::extract::Json(_request): axum::extract::Json<serde_json::Value>,
     ) -> Result<ResponseJson<PlaylistResponse>, (StatusCode, ResponseJson<serde_json::Value>)> {
         // TODO: Implement actual playlist creation logic
         let response = PlaylistResponse {
@@ -106,7 +106,7 @@ impl PlaylistController {
     pub async fn add_song_to_playlist(
         State(_state): State<MusicAppState>,
         Path(playlist_id): Path<Uuid>,
-        _request: serde_json::Value,
+        axum::extract::Json(_request): axum::extract::Json<serde_json::Value>,
     ) -> Result<ResponseJson<serde_json::Value>, (StatusCode, ResponseJson<serde_json::Value>)> {
         // TODO: Implement actual add song logic
         Ok(ResponseJson(serde_json::json!({

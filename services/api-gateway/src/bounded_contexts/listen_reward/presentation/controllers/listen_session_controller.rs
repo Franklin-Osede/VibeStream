@@ -84,7 +84,7 @@ impl ListenSessionController {
         let use_case = StartListenSessionUseCase::new();
         
         // Convert request to command - create mock contracts for now
-        let song_contract = crate::shared::types::contracts::SongContract {
+        let song_contract = vibestream_types::contracts::SongContract {
             id: Uuid::parse_str(&request.song_id).unwrap_or_else(|_| Uuid::new_v4()),
             title: "Unknown Song".to_string(),
             artist_id: Uuid::parse_str(&request.artist_id).unwrap_or_else(|_| Uuid::new_v4()),
@@ -100,7 +100,7 @@ impl ListenSessionController {
             created_at: chrono::Utc::now(),
         };
 
-        let artist_contract = crate::shared::types::contracts::ArtistContract {
+        let artist_contract = vibestream_types::contracts::ArtistContract {
             id: Uuid::parse_str(&request.artist_id).unwrap_or_else(|_| Uuid::new_v4()),
             user_id: Uuid::new_v4(),
             stage_name: "Unknown Artist".to_string(),
