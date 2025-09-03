@@ -2,6 +2,7 @@
 pub mod auth;
 pub mod blockchain;
 pub mod bounded_contexts;
+pub mod gateways;
 pub mod handlers;
 pub mod services;
 pub mod shared;

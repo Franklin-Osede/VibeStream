@@ -76,7 +76,7 @@ async fn create_user_routes(app_state: AppState) -> Result<Router, Box<dyn std::
     let user_state = AppStateFactory::create_user_state(app_state).await
         .map_err(|e| Box::new(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())) as Box<dyn std::error::Error>)?;
     
-    // Create UserApplicationService with concrete type
+    // Create UserApplicationService with the concrete repository type
     let user_service = UserApplicationService::new(user_state.user_repository);
     
     let router = Router::new()

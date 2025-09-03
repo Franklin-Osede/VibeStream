@@ -130,17 +130,17 @@ impl Default for HealthStatus {
 #[derive(Clone)]
 pub struct MusicAppState {
     pub app_state: AppState,
-    pub song_repository: Arc<dyn crate::bounded_contexts::music::domain::repositories::SongRepository + Send + Sync>,
-    pub album_repository: Arc<dyn AlbumRepository + Send + Sync>,
-    pub playlist_repository: Arc<dyn PlaylistRepository + Send + Sync>,
+    pub song_repository: Arc<crate::bounded_contexts::music::infrastructure::repositories::PostgresSongRepository>,
+    pub album_repository: Arc<crate::bounded_contexts::music::infrastructure::repositories::PostgresAlbumRepository>,
+    pub playlist_repository: Arc<crate::bounded_contexts::music::infrastructure::repositories::PostgresPlaylistRepository>,
 }
 
 impl MusicAppState {
     pub fn new(
         app_state: AppState,
-        song_repository: Arc<dyn crate::bounded_contexts::music::domain::repositories::SongRepository + Send + Sync>,
-        album_repository: Arc<dyn AlbumRepository + Send + Sync>,
-        playlist_repository: Arc<dyn PlaylistRepository + Send + Sync>,
+        song_repository: Arc<crate::bounded_contexts::music::infrastructure::repositories::PostgresSongRepository>,
+        album_repository: Arc<crate::bounded_contexts::music::infrastructure::repositories::PostgresAlbumRepository>,
+        playlist_repository: Arc<crate::bounded_contexts::music::infrastructure::repositories::PostgresPlaylistRepository>,
     ) -> Self {
         Self {
             app_state,
@@ -155,13 +155,13 @@ impl MusicAppState {
 #[derive(Clone)]
 pub struct UserAppState {
     pub app_state: AppState,
-    pub user_repository: Arc<dyn crate::bounded_contexts::user::domain::repository::UserRepository + Send + Sync>,
+    pub user_repository: Arc<crate::shared::infrastructure::database::postgres::PostgresUserRepository>,
 }
 
 impl UserAppState {
     pub fn new(
         app_state: AppState,
-        user_repository: Arc<dyn crate::bounded_contexts::user::domain::repository::UserRepository + Send + Sync>,
+        user_repository: Arc<crate::shared::infrastructure::database::postgres::PostgresUserRepository>,
     ) -> Self {
         Self {
             app_state,
