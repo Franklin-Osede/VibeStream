@@ -9,35 +9,16 @@ use chrono::{DateTime, Utc};
 
 use crate::bounded_contexts::campaign::domain::{
     entities::{Campaign, CampaignStatus},
-    value_objects::{CampaignId, CampaignName, DateRange, BoostMultiplier, NFTPrice, NFTSupply},
+    value_objects::*,
     repository::CampaignRepository,
 };
-use crate::bounded_contexts::campaign::domain::value_objects::*;
 use vibestream_types::{SongContract, ArtistContract};
 use crate::shared::infrastructure::app_state::CampaignAppState;
 use crate::bounded_contexts::orchestrator::DomainEvent;
 use crate::bounded_contexts::campaign::application::{
-    CreateCampaignCommand,
-    ListCampaignsQuery,
-    GetCampaignQuery,
-    ActivateCampaignCommand,
-    PauseCampaignCommand,
-    ResumeCampaignCommand,
-    EndCampaignCommand,
-    PurchaseNFTCommand,
-    GetCampaignAnalyticsQuery,
-    GetTrendingCampaignsQuery,
+    commands::CreateCampaign,
+    services::MockCampaignApplicationService,
 };
-use crate::bounded_contexts::campaign::application::CampaignService;
-use crate::bounded_contexts::campaign::application::CampaignId;
-use crate::bounded_contexts::campaign::application::SongContract;
-use crate::bounded_contexts::campaign::application::ArtistContract;
-use crate::bounded_contexts::campaign::application::CampaignName;
-use crate::bounded_contexts::campaign::application::DateRange;
-use crate::bounded_contexts::campaign::application::BoostMultiplier;
-use crate::bounded_contexts::campaign::application::NFTPrice;
-use crate::bounded_contexts::campaign::application::NFTSupply;
-use crate::bounded_contexts::campaign::application::Campaign;
 
 // =============================================================================
 // REQUEST/RESPONSE DTOs
@@ -145,60 +126,58 @@ impl CampaignController {
         let now = Utc::now();
         
         // Save to repository using real implementation
-        let campaign = Campaign::new(
-            CampaignId::new(campaign_id),
-            SongContract::new(request.song_id, "Unknown Song".to_string(), request.artist_id, "Unknown Artist".to_string()),
-            ArtistContract::new(request.artist_id, Uuid::new_v4(), "Unknown Artist".to_string()),
-            CampaignName::new(request.title.clone()).map_err(|e| {
-                return Err((
-                    StatusCode::BAD_REQUEST,
-                    ResponseJson(serde_json::json!({
-                        "error": format!("Invalid campaign name: {}", e)
-                    }))
-                ));
-            })?,
+        let song_contract = SongContract {
+            id: request.song_id,
+            title: "Unknown Song".to_string(),
+            artist_id: request.artist_id,
+            artist_name: "Unknown Artist".to_string(),
+            duration_seconds: None,
+            genre: None,
+            ipfs_hash: None,
+            metadata_url: None,
+            nft_contract_address: None,
+            nft_token_id: None,
+            royalty_percentage: None,
+            is_minted: false,
+            created_at: now,
+        };
+        
+        let artist_contract = ArtistContract {
+            id: request.artist_id,
+            user_id: Uuid::new_v4(),
+            stage_name: "Unknown Artist".to_string(),
+            bio: None,
+            profile_image_url: None,
+            verified: false,
+            created_at: now,
+        };
+        
+        let date_range = DateRange::new(now, now + chrono::Duration::days(30)).map_err(|e| {
+            (
+                StatusCode::BAD_REQUEST,
+                ResponseJson(serde_json::json!({
+                    "error": format!("Invalid date range: {}", e)
+                }))
+            )
+        })?;
+        
+        let (campaign, _event) = Campaign::create(
+            song_contract,
+            artist_contract,
+            request.title.clone(),
             request.description.clone(),
-            DateRange::new(now, now + chrono::Duration::days(30)).map_err(|e| {
-                return Err((
-                    StatusCode::BAD_REQUEST,
-                    ResponseJson(serde_json::json!({
-                        "error": format!("Invalid date range: {}", e)
-                    }))
-                ));
-            })?,
-            BoostMultiplier::new(1.0).map_err(|e| {
-                return Err((
-                    StatusCode::BAD_REQUEST,
-                    ResponseJson(serde_json::json!({
-                        "error": format!("Invalid boost multiplier: {}", e)
-                    }))
-                ));
-            })?,
-            NFTPrice::new(request.nft_price).map_err(|e| {
-                return Err((
-                    StatusCode::BAD_REQUEST,
-                    ResponseJson(serde_json::json!({
-                        "error": format!("Invalid NFT price: {}", e)
-                    }))
-                ));
-            })?,
-            NFTSupply::new(request.max_nfts, 0).map_err(|e| {
-                return Err((
-                    StatusCode::BAD_REQUEST,
-                    ResponseJson(serde_json::json!({
-                        "error": format!("Invalid NFT supply: {}", e)
-                    }))
-                ));
-            })?,
-            CampaignStatus::Draft,
-            None,
+            date_range,
+            1.0, // Default multiplier
+            request.nft_price,
+            request.max_nfts,
+            Some(request.target_amount), // Use target_amount as target_revenue
         ).map_err(|e| {
-            return Err((
+            (
                 StatusCode::BAD_REQUEST,
                 ResponseJson(serde_json::json!({
                     "error": format!("Failed to create campaign: {}", e)
                 }))
-            ));
+            )
         })?;
         
         // Save to repository

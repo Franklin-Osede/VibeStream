@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use crate::shared::infrastructure::app_state::MusicAppState;
 use crate::bounded_contexts::music::domain::entities::Song;
 use crate::bounded_contexts::music::domain::value_objects::{SongTitle, SongDuration, Genre, RoyaltyPercentage};
+use crate::bounded_contexts::music::domain::repositories::SongRepository;
 use crate::bounded_contexts::orchestrator::DomainEvent;
 use crate::shared::domain::errors::AppError;
 

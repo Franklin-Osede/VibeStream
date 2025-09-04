@@ -42,18 +42,46 @@ impl KafkaEventBus {
         // TODO: Implementar cuando rdkafka esté disponible
         Ok(Self)
     }
+
+    pub async fn publish_event(&self, _event: DomainEventWrapper) -> Result<EventPublishResult, AppError> {
+        // TODO: Implementar cuando rdkafka esté disponible
+        Ok(EventPublishResult)
+    }
+
+    pub async fn health_check(&self) -> Result<bool, AppError> {
+        // TODO: Implementar cuando rdkafka esté disponible
+        Ok(true)
+    }
 }
 
 // Placeholder types
-pub struct EventBusConfig;
+#[derive(Debug, Clone, Default)]
+pub struct EventBusConfig {
+    pub brokers: String,
+    pub client_id: String,
+    pub topic_prefix: String,
+    pub retry_attempts: u32,
+    pub timeout_ms: u64,
+}
+
 pub struct EventBusMetrics;
 pub struct EventSubscription;
 pub struct DomainEventWrapper;
 pub struct EventPublishResult;
-pub struct AppError;
+
+// Import the real AppError
+use crate::shared::domain::errors::AppError;
 
 impl EventBusConfig {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self { 
+        Self {
+            brokers: "localhost:9092".to_string(),
+            client_id: "vibestream-kafka".to_string(),
+            topic_prefix: "vibestream".to_string(),
+            retry_attempts: 3,
+            timeout_ms: 5000,
+        }
+    }
 }
 
 impl EventBusMetrics {
