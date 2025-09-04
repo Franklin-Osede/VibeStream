@@ -812,7 +812,48 @@ impl FanVenturesService {
         page: u32,
         page_size: u32,
     ) -> Result<Vec<VentureDiscovery>, AppError> {
-        self.repository.search_ventures(filters, sorting, page, page_size).await
+        let ventures = self.repository.search_ventures_with_filters(
+            &serde_json::to_value(filters)?, 
+            &serde_json::to_value(sorting)?, 
+            page, 
+            page_size
+        ).await?;
+        
+        // Convert ArtistVenture to VentureDiscovery (temporary conversion)
+        let discoveries: Vec<VentureDiscovery> = ventures.into_iter()
+            .map(|venture| VentureDiscovery {
+                venture_id: venture.id,
+                artist_id: venture.artist_id,
+                artist_name: "Unknown Artist".to_string(), // TODO: Get from artist service
+                artist_avatar: None,
+                title: venture.title,
+                description: venture.description,
+                min_investment: venture.min_investment,
+                max_investment: venture.max_investment,
+                funding_goal: venture.funding_goal,
+                current_funding: venture.current_funding,
+                funding_progress: if venture.funding_goal > 0.0 { 
+                    venture.current_funding / venture.funding_goal 
+                } else { 
+                    0.0 
+                },
+                total_investors: 0, // TODO: Calculate from investments
+                status: venture.status,
+                end_date: venture.end_date,
+                days_remaining: None, // TODO: Calculate
+                created_at: venture.created_at,
+                top_tiers: vec![], // TODO: Get from tiers
+                tags: venture.tags,
+                category: venture.category,
+                risk_level: venture.risk_level,
+                expected_return: venture.expected_return,
+                artist_rating: venture.artist_rating,
+                artist_previous_ventures: venture.artist_previous_ventures as u32,
+                artist_success_rate: venture.artist_success_rate,
+            })
+            .collect();
+            
+        Ok(discoveries)
     }
 
     /// Get venture recommendations for a fan
