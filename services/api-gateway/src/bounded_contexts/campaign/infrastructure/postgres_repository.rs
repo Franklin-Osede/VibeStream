@@ -178,6 +178,33 @@ impl CampaignRepository for PostgresCampaignRepository {
         Ok(campaigns)
     }
 
+    async fn find_all(&self) -> RepoResult<Vec<Campaign>> {
+        let rows = sqlx::query(
+            r#"
+            SELECT id, song_id, artist_id, name, description, start_date, end_date,
+                   boost_multiplier, nft_price, max_nfts, nfts_sold, target_revenue,
+                   status, nft_contract_address, created_at, updated_at
+            FROM campaigns
+            ORDER BY created_at DESC
+            "#
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| crate::shared::domain::errors::AppError::Infrastructure(e.to_string()))?;
+
+        let mut campaigns = Vec::new();
+        for row in rows {
+            let campaign_row = CampaignRow::from_row(row)
+                .map_err(|e| crate::shared::domain::errors::AppError::Infrastructure(e))?;
+            
+            let campaign = campaign_row.to_domain()
+                .map_err(|e| crate::shared::domain::errors::AppError::Infrastructure(e))?;
+            campaigns.push(campaign);
+        }
+
+        Ok(campaigns)
+    }
+
     async fn delete(&self, id: Uuid) -> RepoResult<()> {
         let result = sqlx::query("DELETE FROM campaigns WHERE id = $1")
             .bind(id)

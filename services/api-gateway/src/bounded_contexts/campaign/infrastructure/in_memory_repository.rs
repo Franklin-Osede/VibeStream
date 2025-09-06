@@ -50,6 +50,11 @@ impl CampaignRepository for InMemoryCampaignRepository {
             .collect())
     }
 
+    async fn find_all(&self) -> RepoResult<Vec<Campaign>> {
+        let data = self.data.read().await;
+        Ok(data.values().cloned().collect())
+    }
+
     async fn delete(&self, id: Uuid) -> RepoResult<()> {
         let mut data = self.data.write().await;
         if data.remove(&id).is_none() {

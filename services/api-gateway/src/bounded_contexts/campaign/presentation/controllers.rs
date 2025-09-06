@@ -272,7 +272,7 @@ impl CampaignController {
         Path(campaign_id): Path<Uuid>,
     ) -> Result<ResponseJson<CampaignResponse>, (StatusCode, ResponseJson<serde_json::Value>)> {
         // Get campaign from repository using real implementation
-        let campaign = match state.campaign_repository.find_by_id(&CampaignId::new(campaign_id)).await {
+        let campaign = match state.campaign_repository.find_by_id(campaign_id).await {
             Ok(Some(campaign)) => campaign,
             Ok(None) => {
                 return Err((
@@ -297,22 +297,22 @@ impl CampaignController {
             campaign_id,
             artist_id: campaign.artist_contract().id,
             song_id: campaign.song_contract().id,
-            title: campaign.name(),
-            description: campaign.description(),
+            title: campaign.name().to_string(),
+            description: campaign.description().to_string(),
             target_amount: campaign.target().map(|t| t.value()).unwrap_or(0.0),
             nft_price: campaign.nft_price().value(),
             max_nfts: campaign.nft_supply().max_nfts(),
             sold_nfts: campaign.nft_supply().current_sold(),
             total_raised: campaign.nft_supply().current_sold() as f64 * campaign.nft_price().value(),
             status: match campaign.status() {
-                CampaignStatus::Draft => "draft",
-                CampaignStatus::Active => "active",
-                CampaignStatus::Paused => "paused",
-                CampaignStatus::Completed => "completed",
-                CampaignStatus::Cancelled => "cancelled",
-                CampaignStatus::Failed => "failed",
+                CampaignStatus::Draft => "draft".to_string(),
+                CampaignStatus::Active => "active".to_string(),
+                CampaignStatus::Paused => "paused".to_string(),
+                CampaignStatus::Completed => "completed".to_string(),
+                CampaignStatus::Cancelled => "cancelled".to_string(),
+                CampaignStatus::Failed => "failed".to_string(),
             },
-            nft_contract_address: campaign.nft_contract_address(),
+            nft_contract_address: campaign.nft_contract_address().map(|s| s.to_string()),
             created_at: campaign.created_at(),
             updated_at: campaign.updated_at(),
         };

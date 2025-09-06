@@ -2,6 +2,7 @@
 // This module contains the main application services for user operations
 
 use crate::bounded_contexts::user::domain::{
+    entities::User,
     aggregates::UserAggregate,
     value_objects::{Email, Username, PasswordHash, ProfileUrl, UserId},
     repository::UserRepository,
@@ -49,6 +50,18 @@ impl<R: UserRepository + 'static> UserApplicationService<R> {
             repository,
             domain_service,
         }
+    }
+
+    pub async fn find_user_by_email(&self, email: &str) -> Result<Option<User>, AppError> {
+        let email_vo = Email::new(email.to_string()).map_err(|e| AppError::ValidationError(e))?;
+        let user_aggregate = self.repository.find_by_email(&email_vo).await?;
+        Ok(user_aggregate.map(|agg| agg.user))
+    }
+
+    pub async fn find_user_by_username(&self, username: &str) -> Result<Option<User>, AppError> {
+        let username_vo = Username::new(username.to_string()).map_err(|e| AppError::ValidationError(e))?;
+        let user_aggregate = self.repository.find_by_username(&username_vo).await?;
+        Ok(user_aggregate.map(|agg| agg.user))
     }
 }
 

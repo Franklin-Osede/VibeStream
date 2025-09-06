@@ -10,5 +10,6 @@ pub trait CampaignRepository: Send + Sync {
     async fn find_by_id(&self, id: Uuid) -> RepoResult<Option<Campaign>>;
     async fn find_by_artist_id(&self, artist_id: Uuid) -> RepoResult<Vec<Campaign>>;
     async fn find_active_campaigns(&self) -> RepoResult<Vec<Campaign>>;
+    async fn find_all(&self) -> RepoResult<Vec<Campaign>>;
     async fn delete(&self, id: Uuid) -> RepoResult<()>;
 } 

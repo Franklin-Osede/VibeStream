@@ -36,7 +36,7 @@ pub fn create_campaign_routes() -> Router<CampaignAppState> {
 /// Create campaign routes with API version prefix
 /// 
 /// This wraps the campaign routes with the `/api/v1` prefix
-pub fn create_versioned_campaign_routes() -> Router {
+pub fn create_versioned_campaign_routes() -> Router<CampaignAppState> {
     Router::new()
         .nest("/api/v1", create_campaign_routes())
 }

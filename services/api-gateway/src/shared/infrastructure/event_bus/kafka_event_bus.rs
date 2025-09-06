@@ -45,7 +45,12 @@ impl KafkaEventBus {
 
     pub async fn publish_event(&self, _event: DomainEventWrapper) -> Result<EventPublishResult, AppError> {
         // TODO: Implementar cuando rdkafka esté disponible
-        Ok(EventPublishResult)
+        Ok(EventPublishResult {
+            event_id: uuid::Uuid::new_v4(),
+            topic: "vibestream".to_string(),
+            partition: 0,
+            offset: 0,
+        })
     }
 
     pub async fn health_check(&self) -> Result<bool, AppError> {
@@ -67,7 +72,12 @@ pub struct EventBusConfig {
 pub struct EventBusMetrics;
 pub struct EventSubscription;
 pub struct DomainEventWrapper;
-pub struct EventPublishResult;
+pub struct EventPublishResult {
+    pub event_id: uuid::Uuid,
+    pub topic: String,
+    pub partition: i32,
+    pub offset: i64,
+}
 
 // Import the real AppError
 use crate::shared::domain::errors::AppError;

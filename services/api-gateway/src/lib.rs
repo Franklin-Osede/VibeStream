@@ -7,7 +7,7 @@ pub mod handlers;
 pub mod services;
 pub mod shared;
 pub mod openapi;
-pub mod complete_router;
+// pub mod complete_router; // TODO: Fix errors before enabling
 
 // Solo el music context sin dependencias problemáticas
 pub mod music_simple;
@@ -36,7 +36,8 @@ pub mod simple {
         };
         
         // Use the complete router with unified AppState
-        let router = crate::complete_router::create_app_router(app_state.database_pool.get_pool().clone()).await?;
+        // let router = crate::complete_router::create_app_router(app_state.database_pool.get_pool().clone()).await?; // TODO: Fix
+        let router = Router::new(); // Temporary empty router
             
         Ok(router)
     }

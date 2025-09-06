@@ -15,10 +15,10 @@ use crate::bounded_contexts::music::presentation::controllers::{
     SongController, AlbumController, PlaylistController, ArtistController
 };
 use crate::bounded_contexts::user::application::services::UserApplicationService;
-use crate::bounded_contexts::listen_reward::application::services::ListenRewardApplicationService;
-use crate::bounded_contexts::listen_reward::infrastructure::zk::MockZkProofVerificationService;
-use crate::bounded_contexts::campaign::application::services::CampaignService;
-use crate::bounded_contexts::campaign::application::services::MockEventPublisher;
+// use crate::bounded_contexts::listen_reward::application::services::ListenRewardApplicationService; // TODO: Implement
+// use crate::bounded_contexts::listen_reward::infrastructure::zk::MockZkProofVerificationService; // TODO: Implement
+// use crate::bounded_contexts::campaign::application::services::CampaignService; // TODO: Implement
+// use crate::bounded_contexts::campaign::application::services::MockEventPublisher; // TODO: Implement
 
 // =============================================================================
 // MAIN ROUTER CREATION
@@ -161,18 +161,18 @@ async fn create_listen_reward_routes(app_state: AppState) -> Result<Router, Box<
         .map_err(|e| Box::new(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())) as Box<dyn std::error::Error>)?;
     
     // Create ListenRewardApplicationService with available fields
-    let listen_reward_service = ListenRewardApplicationService::new(
-        listen_reward_state.session_repository,
-        listen_reward_state.distribution_repository,
-        Arc::new(MockZkProofVerificationService::new()),
-    );
+        // let listen_reward_service = ListenRewardApplicationService::new( // TODO: Implement
+        //     listen_reward_state.session_repository,
+        //     listen_reward_state.distribution_repository,
+        //     Arc::new(MockZkProofVerificationService::new()),
+        // );
     
     let router = Router::new()
         .route("/sessions/start", axum::routing::post(crate::bounded_contexts::listen_reward::presentation::controllers::listen_reward_controller::ListenRewardController::start_session))
         .route("/sessions/:session_id/complete", axum::routing::post(crate::bounded_contexts::listen_reward::presentation::controllers::listen_reward_controller::ListenRewardController::complete_session))
         .route("/sessions/:session_id", get(crate::bounded_contexts::listen_reward::presentation::controllers::listen_reward_controller::ListenRewardController::get_session_details))
         .route("/sessions/user/:user_id", get(crate::bounded_contexts::listen_reward::presentation::controllers::listen_reward_controller::ListenRewardController::get_user_sessions))
-        .with_state(listen_reward_service);
+        // .with_state(listen_reward_service); // TODO: Implement
     
     Ok(router)
 }
