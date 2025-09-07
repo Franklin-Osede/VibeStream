@@ -1,5 +1,5 @@
 use crate::bounded_contexts::fan_ventures::domain::entities::{
-    ArtistVenture, FanInvestment, VentureTier, VentureBenefit
+    ArtistVenture, FanInvestment, VentureTier, VentureBenefit, VentureCategory, RiskLevel, VentureStatus
 };
 use crate::shared::domain::errors::AppError;
 use sqlx::PgPool;
@@ -19,19 +19,157 @@ impl PostgresFanVenturesRepository {
     // ARTIST VENTURES
     // =============================================================================
 
-    pub async fn create_venture(&self, _venture: &ArtistVenture) -> Result<(), AppError> {
-        // TODO: Implementar cuando la base de datos esté disponible
+    pub async fn create_venture(&self, venture: &ArtistVenture) -> Result<(), AppError> {
+        sqlx::query!(
+            r#"INSERT INTO artist_ventures (
+                id, artist_id, title, description, category, tags, risk_level,
+                expected_return, artist_rating, artist_previous_ventures, artist_success_rate,
+                funding_goal, current_funding, min_investment, max_investment, status,
+                start_date, end_date, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+            ON CONFLICT (id) DO UPDATE SET
+                title = EXCLUDED.title,
+                description = EXCLUDED.description,
+                category = EXCLUDED.category,
+                tags = EXCLUDED.tags,
+                risk_level = EXCLUDED.risk_level,
+                expected_return = EXCLUDED.expected_return,
+                artist_rating = EXCLUDED.artist_rating,
+                artist_previous_ventures = EXCLUDED.artist_previous_ventures,
+                artist_success_rate = EXCLUDED.artist_success_rate,
+                funding_goal = EXCLUDED.funding_goal,
+                current_funding = EXCLUDED.current_funding,
+                min_investment = EXCLUDED.min_investment,
+                max_investment = EXCLUDED.max_investment,
+                status = EXCLUDED.status,
+                start_date = EXCLUDED.start_date,
+                end_date = EXCLUDED.end_date,
+                updated_at = EXCLUDED.updated_at"#,
+            venture.id,
+            venture.artist_id,
+            venture.title,
+            venture.description,
+            venture.category.to_string(),
+            serde_json::to_value(&venture.tags).map_err(|e| AppError::SerializationError(e.to_string()))?,
+            venture.risk_level.to_string(),
+            venture.expected_return,
+            venture.artist_rating,
+            venture.artist_previous_ventures,
+            venture.artist_success_rate,
+            venture.funding_goal,
+            venture.current_funding,
+            venture.min_investment,
+            venture.max_investment,
+            venture.status.to_string(),
+            venture.start_date,
+            venture.end_date,
+            venture.created_at,
+            venture.updated_at
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
         Ok(())
     }
 
-    pub async fn get_venture(&self, _venture_id: Uuid) -> Result<Option<ArtistVenture>, AppError> {
-        // TODO: Implementar cuando la base de datos esté disponible
-        Ok(None)
+    pub async fn get_venture(&self, venture_id: Uuid) -> Result<Option<ArtistVenture>, AppError> {
+        let row = sqlx::query!(
+            r#"SELECT id, artist_id, title, description, category, tags, risk_level,
+                      expected_return, artist_rating, artist_previous_ventures, artist_success_rate,
+                      funding_goal, current_funding, min_investment, max_investment, status,
+                      start_date, end_date, created_at, updated_at
+               FROM artist_ventures WHERE id = $1"#,
+            venture_id
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        match row {
+            Some(row) => {
+                let tags: Vec<String> = serde_json::from_value(row.tags)
+                    .map_err(|e| AppError::SerializationError(e.to_string()))?;
+                
+                let venture = ArtistVenture {
+                    id: row.id,
+                    artist_id: row.artist_id,
+                    title: row.title,
+                    description: row.description,
+                    category: row.category.parse().unwrap_or_default(),
+                    tags,
+                    risk_level: row.risk_level.parse().unwrap_or_default(),
+                    expected_return: row.expected_return,
+                    artist_rating: row.artist_rating,
+                    artist_previous_ventures: row.artist_previous_ventures,
+                    artist_success_rate: row.artist_success_rate,
+                    funding_goal: row.funding_goal,
+                    current_funding: row.current_funding,
+                    min_investment: row.min_investment,
+                    max_investment: row.max_investment,
+                    status: row.status.parse().unwrap_or_default(),
+                    start_date: row.start_date,
+                    end_date: row.end_date,
+                    created_at: row.created_at,
+                    updated_at: row.updated_at,
+                    benefits: vec![], // TODO: Load benefits separately
+                };
+                Ok(Some(venture))
+            }
+            None => Ok(None),
+        }
     }
 
-    pub async fn list_open_ventures(&self, _limit: Option<i32>) -> Result<Vec<ArtistVenture>, AppError> {
-        // TODO: Implementar cuando la base de datos esté disponible
-        Ok(vec![])
+    pub async fn list_open_ventures(&self, limit: Option<i32>) -> Result<Vec<ArtistVenture>, AppError> {
+        let limit = limit.unwrap_or(50) as i64;
+        
+        let rows = sqlx::query!(
+            r#"SELECT id, artist_id, title, description, category, tags, risk_level,
+                      expected_return, artist_rating, artist_previous_ventures, artist_success_rate,
+                      funding_goal, current_funding, min_investment, max_investment, status,
+                      start_date, end_date, created_at, updated_at
+               FROM artist_ventures 
+               WHERE status = 'Open'
+               ORDER BY created_at DESC
+               LIMIT $1"#,
+            limit
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        let mut ventures = Vec::new();
+        for row in rows {
+            let tags: Vec<String> = serde_json::from_value(row.tags)
+                .map_err(|e| AppError::SerializationError(e.to_string()))?;
+            
+            let venture = ArtistVenture {
+                id: row.id,
+                artist_id: row.artist_id,
+                title: row.title,
+                description: row.description,
+                category: row.category.parse().unwrap_or_default(),
+                tags,
+                risk_level: row.risk_level.parse().unwrap_or_default(),
+                expected_return: row.expected_return,
+                artist_rating: row.artist_rating,
+                artist_previous_ventures: row.artist_previous_ventures,
+                artist_success_rate: row.artist_success_rate,
+                funding_goal: row.funding_goal,
+                current_funding: row.current_funding,
+                min_investment: row.min_investment,
+                max_investment: row.max_investment,
+                status: row.status.parse().unwrap_or_default(),
+                start_date: row.start_date,
+                end_date: row.end_date,
+                created_at: row.created_at,
+                updated_at: row.updated_at,
+                benefits: vec![], // TODO: Load benefits separately
+            };
+            ventures.push(venture);
+        }
+
+        Ok(ventures)
     }
 
     pub async fn update_venture(&self, _venture: &ArtistVenture) -> Result<(), AppError> {
@@ -90,8 +228,30 @@ impl PostgresFanVenturesRepository {
     // FAN INVESTMENTS
     // =============================================================================
 
-    pub async fn create_fan_investment(&self, _investment: &FanInvestment) -> Result<(), AppError> {
-        // TODO: Implementar cuando la base de datos esté disponible
+    pub async fn create_fan_investment(&self, investment: &FanInvestment) -> Result<(), AppError> {
+        sqlx::query!(
+            r#"INSERT INTO fan_investments (
+                id, fan_id, venture_id, investment_amount, investment_type, status,
+                created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            ON CONFLICT (id) DO UPDATE SET
+                investment_amount = EXCLUDED.investment_amount,
+                investment_type = EXCLUDED.investment_type,
+                status = EXCLUDED.status,
+                updated_at = EXCLUDED.updated_at"#,
+            investment.id,
+            investment.fan_id,
+            investment.venture_id,
+            investment.investment_amount,
+            serde_json::to_value(&investment.investment_type).map_err(|e| AppError::SerializationError(e.to_string()))?,
+            investment.status.to_string(),
+            investment.created_at,
+            investment.updated_at
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
         Ok(())
     }
 

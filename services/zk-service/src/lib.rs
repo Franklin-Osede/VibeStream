@@ -3,6 +3,9 @@ use vibestream_types::*;
 pub mod zkp;
 pub mod service;
 
+#[cfg(test)]
+mod test_zk;
+
 pub use service::{ZkService, ZkServiceConfig, ZkProofType};
 pub use zkp::{ZkProof, ZkProofGenerator, ZkProofVerifier};
 

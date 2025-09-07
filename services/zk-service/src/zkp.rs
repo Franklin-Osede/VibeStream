@@ -397,34 +397,33 @@ impl ZkProofGenerator {
         let has_valid_signature = signature_nums.iter().all(|&x| x != 0);
         let has_valid_public_key = public_key_nums.iter().all(|&x| x != 0);
 
-        if has_valid_signature && has_valid_public_key {
-            // Try real circuit with numeric inputs
-            let input = json!({
-                "startTime": start_time,
-                "currentTime": current_time,
-                "endTime": end_time,
-                "songHash": song_hash_num,
-                "userSignature": signature_nums,
-                "userPublicKey": public_key_nums,
-                "nonce": nonce_num
-            });
+        // Always try real circuit first
+        let input = json!({
+            "startTime": start_time,
+            "currentTime": current_time,
+            "endTime": end_time,
+            "songHash": song_hash_num,
+            "userSignature": signature_nums,
+            "userPublicKey": public_key_nums,
+            "nonce": nonce_num
+        });
 
-            match self.circuit_manager.generate_proof("proof_of_listen", &input).await {
-                Ok(proof) => Ok(proof),
-                Err(e) => {
-                    warn!("Real circuit failed, falling back to mock: {}", e);
-                    // Fall back to mock proof
-                    self.generate_mock_listen_proof(start_time, current_time, end_time, song_hash)
-                }
+        match self.circuit_manager.generate_proof("proof_of_listen", &input).await {
+            Ok(proof) => {
+                info!("✅ Generated real ZK proof for listen session");
+                Ok(proof)
+            },
+            Err(e) => {
+                error!("❌ Real circuit failed: {}", e);
+                // For now, still fall back to mock for development
+                warn!("Falling back to mock proof for development");
+                self.generate_mock_listen_proof(start_time, current_time, end_time, song_hash)
             }
-        } else {
-            // Use mock proof for invalid cryptographic values
-            self.generate_mock_listen_proof(start_time, current_time, end_time, song_hash)
         }
     }
 
     /// Genera una prueba mock de listen para testing
-    fn generate_mock_listen_proof(
+    pub fn generate_mock_listen_proof(
         &self,
         start_time: u64,
         current_time: u64,
@@ -484,11 +483,18 @@ impl ZkProofVerifier {
         // Use real verification for supported circuits
         match proof.circuit_id.as_str() {
             "proof_of_listen" => {
-                let is_valid = self.circuit_manager.verify_proof(proof).await
-                    .map_err(|e| VibeStreamError::Internal { 
-                        message: format!("Verification failed: {}", e) 
-                    })?;
-                Ok(is_valid)
+                match self.circuit_manager.verify_proof(proof).await {
+                    Ok(is_valid) => {
+                        info!("✅ ZK proof verification result: {}", is_valid);
+                        Ok(is_valid)
+                    },
+                    Err(e) => {
+                        error!("❌ ZK proof verification failed: {}", e);
+                        Err(VibeStreamError::Internal { 
+                            message: format!("Verification failed: {}", e) 
+                        })
+                    }
+                }
             }
             "solvency" | "transaction" => {
                 // For now, mock verification for these circuits

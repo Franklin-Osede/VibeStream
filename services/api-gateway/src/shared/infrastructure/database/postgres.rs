@@ -12,9 +12,9 @@ use crate::bounded_contexts::user::domain::{
 };
 use crate::shared::domain::errors::AppError;
 
-// Temporary crate::bounded_contexts::user::domain::aggregates::UserSummary type
+// Temporary UserSummary type
 #[derive(Debug, Clone)]
-pub struct crate::bounded_contexts::user::domain::aggregates::UserSummary {
+pub struct UserSummary {
     pub id: UserId,
     pub username: Username,
     pub email: Email,
@@ -377,22 +377,22 @@ impl UserRepository for PostgresUserRepository {
         Ok(())
     }
 
-    async fn find_users(&self, criteria: UserSearchCriteria) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
+    async fn find_users(&self, criteria: UserSearchCriteria) -> Result<Vec<UserSummary>, AppError> {
         // For now, return empty vector - implement complex search later
         Ok(vec![])
     }
 
-    async fn find_active_users(&self, page: u32, page_size: u32) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
+    async fn find_active_users(&self, page: u32, page_size: u32) -> Result<Vec<UserSummary>, AppError> {
         // For now, return empty vector - implement later
         Ok(vec![])
     }
 
-    async fn find_by_tier(&self, tier: &str, page: u32, page_size: u32) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
+    async fn find_by_tier(&self, tier: &str, page: u32, page_size: u32) -> Result<Vec<UserSummary>, AppError> {
         // For now, return empty vector - implement later
         Ok(vec![])
     }
 
-    async fn find_by_role(&self, role: &str, page: u32, page_size: u32) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
+    async fn find_by_role(&self, role: &str, page: u32, page_size: u32) -> Result<Vec<UserSummary>, AppError> {
         // For now, return empty vector - implement later
         Ok(vec![])
     }
@@ -406,22 +406,22 @@ impl UserRepository for PostgresUserRepository {
         &self,
         start_date: chrono::DateTime<chrono::Utc>,
         end_date: chrono::DateTime<chrono::Utc>
-    ) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
+    ) -> Result<Vec<UserSummary>, AppError> {
         // For now, return empty vector - implement later
         Ok(vec![])
     }
 
-    async fn find_top_users_by_rewards(&self, limit: u32) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
+    async fn find_top_users_by_rewards(&self, limit: u32) -> Result<Vec<UserSummary>, AppError> {
         // For now, return empty vector - implement later
         Ok(vec![])
     }
 
-    async fn find_top_users_by_listening_time(&self, limit: u32) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
+    async fn find_top_users_by_listening_time(&self, limit: u32) -> Result<Vec<UserSummary>, AppError> {
         // For now, return empty vector - implement later
         Ok(vec![])
     }
 
-    async fn find_users_with_wallets(&self, page: u32, page_size: u32) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
+    async fn find_users_with_wallets(&self, page: u32, page_size: u32) -> Result<Vec<UserSummary>, AppError> {
         // For now, return empty vector - implement later
         Ok(vec![])
     }
@@ -432,7 +432,7 @@ impl UserRepository for PostgresUserRepository {
         max_points: u32,
         page: u32,
         page_size: u32
-    ) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
+    ) -> Result<Vec<UserSummary>, AppError> {
         // For now, return empty vector - implement later
         Ok(vec![])
     }
