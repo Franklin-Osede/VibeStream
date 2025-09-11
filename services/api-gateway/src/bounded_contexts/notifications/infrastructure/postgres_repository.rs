@@ -149,28 +149,73 @@ impl NotificationRepository for PostgresNotificationRepository {
         Ok(row.count.unwrap_or(0) as u32)
     }
 
-    async fn update(&self, _notification: &Notification) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        // TODO: Implementar cuando la base de datos esté disponible
+    async fn update(&self, notification: &Notification) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        sqlx::query!(
+            r#"
+            UPDATE notifications 
+            SET title = $2, message = $3, notification_type = $4, 
+                data = $5, updated_at = $6
+            WHERE id = $1
+            "#,
+            notification.id,
+            notification.title,
+            notification.message,
+            notification.notification_type.to_string(),
+            serde_json::to_value(&notification.data).unwrap_or(serde_json::Value::Null),
+            notification.updated_at
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+        
         Ok(())
     }
 
-    async fn delete(&self, _id: Uuid) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        // TODO: Implementar cuando la base de datos esté disponible
+    async fn delete(&self, id: Uuid) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        sqlx::query!(
+            "DELETE FROM notifications WHERE id = $1",
+            id
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+        
         Ok(())
     }
 
-    async fn mark_as_read(&self, _id: Uuid) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        // TODO: Implementar cuando la base de datos esté disponible
+    async fn mark_as_read(&self, id: Uuid) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        sqlx::query!(
+            "UPDATE notifications SET read_at = NOW() WHERE id = $1",
+            id
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+        
         Ok(())
     }
 
-    async fn mark_as_archived(&self, _id: Uuid) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        // TODO: Implementar cuando la base de datos esté disponible
+    async fn mark_as_archived(&self, id: Uuid) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        sqlx::query!(
+            "UPDATE notifications SET archived_at = NOW() WHERE id = $1",
+            id
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+        
         Ok(())
     }
 
-    async fn mark_all_as_read(&self, _user_id: Uuid) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        // TODO: Implementar cuando la base de datos esté disponible
+    async fn mark_all_as_read(&self, user_id: Uuid) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        sqlx::query!(
+            "UPDATE notifications SET read_at = NOW() WHERE user_id = $1 AND read_at IS NULL",
+            user_id
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+        
         Ok(())
     }
 
@@ -179,8 +224,28 @@ impl NotificationRepository for PostgresNotificationRepository {
         Ok(vec![])
     }
 
-    async fn get_summary(&self, _user_id: Uuid) -> Result<(u32, u32, u32, u32), Box<dyn std::error::Error + Send + Sync>> {
-        // TODO: Implementar cuando la base de datos esté disponible
-        Ok((0, 0, 0, 0))
+    async fn get_summary(&self, user_id: Uuid) -> Result<(u32, u32, u32, u32), Box<dyn std::error::Error + Send + Sync>> {
+        let row = sqlx::query!(
+            r#"
+            SELECT 
+                COUNT(*) as total,
+                COUNT(CASE WHEN read_at IS NULL THEN 1 END) as unread,
+                COUNT(CASE WHEN archived_at IS NOT NULL THEN 1 END) as archived,
+                COUNT(CASE WHEN created_at > NOW() - INTERVAL '24 hours' THEN 1 END) as recent
+            FROM notifications 
+            WHERE user_id = $1
+            "#,
+            user_id
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+        
+        Ok((
+            row.total.unwrap_or(0) as u32,
+            row.unread.unwrap_or(0) as u32,
+            row.archived.unwrap_or(0) as u32,
+            row.recent.unwrap_or(0) as u32,
+        ))
     }
 } 

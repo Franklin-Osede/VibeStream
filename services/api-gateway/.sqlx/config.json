@@ -1,0 +1,8 @@
+{
+  "db": "PostgreSQL",
+  "host": "localhost",
+  "port": 5432,
+  "user": "vibestream",
+  "password": "password",
+  "database": "vibestream"
+}

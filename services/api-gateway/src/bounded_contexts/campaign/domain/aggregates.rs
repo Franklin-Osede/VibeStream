@@ -435,14 +435,11 @@ mod tests {
         
         let artist_contract = ArtistContract {
             id: Uuid::new_v4(),
-            name: "Test Artist".to_string(),
-            verified: true,
+            user_id: Uuid::new_v4(),
+            stage_name: "Test Artist".to_string(),
             bio: Some("Test bio".to_string()),
-            avatar_url: None,
-            social_links: None,
-            genres: vec!["Pop".to_string()],
-            total_streams: 0,
-            monthly_listeners: 0,
+            profile_image_url: None,
+            verified: true,
             created_at: Utc::now(),
         };
         

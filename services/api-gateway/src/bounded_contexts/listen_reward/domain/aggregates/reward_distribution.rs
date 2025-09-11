@@ -561,7 +561,7 @@ mod tests {
         let pool = create_test_pool();
         let mut distribution = RewardDistribution::new(pool);
         let session = create_test_session();
-        let royalty = RoyaltyPercentage::new(10.0).unwrap();
+        let royalty = RoyaltyPercentage::from_decimal(rust_decimal::Decimal::new(10, 0));
 
         let result = distribution.queue_reward_distribution(&session, &royalty);
         assert!(result.is_ok());
@@ -573,7 +573,7 @@ mod tests {
         let pool = create_test_pool();
         let mut distribution = RewardDistribution::new(pool);
         let session = create_test_session();
-        let royalty = RoyaltyPercentage::new(10.0).unwrap();
+        let royalty = RoyaltyPercentage::from_decimal(rust_decimal::Decimal::new(10, 0));
 
         // Queue distribution
         let _ = distribution.queue_reward_distribution(&session, &royalty);
@@ -601,7 +601,7 @@ mod tests {
         distribution.distribution_limits.max_daily_per_user = RewardAmount::new(5.0).unwrap();
         
         let session = create_test_session();
-        let royalty = RoyaltyPercentage::new(10.0).unwrap();
+        let royalty = RoyaltyPercentage::from_decimal(rust_decimal::Decimal::new(10, 0));
 
         // This should fail due to daily limit (assuming session reward > 5.0)
         let result = distribution.queue_reward_distribution(&session, &royalty);
@@ -614,7 +614,7 @@ mod tests {
         let pool = create_test_pool();
         let mut distribution = RewardDistribution::new(pool);
         let session = create_test_session();
-        let royalty = RoyaltyPercentage::new(15.0).unwrap();
+        let royalty = RoyaltyPercentage::from_decimal(rust_decimal::Decimal::new(15, 0));
 
         // Queue and execute distribution
         let _ = distribution.queue_reward_distribution(&session, &royalty);
@@ -625,7 +625,7 @@ mod tests {
         );
 
         // Check artist royalty tracking
-        let pending_royalties = distribution.get_artist_pending_royalties(session.artist_id());
+        let pending_royalties = distribution.get_artist_pending_royalties(&session.artist_id());
         assert!(pending_royalties.tokens() > 0.0);
     }
 } 

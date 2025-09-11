@@ -371,11 +371,12 @@ impl FanVenturesService {
         let tier = VentureTier {
             id: Uuid::new_v4(),
             venture_id,
-            name,
+            tier_name: name,
             min_investment,
             max_investment,
             description,
             created_at: Utc::now(),
+            updated_at: Utc::now(),
             benefits: benefits,
         };
 
@@ -406,7 +407,7 @@ impl FanVenturesService {
             .ok_or_else(|| AppError::NotFound("Tier not found".to_string()))?;
 
         if let Some(name) = name {
-            tier.name = name;
+            tier.tier_name = name;
         }
         if let Some(min_inv) = min_investment {
             if min_inv <= 0.0 {

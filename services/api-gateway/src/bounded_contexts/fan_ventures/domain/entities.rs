@@ -19,6 +19,28 @@ pub struct FanInvestment {
     pub updated_at: DateTime<Utc>,
 }
 
+impl FanInvestment {
+    pub fn new(
+        id: Uuid,
+        fan_id: Uuid,
+        venture_id: Uuid,
+        investment_amount: f64,
+        investment_type: InvestmentType,
+        status: InvestmentStatus,
+    ) -> Self {
+        Self {
+            id,
+            fan_id,
+            venture_id,
+            investment_amount,
+            investment_type,
+            status,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+}
+
 /// Tipo de inversión del fan
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum InvestmentType {
@@ -80,11 +102,12 @@ pub enum VentureStatus {
 pub struct VentureTier {
     pub id: Uuid,
     pub venture_id: Uuid,
-    pub name: String,           // "Bronze", "Silver", "Gold", "Platinum"
+    pub tier_name: String,      // "Bronze", "Silver", "Gold", "Platinum"
     pub min_investment: f64,
     pub max_investment: Option<f64>,
     pub description: Option<String>,
     pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
     pub benefits: Vec<VentureBenefit>,
 }
 

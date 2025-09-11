@@ -453,14 +453,11 @@ mod tests {
         
         let artist_contract = ArtistContract {
             id: Uuid::new_v4(),
-            name: "Test Artist".to_string(),
-            verified: true,
+            user_id: Uuid::new_v4(),
+            stage_name: "Test Artist".to_string(),
             bio: Some("Test bio".to_string()),
-            avatar_url: None,
-            social_links: None,
-            genres: vec!["Pop".to_string()],
-            total_streams: 0,
-            monthly_listeners: 0,
+            profile_image_url: None,
+            verified: true,
             created_at: Utc::now(),
         };
         
@@ -475,10 +472,23 @@ mod tests {
 
     #[test]
     fn test_session_creation() {
+        let song_contract = SongContract::new(
+            Uuid::new_v4(),
+            "Test Song".to_string(),
+            Uuid::new_v4(),
+            "Test Artist".to_string(),
+        );
+        
+        let artist_contract = ArtistContract::new(
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            "Test Artist".to_string(),
+        );
+        
         let (session, event) = ListenSession::new(
             Uuid::new_v4(),
-            SongId::new(),
-            ArtistId::new(),
+            song_contract,
+            artist_contract,
             RewardTier::Premium,
         );
 
@@ -547,10 +557,23 @@ mod tests {
     #[test]
     fn test_reward_calculation_with_tiers() {
         let mut basic_session = create_test_session();
+        let song_contract = SongContract::new(
+            Uuid::new_v4(),
+            "Test Song".to_string(),
+            Uuid::new_v4(),
+            "Test Artist".to_string(),
+        );
+        
+        let artist_contract = ArtistContract::new(
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            "Test Artist".to_string(),
+        );
+        
         let (mut premium_session, _) = ListenSession::new(
             Uuid::new_v4(),
-            SongId::new(),
-            ArtistId::new(),
+            song_contract,
+            artist_contract,
             RewardTier::Premium,
         );
 

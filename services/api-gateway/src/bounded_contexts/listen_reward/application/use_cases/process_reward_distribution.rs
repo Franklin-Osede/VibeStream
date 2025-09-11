@@ -193,10 +193,23 @@ mod tests {
     use vibestream_types::{SongContract, ArtistContract};
 
     fn create_test_session() -> ListenSession {
+        let song_contract = SongContract::new(
+            Uuid::new_v4(),
+            "Test Song".to_string(),
+            Uuid::new_v4(),
+            "Test Artist".to_string(),
+        );
+        
+        let artist_contract = ArtistContract::new(
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            "Test Artist".to_string(),
+        );
+        
         let (mut session, _) = ListenSession::new(
             Uuid::new_v4(),
-            SongId::new(),
-            ArtistId::new(),
+            song_contract,
+            artist_contract,
             RewardTier::Basic,
         );
 

@@ -101,14 +101,11 @@ mod tests {
         
         let artist_contract = ArtistContract {
             id: Uuid::new_v4(),
-            name: "Test Artist".to_string(),
-            verified: true,
+            user_id: Uuid::new_v4(),
+            stage_name: "Test Artist".to_string(),
             bio: Some("Test bio".to_string()),
-            avatar_url: None,
-            social_links: None,
-            genres: vec!["Pop".to_string()],
-            total_streams: 0,
-            monthly_listeners: 0,
+            profile_image_url: None,
+            verified: true,
             created_at: chrono::Utc::now(),
         };
         
@@ -131,8 +128,8 @@ mod tests {
         let (response, event) = result.unwrap();
         
         assert_eq!(response.user_id, command.user_id);
-        assert_eq!(response.song_id, command.song_id);
-        assert_eq!(response.artist_id, command.artist_id);
+        assert_eq!(response.song_id, command.song_contract.id);
+        assert_eq!(response.artist_id, command.song_contract.artist_id);
         assert_eq!(response.user_tier, command.user_tier);
         assert_eq!(event.event_type(), "ListenSessionStarted");
     }
@@ -141,7 +138,7 @@ mod tests {
     fn test_start_listen_session_empty_song_id() {
         let use_case = StartListenSessionUseCase::new();
         let mut command = create_valid_command();
-        command.song_id = String::new();
+        command.song_contract.id = Uuid::new_v4();
 
         let result = use_case.execute(command);
         
@@ -153,7 +150,7 @@ mod tests {
     fn test_start_listen_session_empty_artist_id() {
         let use_case = StartListenSessionUseCase::new();
         let mut command = create_valid_command();
-        command.artist_id = String::new();
+        command.song_contract.artist_id = Uuid::new_v4();
 
         let result = use_case.execute(command);
         
