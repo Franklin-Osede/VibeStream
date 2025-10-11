@@ -1,164 +1,173 @@
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-use chrono::{DateTime, Utc};
-use crate::bounded_contexts::fan_loyalty::domain::{
-    FanId, BiometricData, LoyaltyTier, WristbandType, WristbandId,
-};
+//! Fan Loyalty Commands
+//! 
+//! TDD GREEN PHASE - Command structures for Fan Loyalty System
 
-/// Command to verify fan using biometric data
+use serde::{Deserialize, Serialize};
+use crate::bounded_contexts::fan_loyalty::domain::entities::{FanId, WristbandType, BiometricData, LocationData};
+
+/// Verify Fan Command - TDD GREEN PHASE
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VerifyFanCommand {
     pub fan_id: FanId,
     pub biometric_data: BiometricData,
-    pub timestamp: DateTime<Utc>,
+    pub device_fingerprint: String,
+    pub location: Option<LocationData>,
 }
 
 impl VerifyFanCommand {
-    pub fn new(fan_id: FanId, biometric_data: BiometricData) -> Self {
+    pub fn new(
+        fan_id: FanId,
+        biometric_data: BiometricData,
+        device_fingerprint: String,
+        location: Option<LocationData>,
+    ) -> Self {
         Self {
             fan_id,
             biometric_data,
-            timestamp: Utc::now(),
+            device_fingerprint,
+            location,
         }
     }
 }
 
-/// Command to create NFT wristband
+/// Create Wristband Command - TDD GREEN PHASE
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateNftWristbandCommand {
+pub struct CreateWristbandCommand {
     pub fan_id: FanId,
-    pub artist_id: Uuid,
-    pub concert_id: Uuid,
+    pub concert_id: String,
+    pub artist_id: String,
     pub wristband_type: WristbandType,
-    pub timestamp: DateTime<Utc>,
+    pub fan_wallet_address: String,
 }
 
-impl CreateNftWristbandCommand {
-    pub fn new(fan_id: FanId, artist_id: Uuid, concert_id: Uuid, wristband_type: WristbandType) -> Self {
+impl CreateWristbandCommand {
+    pub fn new(
+        fan_id: FanId,
+        concert_id: String,
+        artist_id: String,
+        wristband_type: WristbandType,
+        fan_wallet_address: String,
+    ) -> Self {
         Self {
             fan_id,
+            concert_id,
             artist_id,
-            concert_id,
             wristband_type,
-            timestamp: Utc::now(),
+            fan_wallet_address,
         }
     }
 }
 
-/// Command to activate NFT wristband
+/// Activate Wristband Command - TDD GREEN PHASE
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActivateNftWristbandCommand {
-    pub wristband_id: WristbandId,
-    pub fan_id: FanId,
-    pub timestamp: DateTime<Utc>,
+pub struct ActivateWristbandCommand {
+    pub wristband_id: crate::bounded_contexts::fan_loyalty::domain::WristbandId,
+    pub activation_code: Option<String>,
 }
 
-impl ActivateNftWristbandCommand {
-    pub fn new(wristband_id: WristbandId, fan_id: FanId) -> Self {
+impl ActivateWristbandCommand {
+    pub fn new(
+        wristband_id: crate::bounded_contexts::fan_loyalty::domain::WristbandId,
+        activation_code: Option<String>,
+    ) -> Self {
         Self {
             wristband_id,
-            fan_id,
-            timestamp: Utc::now(),
+            activation_code,
         }
     }
 }
 
-/// Command to use NFT wristband at concert
+/// Generate QR Code Command - TDD GREEN PHASE
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UseNftWristbandCommand {
-    pub wristband_id: WristbandId,
-    pub fan_id: FanId,
-    pub concert_id: Uuid,
-    pub timestamp: DateTime<Utc>,
+pub struct GenerateQrCodeCommand {
+    pub wristband_id: crate::bounded_contexts::fan_loyalty::domain::WristbandId,
+    pub expiration_hours: Option<u32>,
 }
 
-impl UseNftWristbandCommand {
-    pub fn new(wristband_id: WristbandId, fan_id: FanId, concert_id: Uuid) -> Self {
+impl GenerateQrCodeCommand {
+    pub fn new(
+        wristband_id: crate::bounded_contexts::fan_loyalty::domain::WristbandId,
+        expiration_hours: Option<u32>,
+    ) -> Self {
         Self {
             wristband_id,
-            fan_id,
-            concert_id,
-            timestamp: Utc::now(),
+            expiration_hours,
         }
     }
 }
 
-/// Command to add loyalty points
+/// Validate QR Code Command - TDD GREEN PHASE
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AddLoyaltyPointsCommand {
-    pub fan_id: FanId,
-    pub points: u32,
-    pub reason: String,
-    pub timestamp: DateTime<Utc>,
+pub struct ValidateQrCodeCommand {
+    pub qr_code: String,
+    pub validation_context: Option<QrValidationContext>,
 }
 
-impl AddLoyaltyPointsCommand {
-    pub fn new(fan_id: FanId, points: u32, reason: String) -> Self {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QrValidationContext {
+    pub location: Option<LocationData>,
+    pub device_fingerprint: Option<String>,
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+}
+
+impl ValidateQrCodeCommand {
+    pub fn new(qr_code: String, validation_context: Option<QrValidationContext>) -> Self {
         Self {
-            fan_id,
-            points,
-            reason,
-            timestamp: Utc::now(),
+            qr_code,
+            validation_context,
         }
     }
 }
 
-/// Command to redeem loyalty points
+/// Get Wristband Details Command - TDD GREEN PHASE
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RedeemLoyaltyPointsCommand {
-    pub fan_id: FanId,
-    pub points: u32,
-    pub reason: String,
-    pub timestamp: DateTime<Utc>,
+pub struct GetWristbandDetailsCommand {
+    pub wristband_id: crate::bounded_contexts::fan_loyalty::domain::WristbandId,
+    pub include_benefits: bool,
+    pub include_nft_info: bool,
 }
 
-impl RedeemLoyaltyPointsCommand {
-    pub fn new(fan_id: FanId, points: u32, reason: String) -> Self {
-        Self {
-            fan_id,
-            points,
-            reason,
-            timestamp: Utc::now(),
-        }
-    }
-}
-
-/// Command to upgrade loyalty tier
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpgradeLoyaltyTierCommand {
-    pub fan_id: FanId,
-    pub new_tier: LoyaltyTier,
-    pub reason: String,
-    pub timestamp: DateTime<Utc>,
-}
-
-impl UpgradeLoyaltyTierCommand {
-    pub fn new(fan_id: FanId, new_tier: LoyaltyTier, reason: String) -> Self {
-        Self {
-            fan_id,
-            new_tier,
-            reason,
-            timestamp: Utc::now(),
-        }
-    }
-}
-
-/// Command to revoke NFT wristband
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RevokeNftWristbandCommand {
-    pub wristband_id: WristbandId,
-    pub fan_id: FanId,
-    pub reason: String,
-    pub timestamp: DateTime<Utc>,
-}
-
-impl RevokeNftWristbandCommand {
-    pub fn new(wristband_id: WristbandId, fan_id: FanId, reason: String) -> Self {
+impl GetWristbandDetailsCommand {
+    pub fn new(
+        wristband_id: crate::bounded_contexts::fan_loyalty::domain::WristbandId,
+        include_benefits: bool,
+        include_nft_info: bool,
+    ) -> Self {
         Self {
             wristband_id,
-            fan_id,
+            include_benefits,
+            include_nft_info,
+        }
+    }
+}
+
+/// Update Wristband Status Command - TDD GREEN PHASE
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateWristbandStatusCommand {
+    pub wristband_id: crate::bounded_contexts::fan_loyalty::domain::WristbandId,
+    pub new_status: WristbandStatus,
+    pub reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum WristbandStatus {
+    Active,
+    Inactive,
+    Suspended,
+    Expired,
+    Revoked,
+}
+
+impl UpdateWristbandStatusCommand {
+    pub fn new(
+        wristband_id: crate::bounded_contexts::fan_loyalty::domain::WristbandId,
+        new_status: WristbandStatus,
+        reason: Option<String>,
+    ) -> Self {
+        Self {
+            wristband_id,
+            new_status,
             reason,
-            timestamp: Utc::now(),
         }
     }
 }

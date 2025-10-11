@@ -1,6 +1,9 @@
-pub mod qr_service;
 pub mod nft_service;
-
-// Re-export commonly used types
-pub use qr_service::*;
-pub use nft_service::*;
+pub mod qr_service;
+pub mod rest_handlers;
+pub mod zk_integration;
+pub mod adapters;
+pub mod database;
+pub mod mock_services;
+pub mod postgres_repositories;
+pub mod api_handlers;

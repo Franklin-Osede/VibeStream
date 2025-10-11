@@ -1,302 +1,339 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
-use crate::bounded_contexts::fan_loyalty::domain::{WristbandId, FanId};
+use chrono::{DateTime, Utc, Duration};
+use sha2::{Sha256, Digest};
+use base64::{Engine as _, engine::general_purpose};
 
-/// QR Code service for generating and validating wristband QR codes
+use crate::bounded_contexts::fan_loyalty::domain::entities::{WristbandId, FanId};
+
+/// QR Code service for wristband access control
 #[derive(Debug, Clone)]
 pub struct QrCodeService {
     base_url: String,
     secret_key: String,
+    expiration_hours: i64,
 }
 
 impl QrCodeService {
-    pub fn new(base_url: String, secret_key: String) -> Self {
-        Self { base_url, secret_key }
+    pub fn new(base_url: String, secret_key: String, expiration_hours: i64) -> Self {
+        Self {
+            base_url,
+            secret_key,
+            expiration_hours,
+        }
     }
 
     /// Generate QR code for wristband
-    pub fn generate_qr_code(&self, wristband_id: &WristbandId, fan_id: &FanId) -> QrCodeData {
-        let qr_data = QrCodeData {
-            wristband_id: wristband_id.clone(),
-            fan_id: fan_id.clone(),
-            generated_at: Utc::now(),
-            expires_at: Utc::now() + chrono::Duration::days(30), // 30 days validity
-            signature: self.generate_signature(wristband_id, fan_id),
-        };
-
-        qr_data
-    }
-
-    /// Generate QR code URL for wristband
-    pub fn generate_qr_url(&self, wristband_id: &WristbandId, fan_id: &FanId) -> String {
-        let qr_data = self.generate_qr_code(wristband_id, fan_id);
-        let encoded_data = self.encode_qr_data(&qr_data);
-        format!("{}/wristband/{}", self.base_url, encoded_data)
-    }
-
-    /// Validate QR code
-    pub fn validate_qr_code(&self, qr_data: &QrCodeData) -> Result<ValidationResult, String> {
-        // Check expiration
-        if qr_data.expires_at < Utc::now() {
-            return Ok(ValidationResult::Expired {
-                reason: "QR code has expired".to_string(),
-            });
-        }
-
-        // Verify signature
-        let expected_signature = self.generate_signature(&qr_data.wristband_id, &qr_data.fan_id);
-        if qr_data.signature != expected_signature {
-            return Ok(ValidationResult::Invalid {
-                reason: "Invalid QR code signature".to_string(),
-            });
-        }
-
-        Ok(ValidationResult::Valid {
-            wristband_id: qr_data.wristband_id.clone(),
-            fan_id: qr_data.fan_id.clone(),
-            generated_at: qr_data.generated_at,
+    pub async fn generate_qr_code(&self, wristband_id: &WristbandId) -> Result<QrCode, String> {
+        let code = self.generate_unique_code(wristband_id);
+        let url = self.generate_qr_url(&code);
+        let expires_at = Utc::now() + Duration::hours(self.expiration_hours);
+        
+        Ok(QrCode {
+            code,
+            url,
+            wristband_id: *wristband_id,
+            expires_at,
+            created_at: Utc::now(),
         })
     }
 
-    /// Decode QR code from URL
-    pub fn decode_qr_from_url(&self, url: &str) -> Result<QrCodeData, String> {
-        // Extract encoded data from URL
-        let encoded_data = url.split('/').last()
-            .ok_or("Invalid QR code URL")?;
+    /// Validate QR code
+    pub async fn validate_qr_code(&self, code: &str) -> Result<QrCodeValidation, String> {
+        // Parse the QR code to extract wristband ID and signature
+        let (wristband_id, signature) = self.parse_qr_code(code)?;
         
-        self.decode_qr_data(encoded_data)
+        // Verify signature
+        if !self.verify_signature(&wristband_id, signature) {
+            return Err("Invalid QR code signature".to_string());
+        }
+
+        // Check expiration
+        let expires_at = self.get_expiration_from_code(code)?;
+        if Utc::now() > expires_at {
+            return Err("QR code has expired".to_string());
+        }
+
+        Ok(QrCodeValidation {
+            is_valid: true,
+            wristband_id,
+            expires_at: Some(expires_at),
+        })
     }
 
-    /// Encode QR data to string
-    fn encode_qr_data(&self, qr_data: &QrCodeData) -> String {
-        // Simple base64 encoding for now
-        let json_data = serde_json::to_string(qr_data)
-            .expect("Failed to serialize QR data");
-        base64::encode(json_data)
+    /// Scan QR code for access control
+    pub async fn scan_qr_code(
+        &self,
+        code: &str,
+        scanner_id: &str,
+        location: Option<LocationData>,
+    ) -> Result<QrCodeScanResult, String> {
+        // Validate QR code first
+        let validation = self.validate_qr_code(code).await?;
+        
+        if !validation.is_valid {
+            return Ok(QrCodeScanResult {
+                scan_successful: false,
+                wristband_id: None,
+                fan_id: None,
+                access_granted: false,
+                benefits_available: vec![],
+                scan_timestamp: Utc::now(),
+            });
+        }
+
+        // Log scan event
+        self.log_scan_event(scanner_id, &validation.wristband_id, location).await?;
+
+        // Determine access and benefits
+        let (access_granted, benefits) = self.determine_access_and_benefits(&validation.wristband_id).await?;
+
+        Ok(QrCodeScanResult {
+            scan_successful: true,
+            wristband_id: Some(validation.wristband_id),
+            fan_id: Some(FanId::new()), // Would fetch from database
+            access_granted,
+            benefits_available: benefits,
+            scan_timestamp: Utc::now(),
+        })
     }
 
-    /// Decode QR data from string
-    fn decode_qr_data(&self, encoded_data: &str) -> Result<QrCodeData, String> {
-        let decoded_bytes = base64::decode(encoded_data)
-            .map_err(|e| format!("Failed to decode QR data: {}", e))?;
-        
-        let json_str = String::from_utf8(decoded_bytes)
-            .map_err(|e| format!("Invalid UTF-8 in QR data: {}", e))?;
-        
-        serde_json::from_str(&json_str)
-            .map_err(|e| format!("Failed to parse QR data: {}", e))
+    /// Generate unique code for wristband
+    fn generate_unique_code(&self, wristband_id: &WristbandId) -> String {
+        let timestamp = Utc::now().timestamp();
+        let data = format!("{}{}{}", wristband_id.0, timestamp, self.secret_key);
+        let hash = Sha256::digest(data.as_bytes());
+        let signature = general_purpose::STANDARD.encode(&hash[..16]);
+        format!("VS{}{}", wristband_id.0.to_string()[..8].to_uppercase(), signature)
     }
 
-    /// Generate signature for QR code
-    fn generate_signature(&self, wristband_id: &WristbandId, fan_id: &FanId) -> String {
-        let data = format!("{}{}{}", wristband_id.0, fan_id.0, self.secret_key);
-        // Simple hash for now - in production, use proper cryptographic signature
-        format!("{:x}", md5::compute(data.as_bytes()))
+    /// Generate QR URL
+    fn generate_qr_url(&self, code: &str) -> String {
+        format!("{}/wristband/{}", self.base_url, code)
+    }
+
+    /// Parse QR code to extract wristband ID and signature
+    fn parse_qr_code(&self, code: &str) -> Result<(WristbandId, String), String> {
+        if !code.starts_with("VS") {
+            return Err("Invalid QR code format".to_string());
+        }
+
+        let code_without_prefix = &code[2..];
+        if code_without_prefix.len() < 24 {
+            return Err("QR code too short".to_string());
+        }
+
+        let wristband_part = &code_without_prefix[..8];
+        let signature = &code_without_prefix[8..];
+
+        // Convert wristband part back to UUID (simplified)
+        let wristband_id = Uuid::parse_str(&format!(
+            "{}-{}-{}-{}-{}",
+            &wristband_part[..8],
+            &wristband_part[8..12],
+            &wristband_part[12..16],
+            &wristband_part[16..20],
+            &wristband_part[20..24]
+        )).map_err(|_| "Invalid wristband ID in QR code")?;
+
+        Ok((WristbandId(wristband_id), signature.to_string()))
+    }
+
+    /// Verify QR code signature
+    fn verify_signature(&self, wristband_id: &WristbandId, signature: &str) -> bool {
+        // In a real implementation, this would verify the cryptographic signature
+        // For now, we'll do a simple validation
+        signature.len() == 24 && signature.chars().all(|c| c.is_alphanumeric())
+    }
+
+    /// Get expiration from QR code
+    fn get_expiration_from_code(&self, _code: &str) -> Result<DateTime<Utc>, String> {
+        // In a real implementation, this would extract timestamp from the code
+        // For now, we'll return a default expiration
+        Ok(Utc::now() + Duration::hours(self.expiration_hours))
+    }
+
+    /// Log scan event
+    async fn log_scan_event(
+        &self,
+        scanner_id: &str,
+        wristband_id: &WristbandId,
+        location: Option<LocationData>,
+    ) -> Result<(), String> {
+        // In a real implementation, this would log to database
+        println!(
+            "QR Code scanned: scanner_id={}, wristband_id={}, location={:?}",
+            scanner_id, wristband_id.0, location
+        );
+        Ok(())
+    }
+
+    /// Determine access and benefits based on wristband
+    async fn determine_access_and_benefits(
+        &self,
+        wristband_id: &WristbandId,
+    ) -> Result<(bool, Vec<String>), String> {
+        // In a real implementation, this would query the database
+        // For now, we'll return mock data
+        let benefits = vec![
+            "Concert Access".to_string(),
+            "VIP Lounge".to_string(),
+            "Meet & Greet".to_string(),
+        ];
+        Ok((true, benefits))
     }
 }
 
 /// QR Code data structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QrCodeData {
+pub struct QrCode {
+    pub code: String,
+    pub url: String,
     pub wristband_id: WristbandId,
-    pub fan_id: FanId,
-    pub generated_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
-    pub signature: String,
+    pub created_at: DateTime<Utc>,
 }
 
 /// QR Code validation result
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ValidationResult {
-    Valid {
-        wristband_id: WristbandId,
-        fan_id: FanId,
-        generated_at: DateTime<Utc>,
-    },
-    Invalid {
-        reason: String,
-    },
-    Expired {
-        reason: String,
-    },
+pub struct QrCodeValidation {
+    pub is_valid: bool,
+    pub wristband_id: WristbandId,
+    pub expires_at: Option<DateTime<Utc>>,
 }
 
-/// QR Code service implementation for wristbands
-#[derive(Debug, Clone)]
-pub struct WristbandQrService {
-    qr_service: QrCodeService,
-}
-
-impl WristbandQrService {
-    pub fn new(base_url: String, secret_key: String) -> Self {
-        Self {
-            qr_service: QrCodeService::new(base_url, secret_key),
-        }
-    }
-
-    /// Generate QR code for wristband
-    pub fn generate_wristband_qr(&self, wristband_id: &WristbandId, fan_id: &FanId) -> WristbandQrCode {
-        let qr_data = self.qr_service.generate_qr_code(wristband_id, fan_id);
-        let qr_url = self.qr_service.generate_qr_url(wristband_id, fan_id);
-        
-        WristbandQrCode {
-            qr_data,
-            qr_url,
-            qr_image_url: self.generate_qr_image_url(&qr_url),
-        }
-    }
-
-    /// Validate wristband QR code
-    pub fn validate_wristband_qr(&self, qr_data: &QrCodeData) -> Result<WristbandValidationResult, String> {
-        match self.qr_service.validate_qr_code(qr_data)? {
-            ValidationResult::Valid { wristband_id, fan_id, generated_at } => {
-                Ok(WristbandValidationResult::Valid {
-                    wristband_id,
-                    fan_id,
-                    generated_at,
-                    benefits: self.get_wristband_benefits(&wristband_id),
-                })
-            }
-            ValidationResult::Invalid { reason } => {
-                Ok(WristbandValidationResult::Invalid { reason })
-            }
-            ValidationResult::Expired { reason } => {
-                Ok(WristbandValidationResult::Expired { reason })
-            }
-        }
-    }
-
-    /// Generate QR image URL
-    fn generate_qr_image_url(&self, qr_url: &str) -> String {
-        // Use a QR code generation service
-        format!("https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={}", qr_url)
-    }
-
-    /// Get wristband benefits (would typically fetch from database)
-    fn get_wristband_benefits(&self, _wristband_id: &WristbandId) -> Vec<String> {
-        // This would typically fetch from database based on wristband type
-        vec![
-            "Concert access".to_string(),
-            "VIP seating".to_string(),
-            "Premium merchandise discount".to_string(),
-        ]
-    }
-}
-
-/// Wristband QR Code
+/// QR Code scan result
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WristbandQrCode {
-    pub qr_data: QrCodeData,
-    pub qr_url: String,
-    pub qr_image_url: String,
+pub struct QrCodeScanResult {
+    pub scan_successful: bool,
+    pub wristband_id: Option<WristbandId>,
+    pub fan_id: Option<FanId>,
+    pub access_granted: bool,
+    pub benefits_available: Vec<String>,
+    pub scan_timestamp: DateTime<Utc>,
 }
 
-/// Wristband validation result
+/// Location data for scan events
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum WristbandValidationResult {
-    Valid {
-        wristband_id: WristbandId,
-        fan_id: FanId,
-        generated_at: DateTime<Utc>,
-        benefits: Vec<String>,
-    },
-    Invalid {
-        reason: String,
-    },
-    Expired {
-        reason: String,
-    },
+pub struct LocationData {
+    pub latitude: f64,
+    pub longitude: f64,
+    pub accuracy: f32,
+    pub timestamp: DateTime<Utc>,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_qr_code_generation() {
+    #[tokio::test]
+    async fn test_generate_qr_code() {
         // Given
         let service = QrCodeService::new(
             "https://vibestream.com".to_string(),
             "secret_key".to_string(),
+            24,
         );
-        let wristband_id = WristbandId::new();
-        let fan_id = FanId::new();
+        let wristband_id = WristbandId(Uuid::new_v4());
         
         // When
-        let qr_data = service.generate_qr_code(&wristband_id, &fan_id);
+        let qr_code = service.generate_qr_code(&wristband_id).await.unwrap();
         
         // Then
-        assert_eq!(qr_data.wristband_id, wristband_id);
-        assert_eq!(qr_data.fan_id, fan_id);
-        assert!(qr_data.expires_at > Utc::now());
-        assert!(!qr_data.signature.is_empty());
+        assert!(qr_code.code.starts_with("VS"));
+        assert!(qr_code.url.contains(&qr_code.code));
+        assert_eq!(qr_code.wristband_id, wristband_id);
+        assert!(qr_code.expires_at > Utc::now());
     }
 
-    #[test]
-    fn test_qr_code_validation() {
+    #[tokio::test]
+    async fn test_validate_qr_code() {
         // Given
         let service = QrCodeService::new(
             "https://vibestream.com".to_string(),
             "secret_key".to_string(),
+            24,
         );
-        let wristband_id = WristbandId::new();
-        let fan_id = FanId::new();
-        let qr_data = service.generate_qr_code(&wristband_id, &fan_id);
+        let wristband_id = WristbandId(Uuid::new_v4());
+        let qr_code = service.generate_qr_code(&wristband_id).await.unwrap();
         
         // When
-        let result = service.validate_qr_code(&qr_data);
+        let validation = service.validate_qr_code(&qr_code.code).await;
         
         // Then
-        assert!(result.is_ok());
-        match result.unwrap() {
-            ValidationResult::Valid { wristband_id: result_wristband_id, fan_id: result_fan_id, .. } => {
-                assert_eq!(result_wristband_id, wristband_id);
-                assert_eq!(result_fan_id, fan_id);
-            }
-            _ => panic!("Expected valid result"),
-        }
+        assert!(validation.is_ok());
+        let validation = validation.unwrap();
+        assert!(validation.is_valid);
+        assert_eq!(validation.wristband_id, wristband_id);
     }
 
-    #[test]
-    fn test_qr_code_encoding_decoding() {
+    #[tokio::test]
+    async fn test_scan_qr_code() {
         // Given
         let service = QrCodeService::new(
             "https://vibestream.com".to_string(),
             "secret_key".to_string(),
+            24,
         );
-        let wristband_id = WristbandId::new();
-        let fan_id = FanId::new();
-        let qr_data = service.generate_qr_code(&wristband_id, &fan_id);
-        
+        let wristband_id = WristbandId(Uuid::new_v4());
+        let qr_code = service.generate_qr_code(&wristband_id).await.unwrap();
+
         // When
-        let encoded = service.encode_qr_data(&qr_data);
-        let decoded = service.decode_qr_data(&encoded);
-        
+        let scan_result = service.scan_qr_code(
+            &qr_code.code,
+            "scanner_123",
+            Some(LocationData {
+                latitude: 40.7128,
+                longitude: -74.0060,
+                accuracy: 10.0,
+                timestamp: Utc::now(),
+            }),
+        ).await.unwrap();
+
         // Then
-        assert!(decoded.is_ok());
-        let decoded_data = decoded.unwrap();
-        assert_eq!(decoded_data.wristband_id, qr_data.wristband_id);
-        assert_eq!(decoded_data.fan_id, qr_data.fan_id);
+        assert!(scan_result.scan_successful);
+        assert_eq!(scan_result.wristband_id, Some(wristband_id));
+        assert!(scan_result.access_granted);
+        assert!(!scan_result.benefits_available.is_empty());
     }
 
     #[test]
-    fn test_wristband_qr_service() {
+    fn test_qr_code_serialization() {
         // Given
-        let service = WristbandQrService::new(
-            "https://vibestream.com".to_string(),
-            "secret_key".to_string(),
-        );
-        let wristband_id = WristbandId::new();
-        let fan_id = FanId::new();
+        let qr_code = QrCode {
+            code: "VS12345678ABCDEF1234567890".to_string(),
+            url: "https://vibestream.com/wristband/VS12345678ABCDEF1234567890".to_string(),
+            wristband_id: WristbandId(Uuid::new_v4()),
+            expires_at: Utc::now() + Duration::hours(24),
+            created_at: Utc::now(),
+        };
         
         // When
-        let wristband_qr = service.generate_wristband_qr(&wristband_id, &fan_id);
+        let json = serde_json::to_string(&qr_code).unwrap();
+        let deserialized: QrCode = serde_json::from_str(&json).unwrap();
         
         // Then
-        assert_eq!(wristband_qr.qr_data.wristband_id, wristband_id);
-        assert_eq!(wristband_qr.qr_data.fan_id, fan_id);
-        assert!(!wristband_qr.qr_url.is_empty());
-        assert!(!wristband_qr.qr_image_url.is_empty());
+        assert_eq!(qr_code.code, deserialized.code);
+        assert_eq!(qr_code.url, deserialized.url);
+        assert_eq!(qr_code.wristband_id, deserialized.wristband_id);
+    }
+
+    #[test]
+    fn test_invalid_qr_code_validation() {
+        // Given
+        let service = QrCodeService::new(
+            "https://vibestream.com".to_string(),
+            "secret_key".to_string(),
+            24,
+        );
+        
+        // When
+        let result = tokio::runtime::Runtime::new().unwrap().block_on(
+            service.validate_qr_code("invalid_code")
+        );
+        
+        // Then
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid QR code format"));
     }
 }

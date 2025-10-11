@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
-use crate::bounded_contexts::fan_loyalty::domain::{WristbandId, FanId, WristbandType, NftWristband};
+use crate::bounded_contexts::fan_loyalty::domain::entities::{WristbandId, FanId, WristbandType, NftWristband};
 
 /// NFT service for managing wristband NFTs
 #[derive(Debug, Clone)]
@@ -51,9 +51,9 @@ impl NftService {
     /// Create NFT metadata
     fn create_nft_metadata(&self, wristband: &NftWristband) -> NftMetadata {
         NftMetadata {
-            name: format!("VibeStream {} Wristband", wristband.wristband_type),
+            name: format!("VibeStream {:?} Wristband", wristband.wristband_type),
             description: format!(
-                "Digital wristband for {} concert access. Benefits: {}",
+                "Digital wristband for {:?} concert access. Benefits: {}",
                 wristband.wristband_type,
                 wristband.wristband_type.benefits().join(", ")
             ),

@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
+use crate::bounded_contexts::fan_loyalty::domain::entities::FanVerificationResultId;
 
 /// Fan Loyalty Aggregate - Core business logic for fan verification
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -260,5 +261,31 @@ impl LocationConsistency {
         let dx = loc1.0 - loc2.0;
         let dy = loc1.1 - loc2.1;
         (dx * dx + dy * dy).sqrt() * 111.0 // Rough km conversion
+    }
+}
+
+/// Fan Verification Result Loyalty Aggregate
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FanVerificationResultLoyaltyAggregate {
+    pub fan_id: FanId,
+    pub verification_result_id: FanVerificationResultId,
+    pub loyalty_tier: LoyaltyTier,
+    pub biometric_score: BiometricScore,
+    pub verification_status: VerificationStatus,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl FanVerificationResultLoyaltyAggregate {
+    pub fn new(fan_id: FanId, verification_result_id: FanVerificationResultId) -> Self {
+        Self {
+            fan_id,
+            verification_result_id,
+            loyalty_tier: LoyaltyTier::Bronze,
+            biometric_score: BiometricScore::new(0.0),
+            verification_status: VerificationStatus::Pending,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
     }
 }

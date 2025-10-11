@@ -13,6 +13,7 @@ tower-http = { version = "0.5", features = ["cors", "trace"] }
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+base64 = "0.21"
 
 # Date/time and UUID
 chrono = { version = "0.4", features = ["serde"] }
@@ -38,9 +39,11 @@ vibestream-types = { path = "../../shared/types" }
 # JWT
 jsonwebtoken = "9.0"
 
-# OpenAPI - Comentado temporalmente para compilación rápida
-# utoipa = { version = "4.0", features = ["axum_extras"] }
-# utoipa-axum = "6.0"
+# OpenAPI - Versiones compatibles
+utoipa = { version = "4.0", features = ["axum_extras"] }
+utoipa-axum = "0.1"
+utoipa-swagger-ui = "0.1"
+utoipa-redoc = "0.1"
 
 # Config
 config = "0.13"

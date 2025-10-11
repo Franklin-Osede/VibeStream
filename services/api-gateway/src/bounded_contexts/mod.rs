@@ -14,5 +14,8 @@ pub mod fan_ventures;
 // Notifications Context
 pub mod notifications;
 
+// Fan Loyalty Context
+pub mod fan_loyalty;
+
 // Cross-context orchestrator
 pub mod orchestrator; 

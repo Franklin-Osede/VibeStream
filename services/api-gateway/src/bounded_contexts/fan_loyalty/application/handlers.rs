@@ -1,266 +1,190 @@
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-use chrono::{DateTime, Utc};
-use crate::bounded_contexts::fan_loyalty::domain::{
-    FanId, BiometricData, LoyaltyTier, WristbandType, WristbandId, BiometricScore,
-    FanLoyaltyAggregate, Fan, NftWristband, VerificationResult, ValidationResult,
-    FanLoyaltyEvent, EventGenerationService,
-};
-use crate::bounded_contexts::fan_loyalty::domain::repository::{
-    FanRepository, NftWristbandRepository, FanLoyaltyRepository, 
-    BiometricDataRepository, EventRepository, LoyaltyPointsRepository,
-};
-use crate::bounded_contexts::fan_loyalty::domain::services::{
-    BiometricVerificationService, LoyaltyCalculationService, NftWristbandService,
-};
-use crate::bounded_contexts::fan_loyalty::application::{
-    commands::*, queries::*,
-};
+//! Fan Loyalty Application Handlers
+//! 
+//! TDD GREEN PHASE - Real implementation of application handlers
 
-/// Command handler for fan verification
-pub struct VerifyFanCommandHandler {
-    fan_repository: Box<dyn FanRepository + Send + Sync>,
-    fan_loyalty_repository: Box<dyn FanLoyaltyRepository + Send + Sync>,
-    biometric_data_repository: Box<dyn BiometricDataRepository + Send + Sync>,
-    event_repository: Box<dyn EventRepository + Send + Sync>,
-    biometric_service: BiometricVerificationService,
-    event_service: EventGenerationService,
+use std::sync::Arc;
+use crate::bounded_contexts::fan_loyalty::application::dependency_injection::FanLoyaltyContainer;
+use crate::bounded_contexts::fan_loyalty::application::commands::{VerifyFanCommand, CreateWristbandCommand};
+use crate::bounded_contexts::fan_loyalty::domain::{FanVerificationResult, NftWristband};
+
+/// Fan Verification Handler - TDD GREEN PHASE
+#[derive(Clone)]
+pub struct FanVerificationHandler {
+    container: Arc<FanLoyaltyContainer>,
 }
 
-impl VerifyFanCommandHandler {
-    pub fn new(
-        fan_repository: Box<dyn FanRepository + Send + Sync>,
-        fan_loyalty_repository: Box<dyn FanLoyaltyRepository + Send + Sync>,
-        biometric_data_repository: Box<dyn BiometricDataRepository + Send + Sync>,
-        event_repository: Box<dyn EventRepository + Send + Sync>,
-    ) -> Self {
-        Self {
-            fan_repository,
-            fan_loyalty_repository,
-            biometric_data_repository,
-            event_repository,
-            biometric_service: BiometricVerificationService,
-            event_service: EventGenerationService,
-        }
+impl FanVerificationHandler {
+    pub fn new(container: Arc<FanLoyaltyContainer>) -> Self {
+        Self { container }
+    }
+
+    /// Handle fan verification with biometric data
+    pub async fn handle_verify_fan(&self, command: &VerifyFanCommand) -> Result<FanVerificationResult, String> {
+        // TDD GREEN PHASE: Real implementation
+        
+        // 1. Verify fan with biometric data using domain service
+        let verification_result = self.container.biometric_verification_service.verify_fan(
+            &command.fan_id,
+            &command.biometric_data,
+        ).await?;
+
+        // 2. Save verification result using repository
+        self.container.fan_verification_repository.save_verification_result(
+            &command.fan_id,
+            &verification_result,
+        ).await?;
+
+        // 3. Publish domain event
+        let event = crate::bounded_contexts::fan_loyalty::domain::events::FanVerifiedEvent {
+            fan_id: command.fan_id.clone(),
+            verification_id: verification_result.verification_id.clone(),
+            confidence_score: verification_result.confidence_score,
+            wristband_eligible: verification_result.wristband_eligible,
+            benefits_unlocked: verification_result.benefits_unlocked.clone(),
+            occurred_at: chrono::Utc::now(),
+        };
+        self.container.event_publisher.publish_fan_verified(&event).await?;
+
+        Ok(verification_result)
     }
 }
 
-#[async_trait]
-impl CommandHandler<VerifyFanCommand, VerificationResult> for VerifyFanCommandHandler {
-    async fn handle(&self, command: VerifyFanCommand) -> Result<VerificationResult, String> {
-        // Validate biometric data
-        self.biometric_service.validate_biometric_data(&command.biometric_data)?;
-        
-        // Save biometric data
-        self.biometric_data_repository.save(&command.fan_id, &command.biometric_data).await?;
-        
-        // Get or create fan loyalty aggregate
-        let mut aggregate = self.fan_loyalty_repository
-            .find_by_fan_id(&command.fan_id)
-            .await?
-            .unwrap_or_else(|| FanLoyaltyAggregate::new(command.fan_id.clone()));
-        
-        // Perform verification
-        let result = aggregate.verify_fan(command.biometric_data)?;
-        
-        // Save updated aggregate
-        self.fan_loyalty_repository.save(&aggregate).await?;
-        
-        // Generate and save events
-        match &result {
-            VerificationResult::Verified { fan_id, loyalty_tier, biometric_score } => {
-                let event = self.event_service.generate_fan_verified_event(
-                    fan_id.clone(),
-                    loyalty_tier.clone(),
-                    biometric_score.clone(),
-                );
-                self.event_repository.save_event(&event).await?;
-            }
-            VerificationResult::Failed { .. } => {
-                let event = FanLoyaltyEvent::BiometricVerificationFailed {
-                    fan_id: command.fan_id,
-                    reason: "Insufficient biometric verification".to_string(),
-                    timestamp: Utc::now(),
-                };
-                self.event_repository.save_event(&event).await?;
-            }
-        }
-        
-        Ok(result)
+/// Wristband Handler - TDD GREEN PHASE
+#[derive(Clone)]
+pub struct WristbandHandler {
+    container: Arc<FanLoyaltyContainer>,
+}
+
+impl WristbandHandler {
+    pub fn new(container: Arc<FanLoyaltyContainer>) -> Self {
+        Self { container }
     }
-}
 
-/// Command handler for creating NFT wristbands
-pub struct CreateNftWristbandCommandHandler {
-    fan_repository: Box<dyn FanRepository + Send + Sync>,
-    wristband_repository: Box<dyn NftWristbandRepository + Send + Sync>,
-    event_repository: Box<dyn EventRepository + Send + Sync>,
-    wristband_service: NftWristbandService,
-    loyalty_service: LoyaltyCalculationService,
-    event_service: EventGenerationService,
-}
-
-impl CreateNftWristbandCommandHandler {
-    pub fn new(
-        fan_repository: Box<dyn FanRepository + Send + Sync>,
-        wristband_repository: Box<dyn NftWristbandRepository + Send + Sync>,
-        event_repository: Box<dyn EventRepository + Send + Sync>,
-    ) -> Self {
-        Self {
-            fan_repository,
-            wristband_repository,
-            event_repository,
-            wristband_service: NftWristbandService,
-            loyalty_service: LoyaltyCalculationService,
-            event_service: EventGenerationService,
-        }
-    }
-}
-
-#[async_trait]
-impl CommandHandler<CreateNftWristbandCommand, NftWristband> for CreateNftWristbandCommandHandler {
-    async fn handle(&self, command: CreateNftWristbandCommand) -> Result<NftWristband, String> {
-        // Check if fan exists
-        let fan = self.fan_repository.find_by_id(&command.fan_id).await?
-            .ok_or("Fan not found")?;
+    /// Handle wristband creation
+    pub async fn handle_create_wristband(&self, command: &CreateWristbandCommand) -> Result<NftWristband, String> {
+        // TDD GREEN PHASE: Real implementation
         
-        // Check fan eligibility
-        if !self.loyalty_service.qualifies_for_wristband(&fan.verification_level.into(), &command.wristband_type) {
-            return Err("Fan is not eligible for this wristband type".to_string());
-        }
-        
-        // Create wristband
-        let wristband = self.wristband_service.create_wristband(
+        // 1. Create wristband entity
+        let wristband = NftWristband::new(
             command.fan_id.clone(),
-            command.artist_id,
-            command.concert_id,
+            command.concert_id.clone(),
+            command.artist_id.clone(),
             command.wristband_type.clone(),
-        )?;
-        
-        // Save wristband
-        self.wristband_repository.save(&wristband).await?;
-        
-        // Generate and save event
-        let event = self.event_service.generate_nft_wristband_created_event(
-            wristband.id.clone(),
-            command.fan_id,
-            command.artist_id,
-            command.concert_id,
-            command.wristband_type,
         );
-        self.event_repository.save_event(&event).await?;
+
+        // 2. Save wristband using repository
+        self.container.wristband_repository.save_wristband(&wristband).await?;
+
+        // 3. Create NFT using domain service
+        let nft_result = self.container.nft_service.create_nft(&wristband, &command.fan_wallet_address).await?;
+
+        // 4. Publish domain event
+        let event = crate::bounded_contexts::fan_loyalty::domain::events::WristbandCreatedEvent {
+            wristband_id: wristband.id.clone(),
+            fan_id: wristband.fan_id.clone(),
+            concert_id: wristband.concert_id.clone(),
+            artist_id: wristband.artist_id.clone(),
+            wristband_type: wristband.wristband_type.clone(),
+            created_at: chrono::Utc::now(),
+        };
+        self.container.event_publisher.publish_wristband_created(&event).await?;
+
+        Ok(wristband)
+    }
+
+    /// Handle wristband activation
+    pub async fn handle_activate_wristband(&self, wristband_id: &crate::bounded_contexts::fan_loyalty::domain::WristbandId) -> Result<(), String> {
+        // TDD GREEN PHASE: Real implementation
         
+        // 1. Get wristband from repository
+        let mut wristband = self.container.wristband_repository.get_wristband(wristband_id).await?
+            .ok_or_else(|| "Wristband not found".to_string())?;
+
+        // 2. Activate wristband
+        wristband.is_active = true;
+        wristband.activated_at = Some(chrono::Utc::now());
+
+        // 3. Save updated wristband
+        self.container.wristband_repository.save_wristband(&wristband).await?;
+
+        // 4. Publish domain event
+        let event = crate::bounded_contexts::fan_loyalty::domain::events::WristbandActivatedEvent {
+            wristband_id: wristband.id.clone(),
+            activated_at: chrono::Utc::now(),
+        };
+        self.container.event_publisher.publish_wristband_activated(&event).await?;
+
+        Ok(())
+    }
+
+    /// Handle wristband retrieval
+    pub async fn handle_get_wristband(&self, wristband_id: &crate::bounded_contexts::fan_loyalty::domain::WristbandId) -> Result<Option<NftWristband>, String> {
+        // TDD GREEN PHASE: Real implementation
+        
+        // 1. Get wristband from repository
+        let wristband = self.container.wristband_repository.get_wristband(wristband_id).await?;
+
         Ok(wristband)
     }
 }
 
-/// Command handler for adding loyalty points
-pub struct AddLoyaltyPointsCommandHandler {
-    fan_repository: Box<dyn FanRepository + Send + Sync>,
-    loyalty_points_repository: Box<dyn LoyaltyPointsRepository + Send + Sync>,
-    event_repository: Box<dyn EventRepository + Send + Sync>,
+/// QR Code Handler - TDD GREEN PHASE
+#[derive(Clone)]
+pub struct QrCodeHandler {
+    container: Arc<FanLoyaltyContainer>,
 }
 
-impl AddLoyaltyPointsCommandHandler {
-    pub fn new(
-        fan_repository: Box<dyn FanRepository + Send + Sync>,
-        loyalty_points_repository: Box<dyn LoyaltyPointsRepository + Send + Sync>,
-        event_repository: Box<dyn EventRepository + Send + Sync>,
-    ) -> Self {
-        Self {
-            fan_repository,
-            loyalty_points_repository,
-            event_repository,
+impl QrCodeHandler {
+    pub fn new(container: Arc<FanLoyaltyContainer>) -> Self {
+        Self { container }
+    }
+
+    /// Handle QR code validation
+    pub async fn handle_validate_qr(&self, qr_code: &str) -> Result<Option<crate::bounded_contexts::fan_loyalty::domain::entities::QrCode>, String> {
+        // TDD GREEN PHASE: Real implementation
+        
+        // 1. Validate QR code using domain service
+        let wristband_id = self.container.qr_code_service.validate_qr_code(qr_code).await?;
+
+        if let Some(wristband_id) = wristband_id {
+            // 2. Get wristband details
+            let wristband = self.container.wristband_repository.get_wristband(&wristband_id).await?
+                .ok_or_else(|| "Wristband not found".to_string())?;
+
+            // 3. Create QR code entity
+            let qr_code_entity = crate::bounded_contexts::fan_loyalty::domain::entities::QrCode {
+                code: qr_code.to_string(),
+                wristband_id: wristband.id.clone(),
+                is_valid: wristband.is_active,
+                created_at: chrono::Utc::now(),
+                expires_at: Some(chrono::Utc::now() + chrono::Duration::hours(24)),
+            };
+
+            Ok(Some(qr_code_entity))
+        } else {
+            Ok(None)
         }
     }
-}
 
-#[async_trait]
-impl CommandHandler<AddLoyaltyPointsCommand, u32> for AddLoyaltyPointsCommandHandler {
-    async fn handle(&self, command: AddLoyaltyPointsCommand) -> Result<u32, String> {
-        // Add points
-        self.loyalty_points_repository.add_points(&command.fan_id, command.points).await?;
+    /// Handle QR code generation
+    pub async fn handle_generate_qr(&self, wristband_id: &crate::bounded_contexts::fan_loyalty::domain::WristbandId) -> Result<crate::bounded_contexts::fan_loyalty::domain::entities::QrCode, String> {
+        // TDD GREEN PHASE: Real implementation
         
-        // Get total points
-        let total_points = self.loyalty_points_repository.get_points(&command.fan_id).await?;
-        
-        // Generate and save event
-        let event = FanLoyaltyEvent::LoyaltyPointsAdded {
-            fan_id: command.fan_id,
-            points: command.points,
-            total_points,
-            timestamp: Utc::now(),
+        // 1. Generate QR code using domain service
+        let qr_code = self.container.qr_code_service.generate_qr_code(wristband_id).await?;
+
+        // 2. Save QR code using repository
+        self.container.qr_code_repository.save_qr_code(&qr_code).await?;
+
+        // 3. Publish domain event
+        let event = crate::bounded_contexts::fan_loyalty::domain::events::QrCodeGeneratedEvent {
+            qr_code_id: qr_code.code.clone(),
+            wristband_id: wristband_id.clone(),
+            code: qr_code.code.clone(),
+            generated_at: chrono::Utc::now(),
         };
-        self.event_repository.save_event(&event).await?;
-        
-        Ok(total_points)
+        self.container.event_publisher.publish_qr_code_generated(&event).await?;
+
+        Ok(qr_code)
     }
-}
-
-/// Query handler for getting fan loyalty
-pub struct GetFanLoyaltyQueryHandler {
-    fan_repository: Box<dyn FanRepository + Send + Sync>,
-    fan_loyalty_repository: Box<dyn FanLoyaltyRepository + Send + Sync>,
-    loyalty_points_repository: Box<dyn LoyaltyPointsRepository + Send + Sync>,
-}
-
-impl GetFanLoyaltyQueryHandler {
-    pub fn new(
-        fan_repository: Box<dyn FanRepository + Send + Sync>,
-        fan_loyalty_repository: Box<dyn FanLoyaltyRepository + Send + Sync>,
-        loyalty_points_repository: Box<dyn LoyaltyPointsRepository + Send + Sync>,
-    ) -> Self {
-        Self {
-            fan_repository,
-            fan_loyalty_repository,
-            loyalty_points_repository,
-        }
-    }
-}
-
-#[async_trait]
-impl QueryHandler<GetFanLoyaltyQuery, FanLoyaltyResponse> for GetFanLoyaltyQueryHandler {
-    async fn handle(&self, query: GetFanLoyaltyQuery) -> Result<FanLoyaltyResponse, String> {
-        // Get fan
-        let fan = self.fan_repository.find_by_id(&query.fan_id).await?
-            .ok_or("Fan not found")?;
-        
-        // Get loyalty aggregate
-        let aggregate = self.fan_loyalty_repository.find_by_fan_id(&query.fan_id).await?
-            .ok_or("Fan loyalty not found")?;
-        
-        // Get loyalty points
-        let points = self.loyalty_points_repository.get_points(&query.fan_id).await?;
-        
-        Ok(FanLoyaltyResponse {
-            fan_id: query.fan_id,
-            loyalty_tier: aggregate.loyalty_tier,
-            biometric_score: aggregate.biometric_score,
-            loyalty_points: points,
-            verification_status: aggregate.verification_status,
-        })
-    }
-}
-
-/// Command handler trait
-#[async_trait]
-pub trait CommandHandler<C, R> {
-    async fn handle(&self, command: C) -> Result<R, String>;
-}
-
-/// Query handler trait
-#[async_trait]
-pub trait QueryHandler<Q, R> {
-    async fn handle(&self, query: Q) -> Result<R, String>;
-}
-
-/// Fan loyalty response
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FanLoyaltyResponse {
-    pub fan_id: FanId,
-    pub loyalty_tier: LoyaltyTier,
-    pub biometric_score: BiometricScore,
-    pub loyalty_points: u32,
-    pub verification_status: crate::bounded_contexts::fan_loyalty::domain::aggregates::VerificationStatus,
 }

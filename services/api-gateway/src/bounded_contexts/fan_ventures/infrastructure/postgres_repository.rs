@@ -112,7 +112,7 @@ impl PostgresFanVenturesRepository {
                     end_date: row.end_date,
                     created_at: row.created_at,
                     updated_at: row.updated_at,
-                    benefits: vec![], // TODO: Load benefits separately
+benefits: vec![], // TODO: Load benefits separately
                 };
                 Ok(Some(venture))
             }
@@ -164,7 +164,7 @@ impl PostgresFanVenturesRepository {
                 end_date: row.end_date,
                 created_at: row.created_at,
                 updated_at: row.updated_at,
-                benefits: vec![], // TODO: Load benefits separately
+benefits: vec![], // TODO: Load benefits separately
             };
             ventures.push(venture);
         }
@@ -273,7 +273,7 @@ impl PostgresFanVenturesRepository {
     pub async fn get_investment_by_id(&self, investment_id: Uuid) -> Result<Option<FanInvestment>, AppError> {
         let row = sqlx::query!(
             r#"
-            SELECT id, fan_id, venture_id, amount, investment_date, status, created_at, updated_at
+            SELECT id, fan_id, venture_id, investment_amount, created_at, status, created_at, updated_at
             FROM fan_investments
             WHERE id = $1
             "#,
@@ -288,7 +288,7 @@ impl PostgresFanVenturesRepository {
                 row.id,
                 row.fan_id,
                 row.venture_id,
-                row.amount,
+                row.investment_amount,
                 InvestmentType::RevenueShare, // Default type
                 row.status.into(),
             );
@@ -301,10 +301,10 @@ impl PostgresFanVenturesRepository {
     pub async fn get_investments_by_venture(&self, venture_id: Uuid) -> Result<Vec<FanInvestment>, AppError> {
         let rows = sqlx::query!(
             r#"
-            SELECT id, fan_id, venture_id, amount, investment_date, status, created_at, updated_at
+            SELECT id, fan_id, venture_id, investment_amount, created_at, status, created_at, updated_at
             FROM fan_investments
             WHERE venture_id = $1
-            ORDER BY investment_date DESC
+            ORDER BY created_at DESC
             "#,
             venture_id
         )
@@ -317,7 +317,7 @@ impl PostgresFanVenturesRepository {
                 row.id,
                 row.fan_id,
                 row.venture_id,
-                row.amount,
+                row.investment_amount,
                 InvestmentType::RevenueShare, // Default type
                 row.status.into(),
             )
@@ -337,13 +337,13 @@ impl PostgresFanVenturesRepository {
         Ok(count.unwrap_or(0) as u64)
     }
 
-    pub async fn get_total_invested_amount(&self) -> Result<f64, AppError> {
+    pub async fn get_total_invested_investment_amount(&self) -> Result<f64, AppError> {
         let total = sqlx::query_scalar!(
-            "SELECT COALESCE(SUM(amount), 0) FROM fan_investments WHERE status = 'active'"
+            "SELECT COALESCE(SUM(investment_amount), 0) FROM fan_investments WHERE status = 'active'"
         )
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| AppError::DatabaseError(format!("Failed to get total invested amount: {}", e)))?;
+        .map_err(|e| AppError::DatabaseError(format!("Failed to get total invested investment_amount: {}", e)))?;
         
         Ok(total.unwrap_or(0.0))
     }
@@ -355,19 +355,17 @@ impl PostgresFanVenturesRepository {
     pub async fn create_venture_tier(&self, tier: &VentureTier) -> Result<(), AppError> {
         sqlx::query!(
             r#"
-            INSERT INTO venture_tiers (id, venture_id, tier_name, min_investment, max_investment, 
-                                     description, benefits, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            INSERT INTO venture_tiers (id, venture_id, name, min_investment, max_investment, 
+                                     description, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             "#,
             tier.id,
             tier.venture_id,
-            tier.tier_name,
+            tier.name,
             tier.min_investment,
             tier.max_investment,
             tier.description,
-            serde_json::to_value(&tier.benefits).unwrap_or(serde_json::Value::Null),
-            tier.created_at,
-            tier.updated_at
+            tier.created_at
         )
         .execute(&self.pool)
         .await
@@ -379,8 +377,8 @@ impl PostgresFanVenturesRepository {
     pub async fn get_venture_tiers(&self, venture_id: Uuid) -> Result<Vec<VentureTier>, AppError> {
         let rows = sqlx::query!(
             r#"
-            SELECT id, venture_id, tier_name, min_investment, max_investment, 
-                   description, benefits, created_at, updated_at
+            SELECT id, venture_id, name, min_investment, max_investment, 
+                   description, created_at
             FROM venture_tiers
             WHERE venture_id = $1
             ORDER BY min_investment ASC
@@ -395,11 +393,11 @@ impl PostgresFanVenturesRepository {
             VentureTier {
                 id: row.id,
                 venture_id: row.venture_id,
-                tier_name: row.tier_name,
+                name: row.name,
                 min_investment: row.min_investment,
                 max_investment: row.max_investment,
                 description: row.description,
-                benefits: serde_json::from_value(row.benefits.unwrap_or(serde_json::Value::Null))
+benefits: serde_json::from_value(row.benefits.unwrap_or(serde_json::Value::Null))
                     .unwrap_or_default(),
                 created_at: row.created_at,
                 updated_at: row.updated_at,
@@ -422,8 +420,8 @@ impl PostgresFanVenturesRepository {
     pub async fn get_tier_by_id(&self, tier_id: Uuid) -> Result<Option<VentureTier>, AppError> {
         let row = sqlx::query!(
             r#"
-            SELECT id, venture_id, tier_name, min_investment, max_investment, 
-                   description, benefits, created_at, updated_at
+            SELECT id, venture_id, name, min_investment, max_investment, 
+                   description, created_at
             FROM venture_tiers
             WHERE id = $1
             "#,
@@ -437,11 +435,11 @@ impl PostgresFanVenturesRepository {
             let tier = VentureTier {
                 id: row.id,
                 venture_id: row.venture_id,
-                tier_name: row.tier_name,
+                name: row.name,
                 min_investment: row.min_investment,
                 max_investment: row.max_investment,
                 description: row.description,
-                benefits: serde_json::from_value(row.benefits.unwrap_or(serde_json::Value::Null))
+benefits: serde_json::from_value(row.benefits.unwrap_or(serde_json::Value::Null))
                     .unwrap_or_default(),
                 created_at: row.created_at,
                 updated_at: row.updated_at,
@@ -461,7 +459,7 @@ impl PostgresFanVenturesRepository {
         Ok(())
     }
 
-    pub async fn get_venture_benefits(&self, _venture_id: Uuid) -> Result<Vec<VentureBenefit>, AppError> {
+    pub async fn get_venture_(&self, _venture_id: Uuid) -> Result<Vec<VentureBenefit>, AppError> {
         // TODO: Implementar cuando la base de datos esté disponible
         Ok(vec![])
     }

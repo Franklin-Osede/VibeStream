@@ -1,152 +1,151 @@
+//! Fan Loyalty Domain Events
+//! 
+//! TDD GREEN PHASE - Real domain events implementation
+
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
-use crate::bounded_contexts::fan_loyalty::domain::{
-    aggregates::{FanId, LoyaltyTier, BiometricScore},
-    entities::{WristbandId, WristbandType},
-};
+use crate::bounded_contexts::fan_loyalty::domain::entities::{FanId, WristbandId, WristbandType, FanVerificationResultId};
+use crate::bounded_contexts::fan_loyalty::domain::aggregates::LoyaltyTier;
 
-/// Domain events for Fan Loyalty context
+// ============================================================================
+// DOMAIN EVENTS
+// ============================================================================
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum FanLoyaltyEvent {
-    /// Fan was successfully verified
-    FanVerified {
-        fan_id: FanId,
-        loyalty_tier: LoyaltyTier,
-        biometric_score: BiometricScore,
-        timestamp: DateTime<Utc>,
-    },
-    
-    /// Fan loyalty tier was upgraded
-    LoyaltyTierUpgraded {
-        fan_id: FanId,
-        old_tier: LoyaltyTier,
-        new_tier: LoyaltyTier,
-        timestamp: DateTime<Utc>,
-    },
-    
-    /// Fan loyalty tier was downgraded
-    LoyaltyTierDowngraded {
-        fan_id: FanId,
-        old_tier: LoyaltyTier,
-        new_tier: LoyaltyTier,
-        timestamp: DateTime<Utc>,
-    },
-    
-    /// NFT Wristband was created
-    NftWristbandCreated {
-        wristband_id: WristbandId,
-        fan_id: FanId,
-        artist_id: uuid::Uuid,
-        concert_id: uuid::Uuid,
-        wristband_type: WristbandType,
-        timestamp: DateTime<Utc>,
-    },
-    
-    /// NFT Wristband was activated
-    NftWristbandActivated {
-        wristband_id: WristbandId,
-        fan_id: FanId,
-        timestamp: DateTime<Utc>,
-    },
-    
-    /// NFT Wristband was used at concert
-    NftWristbandUsed {
-        wristband_id: WristbandId,
-        fan_id: FanId,
-        concert_id: uuid::Uuid,
-        timestamp: DateTime<Utc>,
-    },
-    
-    /// NFT Wristband was revoked
-    NftWristbandRevoked {
-        wristband_id: WristbandId,
-        fan_id: FanId,
-        reason: String,
-        timestamp: DateTime<Utc>,
-    },
-    
-    /// Biometric verification failed
-    BiometricVerificationFailed {
-        fan_id: FanId,
-        reason: String,
-        timestamp: DateTime<Utc>,
-    },
-    
-    /// Fan loyalty points were added
-    LoyaltyPointsAdded {
-        fan_id: FanId,
-        points: u32,
-        total_points: u32,
-        timestamp: DateTime<Utc>,
-    },
-    
-    /// Fan loyalty points were redeemed
-    LoyaltyPointsRedeemed {
-        fan_id: FanId,
-        points: u32,
-        remaining_points: u32,
-        timestamp: DateTime<Utc>,
-    },
+pub struct FanVerifiedEvent {
+    pub fan_id: FanId,
+    pub verification_id: String,
+    pub confidence_score: f32,
+    pub wristband_eligible: bool,
+    pub benefits_unlocked: Vec<String>,
+    pub occurred_at: DateTime<Utc>,
 }
 
-impl FanLoyaltyEvent {
-    /// Get the fan ID associated with this event
-    pub fn fan_id(&self) -> Option<FanId> {
-        match self {
-            FanLoyaltyEvent::FanVerified { fan_id, .. } => Some(fan_id.clone()),
-            FanLoyaltyEvent::LoyaltyTierUpgraded { fan_id, .. } => Some(fan_id.clone()),
-            FanLoyaltyEvent::LoyaltyTierDowngraded { fan_id, .. } => Some(fan_id.clone()),
-            FanLoyaltyEvent::NftWristbandCreated { fan_id, .. } => Some(fan_id.clone()),
-            FanLoyaltyEvent::NftWristbandActivated { fan_id, .. } => Some(fan_id.clone()),
-            FanLoyaltyEvent::NftWristbandUsed { fan_id, .. } => Some(fan_id.clone()),
-            FanLoyaltyEvent::NftWristbandRevoked { fan_id, .. } => Some(fan_id.clone()),
-            FanLoyaltyEvent::BiometricVerificationFailed { fan_id, .. } => Some(fan_id.clone()),
-            FanLoyaltyEvent::LoyaltyPointsAdded { fan_id, .. } => Some(fan_id.clone()),
-            FanLoyaltyEvent::LoyaltyPointsRedeemed { fan_id, .. } => Some(fan_id.clone()),
-        }
-    }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WristbandCreatedEvent {
+    pub wristband_id: WristbandId,
+    pub fan_id: FanId,
+    pub concert_id: String,
+    pub artist_id: String,
+    pub wristband_type: WristbandType,
+    pub created_at: DateTime<Utc>,
+}
 
-    /// Get the timestamp of this event
-    pub fn timestamp(&self) -> DateTime<Utc> {
-        match self {
-            FanLoyaltyEvent::FanVerified { timestamp, .. } => *timestamp,
-            FanLoyaltyEvent::LoyaltyTierUpgraded { timestamp, .. } => *timestamp,
-            FanLoyaltyEvent::LoyaltyTierDowngraded { timestamp, .. } => *timestamp,
-            FanLoyaltyEvent::NftWristbandCreated { timestamp, .. } => *timestamp,
-            FanLoyaltyEvent::NftWristbandActivated { timestamp, .. } => *timestamp,
-            FanLoyaltyEvent::NftWristbandUsed { timestamp, .. } => *timestamp,
-            FanLoyaltyEvent::NftWristbandRevoked { timestamp, .. } => *timestamp,
-            FanLoyaltyEvent::BiometricVerificationFailed { timestamp, .. } => *timestamp,
-            FanLoyaltyEvent::LoyaltyPointsAdded { timestamp, .. } => *timestamp,
-            FanLoyaltyEvent::LoyaltyPointsRedeemed { timestamp, .. } => *timestamp,
-        }
-    }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WristbandActivatedEvent {
+    pub wristband_id: WristbandId,
+    pub activated_at: DateTime<Utc>,
+}
 
-    /// Get the event type as string
-    pub fn event_type(&self) -> &'static str {
-        match self {
-            FanLoyaltyEvent::FanVerified { .. } => "FanVerified",
-            FanLoyaltyEvent::LoyaltyTierUpgraded { .. } => "LoyaltyTierUpgraded",
-            FanLoyaltyEvent::LoyaltyTierDowngraded { .. } => "LoyaltyTierDowngraded",
-            FanLoyaltyEvent::NftWristbandCreated { .. } => "NftWristbandCreated",
-            FanLoyaltyEvent::NftWristbandActivated { .. } => "NftWristbandActivated",
-            FanLoyaltyEvent::NftWristbandUsed { .. } => "NftWristbandUsed",
-            FanLoyaltyEvent::NftWristbandRevoked { .. } => "NftWristbandRevoked",
-            FanLoyaltyEvent::BiometricVerificationFailed { .. } => "BiometricVerificationFailed",
-            FanLoyaltyEvent::LoyaltyPointsAdded { .. } => "LoyaltyPointsAdded",
-            FanLoyaltyEvent::LoyaltyPointsRedeemed { .. } => "LoyaltyPointsRedeemed",
-        }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QrCodeGeneratedEvent {
+    pub qr_code_id: String,
+    pub wristband_id: WristbandId,
+    pub code: String,
+    pub generated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QrCodeValidatedEvent {
+    pub qr_code: String,
+    pub wristband_id: WristbandId,
+    pub is_valid: bool,
+    pub validated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NftMintedEvent {
+    pub wristband_id: WristbandId,
+    pub fan_id: FanId,
+    pub nft_token_id: String,
+    pub transaction_hash: String,
+    pub minted_at: DateTime<Utc>,
+}
+
+// ============================================================================
+// EVENT TRAITS
+// ============================================================================
+
+pub trait DomainEvent {
+    fn event_type(&self) -> String;
+    fn occurred_at(&self) -> DateTime<Utc>;
+}
+
+impl DomainEvent for FanVerifiedEvent {
+    fn event_type(&self) -> String {
+        "FanVerified".to_string()
+    }
+    
+    fn occurred_at(&self) -> DateTime<Utc> {
+        self.occurred_at
     }
 }
 
-/// Event handler trait for domain events
-pub trait DomainEventHandler<T> {
-    fn handle(&self, event: &FanLoyaltyEvent) -> Result<(), String>;
+impl DomainEvent for WristbandCreatedEvent {
+    fn event_type(&self) -> String {
+        "WristbandCreated".to_string()
+    }
+    
+    fn occurred_at(&self) -> DateTime<Utc> {
+        self.created_at
+    }
 }
 
-/// Event store trait for persisting domain events
-pub trait EventStore {
-    fn save_event(&self, event: &FanLoyaltyEvent) -> Result<(), String>;
-    fn get_events_for_fan(&self, fan_id: &FanId) -> Result<Vec<FanLoyaltyEvent>, String>;
-    fn get_events_since(&self, since: DateTime<Utc>) -> Result<Vec<FanLoyaltyEvent>, String>;
+impl DomainEvent for WristbandActivatedEvent {
+    fn event_type(&self) -> String {
+        "WristbandActivated".to_string()
+    }
+    
+    fn occurred_at(&self) -> DateTime<Utc> {
+        self.activated_at
+    }
+}
+
+impl DomainEvent for QrCodeGeneratedEvent {
+    fn event_type(&self) -> String {
+        "QrCodeGenerated".to_string()
+    }
+    
+    fn occurred_at(&self) -> DateTime<Utc> {
+        self.generated_at
+    }
+}
+
+impl DomainEvent for QrCodeValidatedEvent {
+    fn event_type(&self) -> String {
+        "QrCodeValidated".to_string()
+    }
+    
+    fn occurred_at(&self) -> DateTime<Utc> {
+        self.validated_at
+    }
+}
+
+impl DomainEvent for NftMintedEvent {
+    fn event_type(&self) -> String {
+        "NftMinted".to_string()
+    }
+    
+    fn occurred_at(&self) -> DateTime<Utc> {
+        self.minted_at
+    }
+}
+
+/// Fan Verification Result Loyalty Event
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FanVerificationResultLoyaltyEvent {
+    pub fan_id: FanId,
+    pub verification_result_id: FanVerificationResultId,
+    pub loyalty_tier: LoyaltyTier,
+    pub occurred_at: DateTime<Utc>,
+}
+
+impl DomainEvent for FanVerificationResultLoyaltyEvent {
+    fn event_type(&self) -> String {
+        "FanVerificationResultLoyalty".to_string()
+    }
+    
+    fn occurred_at(&self) -> DateTime<Utc> {
+        self.occurred_at
+    }
 }

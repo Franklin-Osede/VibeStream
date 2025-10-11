@@ -12,6 +12,7 @@ pub mod campaign_gateway;
 pub mod listen_reward_gateway;
 pub mod fan_ventures_gateway;
 pub mod notification_gateway;
+pub mod fan_loyalty_gateway;
 
 // Re-export para facilitar el uso
 pub use user_gateway::create_user_gateway;
@@ -21,6 +22,7 @@ pub use campaign_gateway::create_campaign_gateway;
 pub use listen_reward_gateway::create_listen_reward_gateway;
 pub use fan_ventures_gateway::create_fan_ventures_gateway;
 pub use notification_gateway::create_notification_gateway;
+pub use fan_loyalty_gateway::create_fan_loyalty_gateway;
 
 // =============================================================================
 // GATEWAY FACTORY
@@ -44,6 +46,7 @@ impl GatewayFactory {
             ("listen_reward".to_string(), create_listen_reward_gateway(app_state.clone()).await?),
             ("fan_ventures".to_string(), create_fan_ventures_gateway(app_state.clone()).await?),
             ("notification".to_string(), create_notification_gateway(app_state.clone()).await?),
+            ("fan_loyalty".to_string(), create_fan_loyalty_gateway(app_state.clone()).await?),
         ];
         
         Ok(gateways)
@@ -62,6 +65,7 @@ impl GatewayFactory {
             "listen_reward" => create_listen_reward_gateway(app_state).await,
             "fan_ventures" => create_fan_ventures_gateway(app_state).await,
             "notification" => create_notification_gateway(app_state).await,
+            "fan_loyalty" => create_fan_loyalty_gateway(app_state).await,
             _ => Err(format!("Gateway '{}' no encontrado", name).into()),
         }
     }
@@ -170,6 +174,17 @@ impl GatewayConfig {
             host: "127.0.0.1".to_string(),
             cors_enabled: true,
             rate_limiting_enabled: false,
+            health_check_enabled: true,
+        }
+    }
+    
+    pub fn fan_loyalty_gateway() -> Self {
+        Self {
+            name: "fan_loyalty".to_string(),
+            port: 3008,
+            host: "127.0.0.1".to_string(),
+            cors_enabled: true,
+            rate_limiting_enabled: true, // High security for biometric data
             health_check_enabled: true,
         }
     }

@@ -4,6 +4,7 @@ pub mod events;
 pub mod services;
 pub mod value_objects;
 pub mod repository;
+pub mod repositories;
 
 // Re-export commonly used types
 pub use aggregates::*;
