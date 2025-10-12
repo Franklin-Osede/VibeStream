@@ -25,7 +25,7 @@ use crate::bounded_contexts::fan_loyalty::{
 };
 
 /// Dependency injection container for Fan Loyalty System
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct FanLoyaltyContainer {
     // Repositories
     pub fan_verification_repository: Arc<dyn FanVerificationRepository>,
@@ -65,18 +65,55 @@ impl FanLoyaltyContainer {
         event_publisher: Arc<dyn EventPublisher>,
     ) -> Self {
         // Create handlers with injected dependencies
+        // Create handlers with proper dependencies
+        let fan_verification_handler = FanVerificationHandler::new(Arc::new(Self {
+            fan_verification_repository: fan_verification_repository.clone(),
+            wristband_repository: wristband_repository.clone(),
+            qr_code_repository: qr_code_repository.clone(),
+            zk_proof_repository: zk_proof_repository.clone(),
+            nft_repository: nft_repository.clone(),
+            biometric_verification_service: biometric_verification_service.clone(),
+            wristband_service: wristband_service.clone(),
+            qr_code_service: qr_code_service.clone(),
+            nft_service: nft_service.clone(),
+            zk_proof_service: zk_proof_service.clone(),
+            event_publisher: event_publisher.clone(),
+        }));
+        
+        let wristband_handler = WristbandHandler::new(Arc::new(Self {
+            fan_verification_repository: fan_verification_repository.clone(),
+            wristband_repository: wristband_repository.clone(),
+            qr_code_repository: qr_code_repository.clone(),
+            zk_proof_repository: zk_proof_repository.clone(),
+            nft_repository: nft_repository.clone(),
+            biometric_verification_service: biometric_verification_service.clone(),
+            wristband_service: wristband_service.clone(),
+            qr_code_service: qr_code_service.clone(),
+            nft_service: nft_service.clone(),
+            zk_proof_service: zk_proof_service.clone(),
+            event_publisher: event_publisher.clone(),
+        }));
+        
+        let qr_handler = QrCodeHandler::new(Arc::new(Self {
+            fan_verification_repository: fan_verification_repository.clone(),
+            wristband_repository: wristband_repository.clone(),
+            qr_code_repository: qr_code_repository.clone(),
+            zk_proof_repository: zk_proof_repository.clone(),
+            nft_repository: nft_repository.clone(),
+            biometric_verification_service: biometric_verification_service.clone(),
+            wristband_service: wristband_service.clone(),
+            qr_code_service: qr_code_service.clone(),
+            nft_service: nft_service.clone(),
+            zk_proof_service: zk_proof_service.clone(),
+            event_publisher: event_publisher.clone(),
+        }));
+        
         let fan_loyalty_handlers = Arc::new(FanLoyaltyHandlers::new(
-            fan_verification_repository.clone(),
-            wristband_repository.clone(),
-            qr_code_repository.clone(),
-            zk_proof_repository.clone(),
-            nft_repository.clone(),
-            biometric_verification_service.clone(),
-            wristband_service.clone(),
-            qr_code_service.clone(),
+            fan_verification_handler,
+            wristband_handler,
+            qr_handler,
             nft_service.clone(),
-            zk_proof_service.clone(),
-            event_publisher.clone(),
+            qr_code_service.clone(),
         ));
 
         Self {
@@ -252,7 +289,6 @@ pub trait ZkProofHandler: Send + Sync {
 // ============================================================================
 
 /// Fan verification handler implementation
-#[derive(Debug)]
 pub struct FanVerificationHandlerImpl {
     fan_verification_repository: Arc<dyn FanVerificationRepository>,
     biometric_verification_service: Arc<dyn BiometricVerificationService>,
@@ -304,7 +340,6 @@ impl FanVerificationHandler for FanVerificationHandlerImpl {
 }
 
 /// Wristband handler implementation
-#[derive(Debug)]
 pub struct WristbandHandlerImpl {
     wristband_repository: Arc<dyn WristbandRepository>,
     wristband_service: Arc<dyn WristbandService>,
@@ -346,8 +381,8 @@ impl WristbandHandler for WristbandHandlerImpl {
         let event = WristbandCreatedEvent {
             wristband_id: wristband.id.clone(),
             fan_id: wristband.fan_id.clone(),
-            concert_id: wristband.concert_id,
-            artist_id: wristband.artist_id,
+            concert_id: Uuid::parse_str(&wristband.concert_id).unwrap_or_else(|_| Uuid::new_v4()),
+            artist_id: Uuid::parse_str(&wristband.artist_id).unwrap_or_else(|_| Uuid::new_v4()),
             wristband_type: wristband.wristband_type.clone(),
             created_at: Utc::now(),
         };
@@ -385,7 +420,6 @@ impl WristbandHandler for WristbandHandlerImpl {
 }
 
 /// QR code handler implementation
-#[derive(Debug)]
 pub struct QrCodeHandlerImpl {
     qr_code_repository: Arc<dyn QrCodeRepository>,
     qr_code_service: Arc<dyn QrCodeService>,
@@ -427,7 +461,7 @@ impl QrCodeHandler for QrCodeHandlerImpl {
         self.qr_code_repository.log_qr_scan(
             &command.qr_code,
             &command.scanner_id,
-            command.location.map(|loc| (loc.latitude, loc.longitude, loc.accuracy)),
+            command.location.as_ref().map(|loc| (loc.latitude, loc.longitude, loc.accuracy)),
         ).await?;
 
         // Publish event
@@ -447,7 +481,6 @@ impl QrCodeHandler for QrCodeHandlerImpl {
 }
 
 /// ZK proof handler implementation
-#[derive(Debug)]
 pub struct ZkProofHandlerImpl {
     zk_proof_repository: Arc<dyn ZkProofRepository>,
     zk_proof_service: Arc<dyn ZkProofService>,
@@ -552,38 +585,15 @@ pub struct VerifyZkProofCommand {
 // SUPPORTING TYPES
 // ============================================================================
 
-/// Biometric data
-#[derive(Debug, Clone)]
-pub struct BiometricData {
-    pub audio_sample: Option<String>,
-    pub behavioral_patterns: BehavioralPatterns,
-    pub device_characteristics: DeviceCharacteristics,
-    pub location: Option<LocationData>,
-}
+// Use domain types directly - no duplicate definitions needed
 
-/// Behavioral patterns
-#[derive(Debug, Clone)]
-pub struct BehavioralPatterns {
-    pub listening_duration: u32,
-    pub skip_frequency: f32,
-    pub volume_preferences: Vec<f32>,
-    pub time_of_day_patterns: Vec<String>,
-}
-
-/// Device characteristics
-#[derive(Debug, Clone)]
-pub struct DeviceCharacteristics {
-    pub device_type: String,
-    pub os_version: String,
-    pub app_version: String,
-    pub hardware_fingerprint: String,
-}
-
-// Location data - using domain type
-use crate::bounded_contexts::fan_loyalty::domain::services::LocationData;
-
-// Biometric proof data - using domain type
+// Use domain types directly
+use crate::bounded_contexts::fan_loyalty::domain::services::{
+    LocationData, BiometricData, FanVerifiedEvent, WristbandCreatedEvent, 
+    WristbandActivatedEvent, QrCodeScannedEvent, QrCodeValidation, QrCodeScanResult
+};
 use crate::bounded_contexts::fan_loyalty::domain::entities::BiometricProofData;
+use crate::bounded_contexts::fan_loyalty::domain::repositories::ZkProof;
 
 /// Wristband activation result
 #[derive(Debug, Clone)]
@@ -594,14 +604,7 @@ pub struct WristbandActivationResult {
     pub benefits_activated: Vec<String>,
 }
 
-// QR code validation - using domain type
-use crate::bounded_contexts::fan_loyalty::domain::services::QrCodeValidation;
-
-// QR code scan result - using domain type
-use crate::bounded_contexts::fan_loyalty::domain::services::QrCodeScanResult;
-
-// ZK proof - using domain type
-use crate::bounded_contexts::fan_loyalty::domain::repositories::ZkProof;
+// All domain types are already imported above
 
 /// ZK proof types
 #[derive(Debug, Clone, PartialEq)]
@@ -611,37 +614,9 @@ pub enum ZkProofType {
     Ownership,
 }
 
-/// Domain events
-#[derive(Debug, Clone)]
-pub struct FanVerifiedEvent {
-    pub fan_id: FanId,
-    pub verification_id: String,
-    pub confidence_score: f32,
-    pub wristband_eligible: bool,
-    pub benefits_unlocked: Vec<String>,
-    pub occurred_at: DateTime<Utc>,
-}
+// Use domain event types directly - no duplicate definitions needed
 
-#[derive(Debug, Clone)]
-pub struct WristbandCreatedEvent {
-    pub wristband_id: WristbandId,
-    pub fan_id: FanId,
-    pub concert_id: Uuid,
-    pub artist_id: Uuid,
-    pub wristband_type: WristbandType,
-    pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone)]
-pub struct WristbandActivatedEvent {
-    pub wristband_id: WristbandId,
-    pub fan_id: FanId,
-    pub activation_reason: String,
-    pub activated_at: DateTime<Utc>,
-}
-
-// QrCodeScannedEvent - using domain type
-use crate::bounded_contexts::fan_loyalty::domain::services::QrCodeScannedEvent;
+// All domain types are already imported above
 
 #[cfg(test)]
 mod tests {

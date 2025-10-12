@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
+use std::fmt;
 
 // =============================================================================
 // FAN VENTURES - ENTITIES (Reemplazando Fractional Ownership)
@@ -95,6 +96,17 @@ pub enum VentureStatus {
     Open,       // Abierto para inversiones
     Closed,     // Cerrado
     Cancelled,  // Cancelado
+}
+
+impl fmt::Display for VentureStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            VentureStatus::Draft => write!(f, "Draft"),
+            VentureStatus::Open => write!(f, "Open"),
+            VentureStatus::Closed => write!(f, "Closed"),
+            VentureStatus::Cancelled => write!(f, "Cancelled"),
+        }
+    }
 }
 
 /// Tier de inversión para un venture
@@ -495,12 +507,41 @@ pub enum VentureCategory {
     Other,
 }
 
+impl fmt::Display for VentureCategory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            VentureCategory::Music => write!(f, "Music"),
+            VentureCategory::VisualArts => write!(f, "Visual Arts"),
+            VentureCategory::Film => write!(f, "Film"),
+            VentureCategory::Gaming => write!(f, "Gaming"),
+            VentureCategory::Technology => write!(f, "Technology"),
+            VentureCategory::Fashion => write!(f, "Fashion"),
+            VentureCategory::Food => write!(f, "Food"),
+            VentureCategory::Travel => write!(f, "Travel"),
+            VentureCategory::Education => write!(f, "Education"),
+            VentureCategory::Health => write!(f, "Health"),
+            VentureCategory::Other => write!(f, "Other"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RiskLevel {
     Low,
     Medium,
     High,
     VeryHigh,
+}
+
+impl fmt::Display for RiskLevel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RiskLevel::Low => write!(f, "Low"),
+            RiskLevel::Medium => write!(f, "Medium"),
+            RiskLevel::High => write!(f, "High"),
+            RiskLevel::VeryHigh => write!(f, "Very High"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

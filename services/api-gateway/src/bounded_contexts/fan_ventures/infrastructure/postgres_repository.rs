@@ -273,7 +273,7 @@ benefits: vec![], // TODO: Load benefits separately
     pub async fn get_investment_by_id(&self, investment_id: Uuid) -> Result<Option<FanInvestment>, AppError> {
         let row = sqlx::query!(
             r#"
-            SELECT id, fan_id, venture_id, investment_amount, created_at, status, created_at, updated_at
+            SELECT id, fan_id, venture_id, investment_amount, created_at, status, updated_at
             FROM fan_investments
             WHERE id = $1
             "#,
@@ -301,7 +301,7 @@ benefits: vec![], // TODO: Load benefits separately
     pub async fn get_investments_by_venture(&self, venture_id: Uuid) -> Result<Vec<FanInvestment>, AppError> {
         let rows = sqlx::query!(
             r#"
-            SELECT id, fan_id, venture_id, investment_amount, created_at, status, created_at, updated_at
+            SELECT id, fan_id, venture_id, investment_amount, created_at, status, updated_at
             FROM fan_investments
             WHERE venture_id = $1
             ORDER BY created_at DESC

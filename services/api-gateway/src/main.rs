@@ -1,4 +1,8 @@
-use api_gateway::gateways::*;
+use api_gateway::gateways::{
+    create_user_gateway, create_music_gateway, create_payment_gateway,
+    create_campaign_gateway, create_listen_reward_gateway, create_fan_ventures_gateway,
+    create_notification_gateway, create_fan_loyalty_gateway,  // Re-enabled after fixing all errors
+};
 use api_gateway::shared::infrastructure::app_state::AppState;
 use api_gateway::openapi::router::create_openapi_router;
 use axum::{
@@ -125,7 +129,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         listen_reward_server,
         fan_ventures_server,
         notification_server,
-        fan_loyalty_server  // Fan Loyalty Gateway - Re-enabled after fixing compilation issues
+        fan_loyalty_server  // Fan Loyalty Gateway - Re-enabled after fixing all errors
     )?;
 
     Ok(())

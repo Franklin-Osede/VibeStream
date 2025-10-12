@@ -3,22 +3,20 @@ use std::sync::Arc;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
-use crate::bounded_contexts::fan_loyalty::{
-    domain::{
-        repositories::{
-            FanVerificationRepository, WristbandRepository, QrCodeRepository,
-            ZkProofRepository, NftRepository
+    use crate::bounded_contexts::fan_loyalty::{
+        domain::{
+            repositories::{
+                FanVerificationRepository, WristbandRepository, QrCodeRepository,
+                ZkProofRepository, NftRepository
+            },
+            services::{
+                BiometricVerificationService, WristbandService, QrCodeService,
+                NftService, ZkProofService, EventPublisher, QrCodeScannedEvent,
+                FanVerifiedEvent, WristbandCreatedEvent, WristbandActivatedEvent
+            },
+            entities::{FanId, WristbandId, WristbandType, NftWristband, FanVerificationResult},
         },
-        services::{
-            BiometricVerificationService, WristbandService, QrCodeService,
-            NftService, ZkProofService, EventPublisher, QrCodeScannedEvent
-        },
-        entities::{FanId, WristbandId, WristbandType, NftWristband, FanVerificationResult},
-    },
-    application::dependency_injection::{
-        FanVerifiedEvent, WristbandCreatedEvent, WristbandActivatedEvent,
-    },
-};
+    };
 
 /// Event handler trait for domain events
 #[async_trait]
