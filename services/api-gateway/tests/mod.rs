@@ -10,6 +10,15 @@ pub mod user_controller_tests;
 pub mod payment_controller_tests;
 pub mod campaign_controller_tests;
 
+// Gateway integration tests (TDD)
+pub mod user_gateway_integration_tests;
+
+// OpenAPI integration tests (TDD)
+pub mod openapi_integration_tests;
+
+// Auth middleware tests (TDD)
+pub mod auth_middleware_tests;
+
 // Legacy tests
 pub mod integration_tests;
 pub mod payment_gateways_integration_tests;

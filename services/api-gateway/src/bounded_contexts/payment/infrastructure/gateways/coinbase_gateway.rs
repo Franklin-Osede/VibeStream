@@ -203,7 +203,7 @@ impl PaymentGateway for CoinbaseGateway {
     ) -> Result<RefundResult, AppError> {
         // Cryptocurrency refunds are not supported in the traditional sense
         // They would require a separate transaction
-        Err(AppError::NotSupported(
+        Err(AppError::InvalidInput(
             "Cryptocurrency refunds require manual processing and separate transactions".to_string()
         ))
     }

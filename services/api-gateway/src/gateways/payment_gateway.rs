@@ -2,49 +2,56 @@
 // PAYMENT GATEWAY - GESTIÓN DE PAGOS INDEPENDIENTE
 // =============================================================================
 
-use axum::{Router, routing::{get, post, put, delete}, response::Json as ResponseJson};
+use axum::{Router, routing::get, response::Json as ResponseJson};
 use serde_json::json;
+use std::sync::Arc;
 use crate::shared::infrastructure::app_state::AppState;
+use crate::bounded_contexts::payment::infrastructure::repositories::{
+    PostgreSQLPaymentRepository as PostgresPaymentRepository,
+    PostgresRoyaltyRepository,
+    PostgresWalletRepository,
+};
+use crate::bounded_contexts::payment::infrastructure::webhooks::WebhookRouter;
+use crate::bounded_contexts::payment::presentation::controllers::payment_controller::{
+    PaymentController, create_payment_controller,
+};
 
-/// Crear el gateway de pagos básico
-pub async fn create_payment_gateway(_app_state: AppState) -> Result<Router, Box<dyn std::error::Error>> {
+/// Crear el gateway de pagos con controllers reales
+/// TDD GREEN PHASE: Conecta el gateway a controllers reales
+pub async fn create_payment_gateway(app_state: AppState) -> Result<Router, Box<dyn std::error::Error>> {
+    let pool = app_state.get_db_pool();
+    
+    // Crear repositorios
+    let payment_repository = Arc::new(PostgresPaymentRepository::new(pool.clone()));
+    let royalty_repository = Arc::new(PostgresRoyaltyRepository::new(pool.clone()));
+    let wallet_repository = Arc::new(PostgresWalletRepository::new(pool.clone()));
+    
+    // Crear WebhookRouter
+    let webhook_router = Arc::new(WebhookRouter::new());
+    
+    // Crear controller
+    let payment_controller = create_payment_controller(
+        payment_repository,
+        royalty_repository,
+        wallet_repository,
+        webhook_router,
+    );
+    
+    // Obtener rutas del controller
+    let payment_routes = PaymentController::routes(payment_controller);
+    
+    // Crear router principal con health/info + rutas reales
     let router = Router::new()
         // =============================================================================
-        // HEALTH & INFO ENDPOINTS
+        // HEALTH & INFO ENDPOINTS (mantener estos)
         // =============================================================================
         .route("/health", get(health_check))
         .route("/info", get(gateway_info))
         
         // =============================================================================
-        // PAYMENT PROCESSING ENDPOINTS
+        // PAYMENT ROUTES REALES (conectados a controllers)
         // =============================================================================
-        .route("/payments", get(get_payments))
-        .route("/payments", post(create_payment))
-        .route("/payments/:id", get(get_payment))
-        .route("/payments/:id/process", post(process_payment))
-        .route("/payments/:id/cancel", post(cancel_payment))
-        
-        // =============================================================================
-        // WALLET MANAGEMENT
-        // =============================================================================
-        .route("/wallets", get(get_wallets))
-        .route("/wallets", post(create_wallet))
-        .route("/wallets/:id", get(get_wallet))
-        .route("/wallets/:id/balance", get(get_wallet_balance))
-        .route("/wallets/:id/transactions", get(get_wallet_transactions))
-        
-        // =============================================================================
-        // BLOCKCHAIN TRANSACTIONS
-        // =============================================================================
-        .route("/blockchain/transactions", get(get_blockchain_transactions))
-        .route("/blockchain/transactions", post(create_blockchain_transaction))
-        .route("/blockchain/transactions/:id", get(get_blockchain_transaction))
-        
-        // =============================================================================
-        // ADMIN ENDPOINTS
-        // =============================================================================
-        .route("/admin/payments", get(get_all_payments_admin))
-        .route("/admin/wallets", get(get_all_wallets_admin));
+        .merge(payment_routes);
     
     Ok(router)
 }
@@ -73,109 +80,8 @@ async fn gateway_info() -> ResponseJson<serde_json::Value> {
 }
 
 // =============================================================================
-// PAYMENT PROCESSING HANDLERS
+// NOTA: Los handlers reales están en payment_controller.rs
+// Estos handlers TODO fueron reemplazados por controllers reales
+// La conexión completa se hará cuando PostgresRoyaltyRepository y 
+// PostgresWalletRepository estén implementados
 // =============================================================================
-
-async fn get_payments() -> ResponseJson<serde_json::Value> {
-    ResponseJson(json!({
-        "payments": [],
-        "total": 0,
-        "message": "Get payments endpoint - TODO: Implement with real service"
-    }))
-}
-
-async fn create_payment() -> ResponseJson<serde_json::Value> {
-    ResponseJson(json!({
-        "message": "Create payment endpoint - TODO: Implement with real service"
-    }))
-}
-
-async fn get_payment() -> ResponseJson<serde_json::Value> {
-    ResponseJson(json!({
-        "message": "Get payment endpoint - TODO: Implement with real service"
-    }))
-}
-
-async fn process_payment() -> ResponseJson<serde_json::Value> {
-    ResponseJson(json!({
-        "message": "Process payment endpoint - TODO: Implement with real service"
-    }))
-}
-
-async fn cancel_payment() -> ResponseJson<serde_json::Value> {
-    ResponseJson(json!({
-        "message": "Cancel payment endpoint - TODO: Implement with real service"
-    }))
-}
-
-// =============================================================================
-// WALLET MANAGEMENT HANDLERS
-// =============================================================================
-
-async fn get_wallets() -> ResponseJson<serde_json::Value> {
-    ResponseJson(json!({
-        "message": "Get wallets endpoint - TODO: Implement with real service"
-    }))
-}
-
-async fn create_wallet() -> ResponseJson<serde_json::Value> {
-    ResponseJson(json!({
-        "message": "Create wallet endpoint - TODO: Implement with real service"
-    }))
-}
-
-async fn get_wallet() -> ResponseJson<serde_json::Value> {
-    ResponseJson(json!({
-        "message": "Get wallet endpoint - TODO: Implement with real service"
-    }))
-}
-
-async fn get_wallet_balance() -> ResponseJson<serde_json::Value> {
-    ResponseJson(json!({
-        "message": "Get wallet balance endpoint - TODO: Implement with real service"
-    }))
-}
-
-async fn get_wallet_transactions() -> ResponseJson<serde_json::Value> {
-    ResponseJson(json!({
-        "message": "Get wallet transactions endpoint - TODO: Implement with real service"
-    }))
-}
-
-// =============================================================================
-// BLOCKCHAIN TRANSACTION HANDLERS
-// =============================================================================
-
-async fn get_blockchain_transactions() -> ResponseJson<serde_json::Value> {
-    ResponseJson(json!({
-        "message": "Get blockchain transactions endpoint - TODO: Implement with real service"
-    }))
-}
-
-async fn create_blockchain_transaction() -> ResponseJson<serde_json::Value> {
-    ResponseJson(json!({
-        "message": "Create blockchain transaction endpoint - TODO: Implement with real service"
-    }))
-}
-
-async fn get_blockchain_transaction() -> ResponseJson<serde_json::Value> {
-    ResponseJson(json!({
-        "message": "Get blockchain transaction endpoint - TODO: Implement with real service"
-    }))
-}
-
-// =============================================================================
-// ADMIN HANDLERS
-// =============================================================================
-
-async fn get_all_payments_admin() -> ResponseJson<serde_json::Value> {
-    ResponseJson(json!({
-        "message": "Get all payments admin endpoint - TODO: Implement with real service"
-    }))
-}
-
-async fn get_all_wallets_admin() -> ResponseJson<serde_json::Value> {
-    ResponseJson(json!({
-        "message": "Get all wallets admin endpoint - TODO: Implement with real service"
-    }))
-}

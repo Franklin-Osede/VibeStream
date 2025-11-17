@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use crate::services::{MessageQueue, DatabasePool};
-use crate::bounded_contexts::orchestrator::{EventBus, DomainEvent};
+use crate::bounded_contexts::orchestrator::{EventBus, DomainEvent, RedisStreamsEventBus, RedisStreamsEventWorker};
 use crate::bounded_contexts::music::domain::repositories::{AlbumRepository, PlaylistRepository};
 
 // =============================================================================
@@ -14,7 +14,6 @@ use crate::bounded_contexts::music::domain::repositories::{AlbumRepository, Play
 /// - **Event Bus**: Para comunicación entre contextos
 /// - **Context-Specific State**: Cada contexto maneja su propio estado
 /// - **Minimal Dependencies**: Solo dependencias esenciales
-#[derive(Clone)]
 pub struct AppState {
     // =============================================================================
     // SHARED INFRASTRUCTURE (Solo recursos realmente compartidos)
@@ -22,6 +21,21 @@ pub struct AppState {
     pub message_queue: MessageQueue,
     pub database_pool: DatabasePool,
     pub event_bus: Arc<dyn EventBus>,
+    // Worker para procesar eventos de Redis Streams (opcional, solo si usamos Redis Streams)
+    // No se clona porque JoinHandle no es clonable, pero el worker sigue corriendo en background
+    _event_worker_handle: Option<tokio::task::JoinHandle<()>>,
+}
+
+impl Clone for AppState {
+    fn clone(&self) -> Self {
+        // El worker handle no se clona, pero el worker sigue corriendo en background
+        Self {
+            message_queue: self.message_queue.clone(),
+            database_pool: self.database_pool.clone(),
+            event_bus: Arc::clone(&self.event_bus),
+            _event_worker_handle: None, // No clonamos el handle, pero el worker sigue activo
+        }
+    }
 }
 
 impl AppState {
@@ -40,12 +54,17 @@ impl AppState {
         // Inicializar solo servicios compartidos esenciales
         let message_queue = MessageQueue::new(redis_url).await?;
         let database_pool = DatabasePool::new(database_url).await?;
-        let event_bus = crate::bounded_contexts::orchestrator::EventBusFactory::create_event_bus();
+        
+        // Usar Redis Streams Event Bus para producción
+        let (event_bus, event_worker_handle) = crate::bounded_contexts::orchestrator::EventBusFactory::create_redis_streams_event_bus(redis_url)
+            .await
+            .map_err(|e| format!("Failed to create Redis Streams Event Bus: {}", e))?;
         
         Ok(Self {
             message_queue,
             database_pool,
             event_bus,
+            _event_worker_handle: event_worker_handle,
         })
     }
     
@@ -72,6 +91,7 @@ impl AppState {
         self.event_bus.publish(event).await
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
     }
+
     
     /// Verificar el estado de salud de los servicios compartidos
     pub async fn health_check(&self) -> Result<HealthStatus, Box<dyn std::error::Error + Send + Sync>> {

@@ -3,11 +3,13 @@ pub mod stripe_webhook;
 pub mod paypal_webhook;
 pub mod coinbase_webhook;
 pub mod webhook_router;
+pub mod webhook_queue;
 
 pub use stripe_webhook::StripeWebhookHandler;
 pub use paypal_webhook::PayPalWebhookHandler;
 pub use coinbase_webhook::CoinbaseWebhookHandler;
 pub use webhook_router::WebhookRouter;
+pub use webhook_queue::{WebhookQueueProcessor, WebhookQueueWorker, WebhookQueueMessage, ReconciliationResult};
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};

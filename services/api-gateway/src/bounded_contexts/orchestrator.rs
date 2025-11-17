@@ -173,14 +173,17 @@ pub trait EventBus: Send + Sync {
 // IN-MEMORY EVENT BUS IMPLEMENTATION
 // =============================================================================
 
+use tokio::sync::RwLock;
+use std::collections::HashMap;
+
 pub struct InMemoryEventBus {
-    handlers: std::collections::HashMap<String, Vec<Arc<dyn EventHandler>>>,
+    handlers: Arc<RwLock<HashMap<String, Vec<Arc<dyn EventHandler>>>>>,
 }
 
 impl InMemoryEventBus {
     pub fn new() -> Self {
         Self {
-            handlers: std::collections::HashMap::new(),
+            handlers: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 }
@@ -190,11 +193,16 @@ impl EventBus for InMemoryEventBus {
     async fn publish(&self, event: DomainEvent) -> Result<(), AppError> {
         let event_type = event.event_type();
         
-        if let Some(handlers) = self.handlers.get(event_type) {
-            for handler in handlers {
-                if let Err(e) = handler.handle(&event).await {
-                    tracing::error!("Error handling event {}: {:?}", event_type, e);
-                }
+        // Obtener handlers de forma thread-safe
+        let handlers = {
+            let handlers_guard = self.handlers.read().await;
+            handlers_guard.get(event_type).cloned().unwrap_or_default()
+        };
+        
+        // Ejecutar handlers
+        for handler in handlers {
+            if let Err(e) = handler.handle(&event).await {
+                tracing::error!("Error handling event {}: {:?}", event_type, e);
             }
         }
         
@@ -202,9 +210,16 @@ impl EventBus for InMemoryEventBus {
     }
 
     async fn subscribe(&self, event_type: &str, handler: Arc<dyn EventHandler>) -> Result<(), AppError> {
-        // Note: This is a simplified implementation
-        // In a real system, you'd want thread-safe mutable access
-        tracing::info!("Subscribing handler to event type: {}", event_type);
+        // TDD GREEN PHASE: Guardar handler de forma thread-safe
+        let mut handlers_guard = self.handlers.write().await;
+        
+        handlers_guard
+            .entry(event_type.to_string())
+            .or_insert_with(Vec::new)
+            .push(handler);
+        
+        tracing::info!("✅ Registered handler for event type: {}", event_type);
+        
         Ok(())
     }
 }
@@ -336,27 +351,89 @@ impl EventHandler for FanVenturesEventHandlers {
 }
 
 // =============================================================================
+// REDIS STREAMS EVENT BUS (Importar aquí)
+// =============================================================================
+
+mod redis_streams_event_bus;
+pub use redis_streams_event_bus::{RedisStreamsEventBus, RedisStreamsEventWorker};
+
+// =============================================================================
 // EVENT BUS FACTORY
 // =============================================================================
 
 pub struct EventBusFactory;
 
 impl EventBusFactory {
-    pub fn create_event_bus() -> Arc<dyn EventBus> {
+    /// Crear un Event Bus usando Redis Streams (producción)
+    /// 
+    /// # Arguments
+    /// * `redis_url` - URL de conexión a Redis
+    /// 
+    /// # Returns
+    /// * `Result<(Arc<dyn EventBus>, Option<tokio::task::JoinHandle<()>>), AppError>` - Event bus y worker handle
+    pub async fn create_redis_streams_event_bus(redis_url: &str) -> Result<(Arc<dyn EventBus>, Option<tokio::task::JoinHandle<()>>), AppError> {
+        let redis_event_bus = Arc::new(RedisStreamsEventBus::new(redis_url).await?);
+        let event_bus: Arc<dyn EventBus> = Arc::clone(&redis_event_bus);
+        
+        // Registrar handlers reales para todos los contextos
+        Self::register_handlers(Arc::clone(&event_bus)).await?;
+        
+        // Iniciar worker para procesar eventos
+        let worker = RedisStreamsEventWorker::new(redis_event_bus);
+        let worker_handle = Some(worker.start());
+        
+        tracing::info!("✅ Redis Streams Event Worker started");
+        
+        Ok((event_bus, worker_handle))
+    }
+
+    /// Crear un Event Bus en memoria (solo para testing)
+    /// TDD GREEN PHASE: Ahora registra handlers correctamente
+    pub async fn create_event_bus() -> Result<Arc<dyn EventBus>, AppError> {
         let event_bus = Arc::new(InMemoryEventBus::new());
         
-        // Register event handlers
+        // Registrar handlers reales (ahora funciona correctamente)
+        Self::register_handlers(Arc::clone(&event_bus)).await?;
+        
+        tracing::warn!("⚠️  Using InMemoryEventBus - not suitable for production. Use create_redis_streams_event_bus instead.");
+        
+        Ok(event_bus)
+    }
+
+    /// Registrar todos los handlers de eventos
+    async fn register_handlers(event_bus: Arc<dyn EventBus>) -> Result<(), AppError> {
+        // User Context Handlers
         let user_handlers = Arc::new(UserEventHandlers);
+        event_bus.subscribe("UserRegistered", Arc::clone(&user_handlers) as Arc<dyn EventHandler>).await?;
+        event_bus.subscribe("UserAuthenticated", Arc::clone(&user_handlers) as Arc<dyn EventHandler>).await?;
+        event_bus.subscribe("UserProfileUpdated", Arc::clone(&user_handlers) as Arc<dyn EventHandler>).await?;
+
+        // Music Context Handlers
         let music_handlers = Arc::new(MusicEventHandlers);
+        event_bus.subscribe("SongListened", Arc::clone(&music_handlers) as Arc<dyn EventHandler>).await?;
+        event_bus.subscribe("SongLiked", Arc::clone(&music_handlers) as Arc<dyn EventHandler>).await?;
+        event_bus.subscribe("SongShared", Arc::clone(&music_handlers) as Arc<dyn EventHandler>).await?;
+
+        // Campaign Context Handlers
         let campaign_handlers = Arc::new(CampaignEventHandlers);
+        event_bus.subscribe("CampaignCreated", Arc::clone(&campaign_handlers) as Arc<dyn EventHandler>).await?;
+        event_bus.subscribe("CampaignActivated", Arc::clone(&campaign_handlers) as Arc<dyn EventHandler>).await?;
+        event_bus.subscribe("NFTPurchased", Arc::clone(&campaign_handlers) as Arc<dyn EventHandler>).await?;
+
+        // Listen Reward Context Handlers
         let listen_reward_handlers = Arc::new(ListenRewardEventHandlers);
+        event_bus.subscribe("ListenSessionStarted", Arc::clone(&listen_reward_handlers) as Arc<dyn EventHandler>).await?;
+        event_bus.subscribe("ListenSessionCompleted", Arc::clone(&listen_reward_handlers) as Arc<dyn EventHandler>).await?;
+
+        // Fan Ventures Context Handlers
         let fan_ventures_handlers = Arc::new(FanVenturesEventHandlers);
+        event_bus.subscribe("VentureCreated", Arc::clone(&fan_ventures_handlers) as Arc<dyn EventHandler>).await?;
+        event_bus.subscribe("InvestmentMade", Arc::clone(&fan_ventures_handlers) as Arc<dyn EventHandler>).await?;
+        event_bus.subscribe("BenefitDelivered", Arc::clone(&fan_ventures_handlers) as Arc<dyn EventHandler>).await?;
+
+        tracing::info!("✅ Registered event handlers for all bounded contexts");
         
-        // Note: In a real implementation, you'd register these handlers
-        // For now, we'll just log that they would be registered
-        tracing::info!("Event handlers would be registered for all contexts");
-        
-        event_bus
+        Ok(())
     }
 }
 
@@ -371,7 +448,8 @@ pub struct BoundedContextOrchestrator {
 
 impl BoundedContextOrchestrator {
     pub async fn new() -> Result<Self, AppError> {
-        let event_bus = EventBusFactory::create_event_bus();
+        let event_bus = EventBusFactory::create_event_bus().await
+            .map_err(|e| AppError::InternalError(format!("Failed to create event bus: {}", e)))?;
         
         Ok(Self {
             event_bus,

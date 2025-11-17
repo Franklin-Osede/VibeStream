@@ -4,22 +4,30 @@
 use axum::{
     routing::{get, post, put, delete},
     Router,
+    middleware,
 };
 use std::sync::Arc;
 
 use super::controllers::user_controller::*;
 use crate::bounded_contexts::user::application::services::UserApplicationService;
 use crate::shared::infrastructure::database::postgres::PostgresUserRepository;
+use crate::shared::infrastructure::auth::middleware::jwt_auth_middleware;
 
 /// Configure user routes with comprehensive REST API endpoints
+/// TDD GREEN PHASE: Aplica auth middleware a rutas protegidas
 pub fn configure_user_routes(
     user_service: Arc<UserApplicationService<PostgresUserRepository>>,
 ) -> Router {
-    Router::new()
-        // Authentication & Registration
+    // Rutas públicas (no requieren autenticación)
+    let public_routes = Router::new()
+        // Authentication & Registration (públicas)
         .route("/register", post(register_user))
         .route("/login", post(login_user))
-        
+        // Search básico puede ser público (con limitaciones)
+        .route("/search", get(search_users));
+    
+    // Rutas protegidas (requieren JWT)
+    let protected_routes = Router::new()
         // User Profile Management
         .route("/:user_id", get(get_user_profile))
         .route("/:user_id", put(update_user_profile))
@@ -27,9 +35,6 @@ pub fn configure_user_routes(
         
         // User Statistics & Analytics
         .route("/:user_id/stats", get(get_user_stats))
-        
-        // User Search & Discovery
-        .route("/search", get(search_users))
         
         // Social Features
         .route("/:user_id/follow", post(follow_user))
@@ -43,6 +48,13 @@ pub fn configure_user_routes(
         // Admin Analytics
         .route("/analytics", get(get_user_analytics))
         
+        // Aplicar middleware de autenticación a todas las rutas protegidas
+        .layer(middleware::from_fn(jwt_auth_middleware));
+    
+    // Combinar rutas públicas y protegidas
+    Router::new()
+        .merge(public_routes)
+        .merge(protected_routes)
         // Set the user service as shared state
         .with_state((*user_service).clone())
 }

@@ -33,7 +33,9 @@ use crate::bounded_contexts::payment::infrastructure::repositories::{
 };
 use crate::bounded_contexts::payment::infrastructure::webhooks::{
     WebhookRouter, StripeWebhookHandler, PayPalWebhookHandler, CoinbaseWebhookHandler,
+    WebhookQueueProcessor, ReconciliationResult,
 };
+use crate::services::MessageQueue;
 use crate::bounded_contexts::payment::infrastructure::gateways::{
     StripeGateway, PayPalGateway, CoinbaseGateway,
 };
@@ -266,6 +268,7 @@ pub struct PaymentController {
     royalty_repository: Arc<PostgresRoyaltyRepository>,
     wallet_repository: Arc<PostgresWalletRepository>,
     webhook_router: Arc<WebhookRouter>,
+    webhook_queue_processor: Option<Arc<WebhookQueueProcessor>>,
 }
 
 impl PaymentController {
@@ -274,12 +277,14 @@ impl PaymentController {
         royalty_repository: Arc<PostgresRoyaltyRepository>,
         wallet_repository: Arc<PostgresWalletRepository>,
         webhook_router: Arc<WebhookRouter>,
+        webhook_queue_processor: Option<Arc<WebhookQueueProcessor>>,
     ) -> Self {
         Self {
             payment_repository,
             royalty_repository,
             wallet_repository,
             webhook_router,
+            webhook_queue_processor,
         }
     }
 
@@ -325,6 +330,9 @@ impl PaymentController {
             .route("/webhooks/paypal", post(Self::paypal_webhook))
             .route("/webhooks/coinbase", post(Self::coinbase_webhook))
             .route("/webhooks/:gateway", post(Self::generic_webhook))
+            
+            // Reconciliation endpoints
+            .route("/reconcile/:payment_id", post(Self::reconcile_payment))
             
             .with_state(controller)
     }
@@ -798,6 +806,21 @@ impl PaymentController {
             .and_then(|h| h.to_str().ok())
             .ok_or(StatusCode::BAD_REQUEST)?;
 
+        // If queue processor is available, enqueue for async processing
+        if let Some(ref queue_processor) = controller.webhook_queue_processor {
+            match queue_processor.enqueue_webhook("stripe", &body, signature).await {
+                Ok(webhook_id) => {
+                    tracing::info!("Enqueued Stripe webhook: {}", webhook_id);
+                    return Ok(Json(ApiResponse::success(())));
+                }
+                Err(e) => {
+                    tracing::error!("Failed to enqueue Stripe webhook: {:?}", e);
+                    // Fallback to synchronous processing
+                }
+            }
+        }
+
+        // Fallback to synchronous processing
         match controller.webhook_router.route_webhook("stripe", &body, signature).await {
             Ok(result) => {
                 if result.success {
@@ -823,6 +846,21 @@ impl PaymentController {
             .and_then(|h| h.to_str().ok())
             .ok_or(StatusCode::BAD_REQUEST)?;
 
+        // If queue processor is available, enqueue for async processing
+        if let Some(ref queue_processor) = controller.webhook_queue_processor {
+            match queue_processor.enqueue_webhook("paypal", &body, signature).await {
+                Ok(webhook_id) => {
+                    tracing::info!("Enqueued PayPal webhook: {}", webhook_id);
+                    return Ok(Json(ApiResponse::success(())));
+                }
+                Err(e) => {
+                    tracing::error!("Failed to enqueue PayPal webhook: {:?}", e);
+                    // Fallback to synchronous processing
+                }
+            }
+        }
+
+        // Fallback to synchronous processing
         match controller.webhook_router.route_webhook("paypal", &body, signature).await {
             Ok(result) => {
                 if result.success {
@@ -848,6 +886,20 @@ impl PaymentController {
             .and_then(|h| h.to_str().ok())
             .ok_or(StatusCode::BAD_REQUEST)?;
 
+        // If queue processor is available, enqueue for async processing
+        if let Some(ref queue_processor) = controller.webhook_queue_processor {
+            match queue_processor.enqueue_webhook("coinbase", &body, signature).await {
+                Ok(webhook_id) => {
+                    tracing::info!("Enqueued Coinbase webhook: {}", webhook_id);
+                    return Ok(Json(ApiResponse::success(())));
+                }
+                Err(e) => {
+                    tracing::error!("Failed to enqueue Coinbase webhook: {:?}", e);
+                    // Fallback to synchronous processing
+                }
+            }
+        }
+
         match controller.webhook_router.route_webhook("coinbase", &body, signature).await {
             Ok(result) => {
                 if result.success {
@@ -860,6 +912,25 @@ impl PaymentController {
                 tracing::error!("Coinbase webhook error: {:?}", e);
                 Err(StatusCode::BAD_REQUEST)
             }
+        }
+    }
+
+    /// POST /payments/reconcile/:payment_id
+    /// Reconcile payment with webhook events
+    async fn reconcile_payment(
+        State(controller): State<Arc<Self>>,
+        Path(payment_id): Path<Uuid>,
+    ) -> Result<Json<ApiResponse<ReconciliationResult>>, StatusCode> {
+        if let Some(ref queue_processor) = controller.webhook_queue_processor {
+            match queue_processor.reconcile_payment(payment_id).await {
+                Ok(result) => Ok(Json(ApiResponse::success(result))),
+                Err(e) => {
+                    tracing::error!("Reconciliation error: {:?}", e);
+                    Err(StatusCode::INTERNAL_SERVER_ERROR)
+                }
+            }
+        } else {
+            Err(StatusCode::NOT_IMPLEMENTED)
         }
     }
 

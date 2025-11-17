@@ -7,6 +7,7 @@ pub mod handlers;
 pub mod services;
 pub mod shared;
 pub mod openapi;
+pub mod oauth; // Real OAuth implementation
 // pub mod complete_router; // TODO: Fix errors before enabling
 
 // Solo el music context sin dependencias problemáticas

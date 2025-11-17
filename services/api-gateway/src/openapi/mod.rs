@@ -8,6 +8,7 @@ use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 pub mod router;
+pub mod paths;
 
 /// Función para generar la documentación OpenAPI completa
 pub fn generate_openapi_spec() -> String {
@@ -15,15 +16,8 @@ pub fn generate_openapi_spec() -> String {
     serde_json::to_string_pretty(&spec).unwrap_or_else(|_| "{}".to_string())
 }
 
-/// Implementar el método openapi para ApiDoc
-impl ApiDoc {
-    pub fn openapi() -> utoipa::openapi::OpenApi {
-        utoipa::openapi::OpenApi::new(
-            utoipa::openapi::Info::new("VibeStream API", "2.0.0"),
-            utoipa::openapi::Paths::new()
-        )
-    }
-}
+// El método openapi() es generado automáticamente por el macro #[derive(OpenApi)]
+// No necesitamos implementarlo manualmente - el macro ya lo hace
 
 /// Función para generar el JSON de la especificación OpenAPI
 pub fn generate_openapi_json() -> String {
@@ -172,7 +166,15 @@ pub struct ApiResponse<T> {
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(),
+    paths(
+        paths::_register_user_doc,
+        paths::_login_user_doc,
+        paths::_refresh_token_doc,
+        paths::_get_user_profile_doc,
+        paths::_create_song_doc,
+        paths::_get_song_doc,
+        paths::_create_campaign_doc
+    ),
     components(
         schemas(
             User,
@@ -186,7 +188,9 @@ pub struct ApiResponse<T> {
             NftWristband,
             QrCode,
             ApiError,
-            ApiResponse<serde_json::Value>
+            ApiResponse<serde_json::Value>,
+            paths::RefreshTokenRequest,
+            paths::RefreshTokenResponse
         )
     ),
     tags(
