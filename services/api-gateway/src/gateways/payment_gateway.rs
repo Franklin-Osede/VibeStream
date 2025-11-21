@@ -17,7 +17,6 @@ use crate::bounded_contexts::payment::presentation::controllers::payment_control
 };
 
 /// Crear el gateway de pagos con controllers reales
-/// TDD GREEN PHASE: Conecta el gateway a controllers reales
 pub async fn create_payment_gateway(app_state: AppState) -> Result<Router, Box<dyn std::error::Error>> {
     let pool = app_state.get_db_pool();
     

@@ -44,6 +44,7 @@ impl AppState {
     /// # Arguments
     /// * `database_url` - URL de conexión a PostgreSQL
     /// * `redis_url` - URL de conexión a Redis
+    /// * `run_migrations` - Si es true, ejecuta migraciones automáticamente
     /// 
     /// # Returns
     /// * `Result<Self>` - AppState configurado o error
@@ -60,12 +61,17 @@ impl AppState {
             .await
             .map_err(|e| format!("Failed to create Redis Streams Event Bus: {}", e))?;
         
-        Ok(Self {
+        let app_state = Self {
             message_queue,
             database_pool,
             event_bus,
             _event_worker_handle: event_worker_handle,
-        })
+        };
+        
+        // Ejecutar migraciones automáticamente si está habilitado
+        Self::run_migrations_if_enabled(app_state.get_db_pool()).await?;
+        
+        Ok(app_state)
     }
     
     /// Crear una instancia por defecto para testing y desarrollo
@@ -84,6 +90,64 @@ impl AppState {
     /// Obtener la conexión a la base de datos
     pub fn get_db_pool(&self) -> &sqlx::PgPool {
         self.database_pool.get_pool()
+    }
+    
+    /// Ejecutar migraciones automáticamente si está habilitado
+    /// 
+    /// Las migraciones se ejecutan automáticamente si:
+    /// - La variable de entorno RUN_MIGRATIONS está configurada como "true" o "1"
+    /// - O si no está configurada (por defecto en desarrollo)
+    /// 
+    /// Para deshabilitar en producción, establecer RUN_MIGRATIONS=false
+    async fn run_migrations_if_enabled(pool: &sqlx::PgPool) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let run_migrations = std::env::var("RUN_MIGRATIONS")
+            .unwrap_or_else(|_| "true".to_string())
+            .to_lowercase();
+        
+        // Ejecutar migraciones si está habilitado (por defecto sí)
+        if run_migrations == "true" || run_migrations == "1" || run_migrations.is_empty() {
+            println!("🔄 Running database migrations...");
+            
+            // Intentar ejecutar migraciones desde el directorio migrations
+            // Primero intentamos desde la raíz del proyecto
+            let migrations_paths = vec![
+                "../../migrations",
+                "../migrations",
+                "migrations",
+            ];
+            
+            let mut migration_success = false;
+            for path in migrations_paths {
+                if std::path::Path::new(path).exists() {
+                    match sqlx::migrate::Migrator::new(std::path::Path::new(path)).await {
+                        Ok(migrator) => {
+                            match migrator.run(pool).await {
+                                Ok(_) => {
+                                    println!("✅ Database migrations completed successfully");
+                                    migration_success = true;
+                                    break;
+                                }
+                                Err(e) => {
+                                    eprintln!("⚠️  Failed to run migrations from {}: {}", path, e);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("⚠️  Failed to create migrator from {}: {}", path, e);
+                        }
+                    }
+                }
+            }
+            
+            if !migration_success {
+                println!("⚠️  Could not find migrations directory. Skipping automatic migrations.");
+                println!("   You can run migrations manually with: sqlx migrate run");
+            }
+        } else {
+            println!("⏭️  Skipping automatic migrations (RUN_MIGRATIONS={})", run_migrations);
+        }
+        
+        Ok(())
     }
     
     /// Publicar un evento de dominio

@@ -210,7 +210,6 @@ impl EventBus for InMemoryEventBus {
     }
 
     async fn subscribe(&self, event_type: &str, handler: Arc<dyn EventHandler>) -> Result<(), AppError> {
-        // TDD GREEN PHASE: Guardar handler de forma thread-safe
         let mut handlers_guard = self.handlers.write().await;
         
         handlers_guard
@@ -388,7 +387,6 @@ impl EventBusFactory {
     }
 
     /// Crear un Event Bus en memoria (solo para testing)
-    /// TDD GREEN PHASE: Ahora registra handlers correctamente
     pub async fn create_event_bus() -> Result<Arc<dyn EventBus>, AppError> {
         let event_bus = Arc::new(InMemoryEventBus::new());
         

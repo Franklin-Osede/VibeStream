@@ -59,6 +59,15 @@ pub trait UserRepository: Send + Sync {
     /// Get user statistics
     async fn get_user_stats(&self, user_id: &UserId) -> Result<Option<UserStats>, AppError>;
 
+    /// Get followers of a user (users who follow this user)
+    async fn get_followers(&self, user_id: &UserId, page: u32, page_size: u32) -> Result<Vec<UserSummary>, AppError>;
+
+    /// Get users that a user is following
+    async fn get_following(&self, user_id: &UserId, page: u32, page_size: u32) -> Result<Vec<UserSummary>, AppError>;
+
+    /// Check if user A follows user B
+    async fn is_following(&self, follower_id: &UserId, followee_id: &UserId) -> Result<bool, AppError>;
+
     /// Delete user (soft delete - deactivate)
     async fn delete(&self, id: &UserId) -> Result<(), AppError>;
 

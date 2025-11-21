@@ -19,6 +19,15 @@ pub mod openapi_integration_tests;
 // Auth middleware tests (TDD)
 pub mod auth_middleware_tests;
 
+// MessageQueue async migration tests (TDD)
+pub mod message_queue_async_tests;
+
+// Register/Login integration tests (TDD)
+pub mod register_login_integration_tests;
+
+// Test fixtures and helpers
+pub mod fixtures;
+
 // Legacy tests
 pub mod integration_tests;
 pub mod payment_gateways_integration_tests;

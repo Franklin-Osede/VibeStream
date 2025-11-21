@@ -25,7 +25,6 @@ use crate::bounded_contexts::user::presentation::routes::configure_user_routes;
 // =============================================================================
 
 /// Crear el gateway de usuario con todas las rutas y middleware
-/// TDD GREEN PHASE: Conecta el gateway a controllers reales
 pub async fn create_user_gateway(app_state: AppState) -> Result<Router, Box<dyn std::error::Error>> {
     // Crear UserAppState desde AppState usando el factory
     let user_app_state = AppStateFactory::create_user_state(app_state).await?;

@@ -538,21 +538,30 @@ impl UserRepository for PostgresUserRepository {
     async fn get_user_stats(&self, user_id: &UserId) -> Result<Option<UserStats>, AppError> {
         let user_uuid = user_id.value();
         
+        // Query para obtener estadísticas de escucha y recompensas
         let row = sqlx::query(
             r#"
             SELECT 
-                COUNT(DISTINCT lf.id) as total_listens,
-                COALESCE(SUM(lf.duration_seconds), 0) as total_listening_time,
-                COUNT(DISTINCT uf.followee_id) as following_count,
-                COUNT(DISTINCT uf2.follower_id) as followers_count,
-                COALESCE(SUM(r.amount), 0) as total_rewards
+                COALESCE(COUNT(DISTINCT ls.id), 0)::BIGINT as total_songs_listened,
+                COALESCE(SUM(ls.listen_duration_seconds), 0)::BIGINT as total_listening_time_seconds,
+                COALESCE(SUM(ls.final_reward_tokens), 0.0)::DECIMAL as total_rewards_earned,
+                COALESCE(COUNT(DISTINCT uf.followee_id), 0)::BIGINT as following_count,
+                COALESCE(COUNT(DISTINCT uf2.follower_id), 0)::BIGINT as followers_count,
+                COALESCE(COUNT(DISTINCT fi.id), 0)::BIGINT as investment_count,
+                COALESCE(SUM(fi.investment_amount), 0.0)::DECIMAL as total_investments,
+                COALESCE(COUNT(DISTINCT cn.id), 0)::BIGINT as campaigns_participated,
+                COALESCE(COUNT(DISTINCT nft.id), 0)::BIGINT as nfts_owned,
+                COALESCE(utp.current_points, 0)::INTEGER as tier_points
             FROM users u
-            LEFT JOIN listen_sessions lf ON u.id = lf.user_id
+            LEFT JOIN listen_sessions ls ON u.id = ls.user_id AND ls.status IN ('completed', 'verified', 'rewarded')
             LEFT JOIN user_followers uf ON u.id = uf.follower_id
             LEFT JOIN user_followers uf2 ON u.id = uf2.followee_id
-            LEFT JOIN rewards r ON u.id = r.user_id
+            LEFT JOIN fan_investments fi ON u.id = fi.fan_id AND fi.status = 'active'
+            LEFT JOIN campaign_nfts cn ON u.id = cn.user_id
+            LEFT JOIN nft_purchases nft ON u.id = nft.user_id
+            LEFT JOIN user_tier_progress utp ON u.id = utp.user_id
             WHERE u.id = $1
-            GROUP BY u.id
+            GROUP BY u.id, utp.current_points
             "#
         )
         .bind(user_uuid)
@@ -561,13 +570,158 @@ impl UserRepository for PostgresUserRepository {
         .map_err(|e| AppError::DatabaseError(format!("Failed to get user stats: {}", e)))?;
         
         if let Some(row) = row {
-            let stats = UserStats::new(user_id.clone());
-            // Note: UserStats would need methods to update these values
-            // For now, return the stats with default values
+            let total_listening_time_seconds: i64 = row.try_get("total_listening_time_seconds")?;
+            let total_listening_time_minutes = (total_listening_time_seconds / 60) as u64;
+            let total_songs_listened: i64 = row.try_get("total_songs_listened")?;
+            let total_rewards_earned: rust_decimal::Decimal = row.try_get("total_rewards_earned")?;
+            let total_rewards_earned_f64 = total_rewards_earned.to_string().parse::<f64>().unwrap_or(0.0);
+            let investment_count: i64 = row.try_get("investment_count")?;
+            let total_investments: rust_decimal::Decimal = row.try_get("total_investments")?;
+            let total_investments_f64 = total_investments.to_string().parse::<f64>().unwrap_or(0.0);
+            let campaigns_participated: i64 = row.try_get("campaigns_participated")?;
+            let nfts_owned: i64 = row.try_get("nfts_owned")?;
+            let tier_points: i32 = row.try_get("tier_points")?;
+            
+            // Calcular streak (simplificado - necesitaría lógica más compleja)
+            let current_listening_streak = 0; // TODO: Implementar cálculo de streak
+            let longest_listening_streak = 0; // TODO: Implementar cálculo de streak más largo
+            
+            // Obtener achievements (simplificado)
+            let achievements_unlocked = Vec::new(); // TODO: Query desde user_achievements
+            
+            // Crear UserStats con valores reales
+            use chrono::Utc;
+            
+            let stats = UserStats {
+                user_id: user_id.clone(),
+                total_listening_time_minutes,
+                total_songs_listened: total_songs_listened as u64,
+                total_rewards_earned: total_rewards_earned_f64,
+                current_listening_streak,
+                longest_listening_streak,
+                total_investments: total_investments_f64,
+                investment_count: investment_count as u32,
+                nfts_owned: nfts_owned as u32,
+                campaigns_participated: campaigns_participated as u32,
+                tier_points: tier_points as u32,
+                achievements_unlocked,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            };
+            
             Ok(Some(stats))
         } else {
-        Ok(None)
+            // Usuario no encontrado, retornar stats vacías
+            Ok(Some(UserStats::new(user_id.clone())))
         }
+    }
+
+    async fn get_followers(&self, user_id: &UserId, page: u32, page_size: u32) -> Result<Vec<UserSummary>, AppError> {
+        let user_uuid = user_id.value();
+        let offset = page * page_size;
+        
+        let rows = sqlx::query(
+            r#"
+            SELECT 
+                u.id, u.username, u.email, u.display_name, u.avatar_url,
+                u.tier, u.role, u.is_verified, u.is_active,
+                u.total_rewards_earned, u.current_balance,
+                u.created_at
+            FROM users u
+            INNER JOIN user_followers uf ON u.id = uf.follower_id
+            WHERE uf.followee_id = $1
+            ORDER BY uf.created_at DESC
+            LIMIT $2 OFFSET $3
+            "#
+        )
+        .bind(user_uuid)
+        .bind(page_size as i64)
+        .bind(offset as i64)
+        .fetch_all(&*self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(format!("Failed to get followers: {}", e)))?;
+        
+        let followers = rows.into_iter().map(|row| {
+            Self::create_user_summary(
+                row.try_get("id")?,
+                row.try_get("username")?,
+                row.try_get("email")?,
+                row.try_get("tier")?,
+                row.try_get("role")?,
+                row.try_get("is_verified")?,
+                row.try_get("is_active")?,
+                row.try_get("display_name")?,
+                row.try_get("avatar_url")?,
+                None, // total_listening_time
+                row.try_get("total_rewards_earned")?,
+                None, // tier_points
+                row.try_get("created_at")?,
+            )
+        }).collect::<Result<Vec<UserSummary>, AppError>>()?;
+        
+        Ok(followers)
+    }
+
+    async fn get_following(&self, user_id: &UserId, page: u32, page_size: u32) -> Result<Vec<UserSummary>, AppError> {
+        let user_uuid = user_id.value();
+        let offset = page * page_size;
+        
+        let rows = sqlx::query(
+            r#"
+            SELECT 
+                u.id, u.username, u.email, u.display_name, u.avatar_url,
+                u.tier, u.role, u.is_verified, u.is_active,
+                u.total_rewards_earned, u.current_balance,
+                u.created_at
+            FROM users u
+            INNER JOIN user_followers uf ON u.id = uf.followee_id
+            WHERE uf.follower_id = $1
+            ORDER BY uf.created_at DESC
+            LIMIT $2 OFFSET $3
+            "#
+        )
+        .bind(user_uuid)
+        .bind(page_size as i64)
+        .bind(offset as i64)
+        .fetch_all(&*self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(format!("Failed to get following: {}", e)))?;
+        
+        let following = rows.into_iter().map(|row| {
+            Self::create_user_summary(
+                row.try_get("id")?,
+                row.try_get("username")?,
+                row.try_get("email")?,
+                row.try_get("tier")?,
+                row.try_get("role")?,
+                row.try_get("is_verified")?,
+                row.try_get("is_active")?,
+                row.try_get("display_name")?,
+                row.try_get("avatar_url")?,
+                None, // total_listening_time
+                row.try_get("total_rewards_earned")?,
+                None, // tier_points
+                row.try_get("created_at")?,
+            )
+        }).collect::<Result<Vec<UserSummary>, AppError>>()?;
+        
+        Ok(following)
+    }
+
+    async fn is_following(&self, follower_id: &UserId, followee_id: &UserId) -> Result<bool, AppError> {
+        let follower_uuid = follower_id.value();
+        let followee_uuid = followee_id.value();
+        
+        let count = sqlx::query_scalar!(
+            "SELECT COUNT(*) FROM user_followers WHERE follower_id = $1 AND followee_id = $2",
+            follower_uuid,
+            followee_uuid
+        )
+        .fetch_one(&*self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(format!("Failed to check if following: {}", e)))?;
+        
+        Ok(count.unwrap_or(0) > 0)
     }
 
     async fn find_users_registered_between(

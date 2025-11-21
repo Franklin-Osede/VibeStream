@@ -14,7 +14,6 @@ use crate::shared::infrastructure::database::postgres::PostgresUserRepository;
 use crate::shared::infrastructure::auth::middleware::jwt_auth_middleware;
 
 /// Configure user routes with comprehensive REST API endpoints
-/// TDD GREEN PHASE: Aplica auth middleware a rutas protegidas
 pub fn configure_user_routes(
     user_service: Arc<UserApplicationService<PostgresUserRepository>>,
 ) -> Router {

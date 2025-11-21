@@ -1,5 +1,4 @@
 //! PostgreSQL implementation of RoyaltyDistributionRepository
-//! TDD GREEN PHASE: Implementación mínima para conectar Payment Gateway
 
 use async_trait::async_trait;
 use sqlx::PgPool;

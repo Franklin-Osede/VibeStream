@@ -22,7 +22,7 @@ use crate::bounded_contexts::user::application::{
     services::UserApplicationService,
 };
 use crate::shared::infrastructure::database::postgres::PostgresUserRepository;
-use crate::shared::infrastructure::auth::{JwtService, PasswordService};
+use crate::shared::infrastructure::auth::{JwtService, PasswordService, AuthenticatedUser};
 use crate::shared::domain::errors::AppError;
 
 // Type alias para simplificar el estado
@@ -506,34 +506,35 @@ pub async fn update_user_profile(
 /// Get user statistics
 #[axum::debug_handler]
 pub async fn get_user_stats(
-    State(_user_service): State<UserAppService>,
+    State(user_service): State<UserAppService>,
     Path(user_id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<UserStatsResponse>>, StatusCode> {
-    let mock_stats = UserStatsResponse {
+    let user_id_vo = crate::bounded_contexts::user::domain::value_objects::UserId::from_uuid(user_id);
+    let stats = user_service.repository.get_user_stats(&user_id_vo).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    let response = UserStatsResponse {
         user_id,
-        total_listening_time_minutes: 14520,
-        total_listening_hours: 242.0,
-        total_songs_listened: 1250,
-        total_rewards_earned: 125.50,
-        current_listening_streak: 7,
-        longest_listening_streak: 21,
-        total_investments: 500.0,
-        investment_count: 3,
-        nfts_owned: 8,
-        campaigns_participated: 5,
-        tier_points: 1200,
-        achievements_unlocked: vec![
-            "Primera canción".to_string(),
-            "100 horas de música".to_string(),
-            "Primer NFT".to_string(),
-        ],
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
+        total_listening_time_minutes: stats.total_listening_time_minutes,
+        total_listening_hours: stats.total_listening_time_minutes as f64 / 60.0,
+        total_songs_listened: stats.total_songs_listened,
+        total_rewards_earned: stats.total_rewards_earned,
+        current_listening_streak: stats.current_listening_streak,
+        longest_listening_streak: stats.longest_listening_streak,
+        total_investments: stats.total_investments,
+        investment_count: stats.investment_count,
+        nfts_owned: stats.nfts_owned,
+        campaigns_participated: stats.campaigns_participated,
+        tier_points: stats.tier_points,
+        achievements_unlocked: stats.achievements_unlocked,
+        created_at: stats.created_at,
+        updated_at: stats.updated_at,
     };
 
     Ok(Json(ApiResponse {
         success: true,
-        data: Some(mock_stats),
+        data: Some(response),
         message: None,
         errors: None,
     }))
@@ -602,12 +603,20 @@ pub async fn search_users(
 /// Follow/unfollow user
 #[axum::debug_handler]
 pub async fn follow_user(
+    AuthenticatedUser { user_id: follower_id, .. }: AuthenticatedUser,
     State(user_service): State<UserAppService>,
     Path(followee_id): Path<Uuid>,
     Json(request): Json<FollowUserRequest>,
 ) -> Result<Json<ApiResponse<()>>, StatusCode> {
-    // TODO: Extract follower_id from JWT token
-    let follower_id = Uuid::new_v4(); // Mock for now
+    // Validar que no se puede seguir a sí mismo
+    if follower_id == followee_id {
+        return Ok(Json(ApiResponse {
+            success: false,
+            data: None,
+            message: Some("No puedes seguirte a ti mismo".to_string()),
+            errors: None,
+        }));
+    }
     
     let command = FollowUserCommand {
         follower_id,
@@ -638,11 +647,22 @@ pub async fn follow_user(
 /// Change user password
 #[axum::debug_handler]
 pub async fn change_password(
-    State(_user_service): State<UserAppService>,
-    Path(_user_id): Path<Uuid>,
+    AuthenticatedUser { user_id, .. }: AuthenticatedUser,
+    State(user_service): State<UserAppService>,
+    Path(requested_user_id): Path<Uuid>,
     Json(request): Json<ChangePasswordRequest>,
 ) -> Result<Json<ApiResponse<()>>, StatusCode> {
-    // Validate passwords match
+    // Validar que el usuario solo puede cambiar su propia contraseña
+    if user_id != requested_user_id {
+        return Ok(Json(ApiResponse {
+            success: false,
+            data: None,
+            message: Some("Solo puedes cambiar tu propia contraseña".to_string()),
+            errors: None,
+        }));
+    }
+
+    // Validar que las contraseñas coinciden
     if request.new_password != request.confirm_new_password {
         return Ok(Json(ApiResponse {
             success: false,
@@ -652,7 +672,50 @@ pub async fn change_password(
         }));
     }
 
-    // TODO: Implement password change logic
+    // Validar longitud mínima de contraseña
+    if request.new_password.len() < 8 {
+        return Ok(Json(ApiResponse {
+            success: false,
+            data: None,
+            message: Some("La contraseña debe tener al menos 8 caracteres".to_string()),
+            errors: None,
+        }));
+    }
+
+    // Buscar usuario
+    let user_id_vo = crate::bounded_contexts::user::domain::value_objects::UserId::from_uuid(user_id);
+    let user_aggregate = user_service.repository.find_by_id(&user_id_vo).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    // Verificar contraseña actual
+    let is_valid = PasswordService::verify_password(
+        &request.current_password,
+        user_aggregate.user.password_hash.value()
+    ).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    if !is_valid {
+        return Ok(Json(ApiResponse {
+            success: false,
+            data: None,
+            message: Some("La contraseña actual es incorrecta".to_string()),
+            errors: None,
+        }));
+    }
+
+    // Hashear nueva contraseña
+    let new_password_hash = PasswordService::hash_password(&request.new_password)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    // Actualizar contraseña en el agregado
+    let password_hash_vo = crate::bounded_contexts::user::domain::value_objects::PasswordHash::new(new_password_hash);
+    let mut updated_aggregate = user_aggregate;
+    updated_aggregate.user.update_password(password_hash_vo);
+
+    // Guardar cambios
+    user_service.repository.update(&updated_aggregate).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
     Ok(Json(ApiResponse {
         success: true,
         data: None,
@@ -665,11 +728,48 @@ pub async fn change_password(
 /// Link wallet to user account
 #[axum::debug_handler]
 pub async fn link_wallet(
-    State(_user_service): State<UserAppService>,
-    Path(_user_id): Path<Uuid>,
-    Json(_request): Json<LinkWalletRequest>,
+    AuthenticatedUser { user_id, .. }: AuthenticatedUser,
+    State(user_service): State<UserAppService>,
+    Path(requested_user_id): Path<Uuid>,
+    Json(request): Json<LinkWalletRequest>,
 ) -> Result<Json<ApiResponse<()>>, StatusCode> {
-    // TODO: Implement wallet linking logic with signature verification
+    // Validar que el usuario solo puede vincular su propia wallet
+    if user_id != requested_user_id {
+        return Ok(Json(ApiResponse {
+            success: false,
+            data: None,
+            message: Some("Solo puedes vincular tu propia wallet".to_string()),
+            errors: None,
+        }));
+    }
+
+    // Validar formato de wallet address
+    let wallet_address_vo = crate::bounded_contexts::user::domain::value_objects::WalletAddress::new(
+        request.wallet_address.clone()
+    ).map_err(|e| {
+        StatusCode::BAD_REQUEST
+    })?;
+
+    // TODO: Verificar firma de la wallet
+    // Por ahora solo validamos el formato, pero en producción deberíamos:
+    // 1. Verificar que la firma corresponde al mensaje
+    // 2. Verificar que la wallet address corresponde a la firma
+    // 3. Verificar que el mensaje es el esperado
+    
+    // Buscar usuario
+    let user_id_vo = crate::bounded_contexts::user::domain::value_objects::UserId::from_uuid(user_id);
+    let mut user_aggregate = user_service.repository.find_by_id(&user_id_vo).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    // Vincular wallet
+    user_aggregate.link_wallet(wallet_address_vo)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    // Guardar cambios
+    user_service.repository.update(&user_aggregate).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
     Ok(Json(ApiResponse {
         success: true,
         data: None,
@@ -679,12 +779,43 @@ pub async fn link_wallet(
 }
 
 /// DELETE /api/v1/users/{user_id}
-/// Delete user account
+/// Delete user account (soft delete)
 #[axum::debug_handler]
 pub async fn delete_user(
-    State(_user_service): State<UserAppService>,
-    Path(_user_id): Path<Uuid>,
+    AuthenticatedUser { user_id, role, .. }: AuthenticatedUser,
+    State(user_service): State<UserAppService>,
+    Path(requested_user_id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<()>>, StatusCode> {
+    // Validar que el usuario solo puede eliminar su propia cuenta (o admin)
+    if user_id != requested_user_id && role != "admin" {
+        return Ok(Json(ApiResponse {
+            success: false,
+            data: None,
+            message: Some("Solo puedes eliminar tu propia cuenta".to_string()),
+            errors: None,
+        }));
+    }
+
+    // Buscar usuario
+    let user_id_vo = crate::bounded_contexts::user::domain::value_objects::UserId::from_uuid(requested_user_id);
+    let mut user_aggregate = user_service.repository.find_by_id(&user_id_vo).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    // Soft delete: desactivar usuario en lugar de eliminar
+    user_aggregate.user.deactivate();
+
+    // Guardar cambios
+    user_service.repository.update(&user_aggregate).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(Json(ApiResponse {
+        success: true,
+        data: None,
+        message: Some("Cuenta eliminada exitosamente".to_string()),
+        errors: None,
+    }))
+}
     // TODO: Implement user deletion logic
     Ok(Json(ApiResponse {
         success: true,
@@ -698,37 +829,51 @@ pub async fn delete_user(
 /// Get user followers
 #[axum::debug_handler]
 pub async fn get_user_followers(
-    State(_user_service): State<UserAppService>,
-    Path(_user_id): Path<Uuid>,
-    Query(_query): Query<HashMap<String, String>>,
+    State(user_service): State<UserAppService>,
+    Path(user_id): Path<Uuid>,
+    Query(query): Query<HashMap<String, String>>,
 ) -> Result<Json<ApiResponse<UserListResponse>>, StatusCode> {
-    let mock_followers = vec![
+    let page = query.get("page")
+        .and_then(|p| p.parse::<u32>().ok())
+        .unwrap_or(0);
+    let page_size = query.get("page_size")
+        .and_then(|p| p.parse::<u32>().ok())
+        .unwrap_or(20);
+
+    let user_id_vo = crate::bounded_contexts::user::domain::value_objects::UserId::from_uuid(user_id);
+    let followers_summaries = user_service.repository.get_followers(&user_id_vo, page, page_size).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let users: Vec<UserSummaryResponse> = followers_summaries.into_iter().map(|summary| {
         UserSummaryResponse {
-            id: Uuid::new_v4(),
-            username: "follower1".to_string(),
-            display_name: Some("Seguidor 1".to_string()),
-            avatar_url: Some("https://example.com/avatar1.jpg".to_string()),
-            tier: "bronze".to_string(),
-            role: "user".to_string(),
-            is_verified: false,
-            is_active: true,
-            tier_points: 600,
-            total_rewards: 30.0,
-            created_at: Utc::now(),
-        },
-    ];
+            id: summary.id.value(),
+            username: summary.username.value().to_string(),
+            display_name: summary.display_name.clone(),
+            avatar_url: summary.avatar_url.as_ref().map(|url| url.value().to_string()),
+            tier: format!("{}", summary.tier),
+            role: format!("{}", summary.role),
+            is_verified: summary.is_verified,
+            is_active: summary.is_active,
+            tier_points: summary.tier_points.unwrap_or(0),
+            total_rewards: summary.total_rewards.unwrap_or(0.0),
+            created_at: summary.created_at,
+        }
+    }).collect();
+
+    let total_count = users.len() as u64; // TODO: Get actual count from repository
+    let total_pages = (total_count as f64 / page_size as f64).ceil() as u32;
 
     let pagination = PaginationResponse {
-        page: 0,
-        page_size: 20,
-        total_count: 1,
-        total_pages: 1,
-        has_next_page: false,
-        has_previous_page: false,
+        page,
+        page_size,
+        total_count,
+        total_pages,
+        has_next_page: page < total_pages.saturating_sub(1),
+        has_previous_page: page > 0,
     };
 
     let response = UserListResponse {
-        users: mock_followers,
+        users,
         pagination,
     };
 
@@ -744,37 +889,51 @@ pub async fn get_user_followers(
 /// Get users that the user is following
 #[axum::debug_handler]
 pub async fn get_user_following(
-    State(_user_service): State<UserAppService>,
-    Path(_user_id): Path<Uuid>,
-    Query(_query): Query<HashMap<String, String>>,
+    State(user_service): State<UserAppService>,
+    Path(user_id): Path<Uuid>,
+    Query(query): Query<HashMap<String, String>>,
 ) -> Result<Json<ApiResponse<UserListResponse>>, StatusCode> {
-    let mock_following = vec![
+    let page = query.get("page")
+        .and_then(|p| p.parse::<u32>().ok())
+        .unwrap_or(0);
+    let page_size = query.get("page_size")
+        .and_then(|p| p.parse::<u32>().ok())
+        .unwrap_or(20);
+
+    let user_id_vo = crate::bounded_contexts::user::domain::value_objects::UserId::from_uuid(user_id);
+    let following_summaries = user_service.repository.get_following(&user_id_vo, page, page_size).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let users: Vec<UserSummaryResponse> = following_summaries.into_iter().map(|summary| {
         UserSummaryResponse {
-            id: Uuid::new_v4(),
-            username: "following1".to_string(),
-            display_name: Some("Siguiendo 1".to_string()),
-            avatar_url: Some("https://example.com/avatar1.jpg".to_string()),
-            tier: "silver".to_string(),
-            role: "artist".to_string(),
-            is_verified: true,
-            is_active: true,
-            tier_points: 2000,
-            total_rewards: 200.0,
-            created_at: Utc::now(),
-        },
-    ];
+            id: summary.id.value(),
+            username: summary.username.value().to_string(),
+            display_name: summary.display_name.clone(),
+            avatar_url: summary.avatar_url.as_ref().map(|url| url.value().to_string()),
+            tier: format!("{}", summary.tier),
+            role: format!("{}", summary.role),
+            is_verified: summary.is_verified,
+            is_active: summary.is_active,
+            tier_points: summary.tier_points.unwrap_or(0),
+            total_rewards: summary.total_rewards.unwrap_or(0.0),
+            created_at: summary.created_at,
+        }
+    }).collect();
+
+    let total_count = users.len() as u64; // TODO: Get actual count from repository
+    let total_pages = (total_count as f64 / page_size as f64).ceil() as u32;
 
     let pagination = PaginationResponse {
-        page: 0,
-        page_size: 20,
-        total_count: 1,
-        total_pages: 1,
-        has_next_page: false,
-        has_previous_page: false,
+        page,
+        page_size,
+        total_count,
+        total_pages,
+        has_next_page: page < total_pages.saturating_sub(1),
+        has_previous_page: page > 0,
     };
 
     let response = UserListResponse {
-        users: mock_following,
+        users,
         pagination,
     };
 

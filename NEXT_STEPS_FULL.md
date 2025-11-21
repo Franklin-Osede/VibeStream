@@ -20,8 +20,9 @@
 ## 2. Prioridad Semana 0‑2 (Blocking para Front/QA)
 
 1. **Cerrar capa Auth**  
-   - Cablear `JwtService` + `PasswordService` en `user_controller.rs`.  
-   - Añadir refresh/token rotation endpoints y middleware de protección.
+   - ✅ `JwtService` + `PasswordService` cableados en `user_controller.rs` (register/login implementados)
+   - ✅ Middleware de protección aplicado a rutas protegidas
+   - ⚠️ Pendiente: Refresh token endpoints y token rotation
 2. **Gateways de Pago reales**  
    - Implementar Stripe/Coinbase/PayPal en `payment/infrastructure/gateways`.  
    - Configurar webhooks y colas Redis para reconciliación.  
@@ -29,9 +30,17 @@
    - Reemplazar `InMemoryEventBus` por Redis Streams/Kafka.  
    - Registrar handlers reales para User, Music, Campaign, Listen Reward, Fan Ventures.  
 4. **OpenAPI completo**  
-   - Documentar `paths` reales, versionar `openapi.json` y automatizar generación de clientes Angular (`ng-openapi-gen`).  
+   - ✅ Paths definidos en `openapi/paths.rs` (register, login, user profile, songs, campaigns)
+   - ✅ Schemas definidos (User, LoginRequest, ApiResponse, etc.)
+   - ⚠️ Pendiente: Arreglar errores de compilación en OpenAPI y servir Swagger/Redoc reales
+   - ⚠️ Pendiente: Automatizar generación de clientes Angular (`ng-openapi-gen`)  
 5. **Testing base**  
-   - Configurar `sqlx::migrate` + BD de test, escribir primeros integration tests (User register/login, Campaign CRUD).  
+   - ✅ Tests de integración creados: `register_login_integration_tests.rs` (5 tests), `message_queue_async_tests.rs` (4 tests)
+   - ✅ Endpoints de register/login implementados con JwtService y PasswordService
+   - ⚠️ **Estado actual**: Tests marcados con `#[ignore]` hasta configurar Postgres/Redis
+   - ✅ Fixtures creados: `tests/fixtures.rs` y `tests/README_FIXTURES.md`
+   - **Requisitos**: Ver `services/api-gateway/tests/README.md` y `tests/README_FIXTURES.md`
+   - **Próximo paso**: Configurar servicios en CI o implementar testcontainers para habilitar tests automáticamente  
 
 ---
 
