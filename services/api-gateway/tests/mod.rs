@@ -12,12 +12,16 @@ pub mod campaign_controller_tests;
 
 // Gateway integration tests (TDD)
 pub mod user_gateway_integration_tests;
+pub mod music_gateway_integration_tests;
 
 // OpenAPI integration tests (TDD)
 pub mod openapi_integration_tests;
 
 // Auth middleware tests (TDD)
 pub mod auth_middleware_tests;
+
+// Music Gateway authentication tests (TDD)
+pub mod music_gateway_auth_tests;
 
 // MessageQueue async migration tests (TDD)
 pub mod message_queue_async_tests;
@@ -27,6 +31,9 @@ pub mod register_login_integration_tests;
 
 // Test fixtures and helpers
 pub mod fixtures;
+
+// Testcontainers setup
+pub mod testcontainers_setup;
 
 // Legacy tests
 pub mod integration_tests;

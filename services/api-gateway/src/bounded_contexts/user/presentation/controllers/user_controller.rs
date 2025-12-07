@@ -210,8 +210,18 @@ pub struct ApiResponse<T> {
 
 // REST Endpoints
 
-/// POST /api/v1/users/register
-/// Register new user account
+/// Register a new user account
+#[utoipa::path(
+    post,
+    path = "/api/v1/users/register",
+    request_body = RegisterUserRequest,
+    responses(
+        (status = 201, description = "User registered successfully", body = ApiResponse<RegisterUserResponse>),
+        (status = 400, description = "Invalid request data", body = ApiResponse<serde_json::Value>),
+        (status = 409, description = "User already exists", body = ApiResponse<serde_json::Value>)
+    ),
+    tag = "users"
+)]
 #[axum::debug_handler]
 pub async fn register_user(
     State(user_service): State<UserAppService>,
@@ -248,8 +258,11 @@ pub async fn register_user(
     match user_service.handle_create_user(command).await {
         Ok(result) => {
             // Generate real JWT token
-            let jwt_secret = std::env::var("JWT_SECRET")
-                .unwrap_or_else(|_| "default_secret_change_in_production".to_string());
+            let jwt_secret = crate::shared::infrastructure::auth::get_jwt_secret()
+                .map_err(|e| {
+                    eprintln!("JWT configuration error: {}", e);
+                    StatusCode::INTERNAL_SERVER_ERROR
+                })?;
             let jwt_service = JwtService::new(&jwt_secret)
                 .map_err(|e| {
                     eprintln!("Error creating JWT service: {}", e);
@@ -292,8 +305,17 @@ pub async fn register_user(
     }
 }
 
-/// POST /api/v1/users/login
-/// User login
+/// Authenticate user and get JWT tokens
+#[utoipa::path(
+    post,
+    path = "/api/v1/users/login",
+    request_body = LoginRequest,
+    responses(
+        (status = 200, description = "Login successful", body = ApiResponse<LoginResponse>),
+        (status = 401, description = "Invalid credentials", body = ApiResponse<serde_json::Value>)
+    ),
+    tag = "users"
+)]
 #[axum::debug_handler]
 pub async fn login_user(
     State(user_service): State<UserAppService>,
@@ -329,8 +351,11 @@ pub async fn login_user(
     }
 
     // Generate real JWT tokens
-    let jwt_secret = std::env::var("JWT_SECRET")
-        .unwrap_or_else(|_| "default_secret_change_in_production".to_string());
+    let jwt_secret = crate::shared::infrastructure::auth::get_jwt_secret()
+        .map_err(|e| {
+            eprintln!("JWT configuration error: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
     let jwt_service = JwtService::new(&jwt_secret)
         .map_err(|e| {
             eprintln!("Error creating JWT service: {}", e);
@@ -371,14 +396,26 @@ pub async fn login_user(
     }))
 }
 
-/// POST /api/v1/users/refresh
 /// Refresh access token using refresh token
+#[utoipa::path(
+    post,
+    path = "/api/v1/users/refresh",
+    request_body = RefreshTokenRequest,
+    responses(
+        (status = 200, description = "Token refreshed successfully", body = ApiResponse<RefreshTokenResponse>),
+        (status = 401, description = "Invalid refresh token", body = ApiResponse<serde_json::Value>)
+    ),
+    tag = "users"
+)]
 #[axum::debug_handler]
 pub async fn refresh_token(
     Json(request): Json<RefreshTokenRequest>,
 ) -> Result<Json<ApiResponse<RefreshTokenResponse>>, StatusCode> {
-    let jwt_secret = std::env::var("JWT_SECRET")
-        .unwrap_or_else(|_| "default_secret_change_in_production".to_string());
+    let jwt_secret = crate::shared::infrastructure::auth::get_jwt_secret()
+        .map_err(|e| {
+            eprintln!("JWT configuration error: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
     let jwt_service = JwtService::new(&jwt_secret)
         .map_err(|e| {
             eprintln!("Error creating JWT service: {}", e);
@@ -422,13 +459,30 @@ pub async fn refresh_token(
     }))
 }
 
-/// GET /api/v1/users/{user_id}
 /// Get user profile by ID
+/// 
+/// Shows more information if you're viewing your own profile.
+#[utoipa::path(
+    get,
+    path = "/api/v1/users/{user_id}",
+    params(
+        ("user_id" = Uuid, Path, description = "User ID")
+    ),
+    responses(
+        (status = 200, description = "User profile", body = ApiResponse<UserProfileResponse>),
+        (status = 404, description = "User not found", body = ApiResponse<serde_json::Value>)
+    ),
+    tag = "users"
+)]
 #[axum::debug_handler]
 pub async fn get_user_profile(
+    // Authenticated user (required because this is in protected routes)
+    AuthenticatedUser { user_id: authenticated_user_id, .. }: AuthenticatedUser,
     State(user_service): State<UserAppService>,
     Path(user_id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<UserProfileResponse>>, StatusCode> {
+    // Check if user is viewing their own profile (for showing more info)
+    let is_own_profile = authenticated_user_id == user_id;
     let query = GetUserQuery { user_id };
     
     match user_service.handle_get_user(query).await {
@@ -475,10 +529,21 @@ pub async fn get_user_profile(
 /// Update user profile
 #[axum::debug_handler]
 pub async fn update_user_profile(
+    AuthenticatedUser { user_id: authenticated_user_id, .. }: AuthenticatedUser,
     State(user_service): State<UserAppService>,
     Path(user_id): Path<Uuid>,
     Json(request): Json<UpdateUserRequest>,
 ) -> Result<Json<ApiResponse<()>>, StatusCode> {
+    // Validar que el usuario solo puede editar su propio perfil
+    if authenticated_user_id != user_id {
+        return Ok(Json(ApiResponse {
+            success: false,
+            data: None,
+            message: Some("Solo puedes editar tu propio perfil".to_string()),
+            errors: None,
+        }));
+    }
+    
     let command = UpdateUserCommand {
         user_id,
         display_name: request.display_name.clone(),
@@ -504,11 +569,23 @@ pub async fn update_user_profile(
 
 /// GET /api/v1/users/{user_id}/stats
 /// Get user statistics
+/// 
+/// Note: Users can only view their own stats unless they are admin.
 #[axum::debug_handler]
 pub async fn get_user_stats(
+    AuthenticatedUser { user_id: authenticated_user_id, role, .. }: AuthenticatedUser,
     State(user_service): State<UserAppService>,
     Path(user_id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<UserStatsResponse>>, StatusCode> {
+    // Validar que el usuario solo puede ver sus propias estadísticas (o admin puede ver cualquiera)
+    if authenticated_user_id != user_id && role != "admin" {
+        return Ok(Json(ApiResponse {
+            success: false,
+            data: None,
+            message: Some("Solo puedes ver tus propias estadísticas".to_string()),
+            errors: None,
+        }));
+    }
     let user_id_vo = crate::bounded_contexts::user::domain::value_objects::UserId::from_uuid(user_id);
     let stats = user_service.repository.get_user_stats(&user_id_vo).await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -813,14 +890,6 @@ pub async fn delete_user(
         success: true,
         data: None,
         message: Some("Cuenta eliminada exitosamente".to_string()),
-        errors: None,
-    }))
-}
-    // TODO: Implement user deletion logic
-    Ok(Json(ApiResponse {
-        success: true,
-        data: None,
-        message: Some("Usuario eliminado exitosamente".to_string()),
         errors: None,
     }))
 }

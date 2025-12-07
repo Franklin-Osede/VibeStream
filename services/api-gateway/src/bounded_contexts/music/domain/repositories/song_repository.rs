@@ -26,6 +26,7 @@ pub trait SongRepository: Send + Sync {
     async fn delete(&self, id: &SongId) -> RepositoryResult<()>;
     
     // Query operations
+    async fn find_all(&self, limit: usize, offset: usize) -> RepositoryResult<Vec<Song>>;
     async fn find_by_artist(&self, artist_id: &ArtistId) -> RepositoryResult<Vec<Song>>;
     async fn find_by_genre(&self, genre: &Genre) -> RepositoryResult<Vec<Song>>;
     async fn find_trending(&self, limit: Option<usize>) -> RepositoryResult<Vec<Song>>;
@@ -33,6 +34,7 @@ pub trait SongRepository: Send + Sync {
     async fn search_by_title(&self, query: &str, limit: Option<usize>) -> RepositoryResult<Vec<Song>>;
     
     // Analytics
+    async fn count(&self) -> RepositoryResult<usize>;
     async fn count_by_artist(&self, artist_id: &ArtistId) -> RepositoryResult<usize>;
     async fn get_total_listens(&self) -> RepositoryResult<u64>;
 }

@@ -9,6 +9,7 @@ use uuid::Uuid;
 use std::collections::HashMap;
 
 use crate::shared::infrastructure::app_state::MusicAppState;
+use crate::shared::infrastructure::auth::AuthenticatedUser;
 use crate::bounded_contexts::music::domain::entities::Song;
 use crate::bounded_contexts::music::domain::value_objects::{SongTitle, SongDuration, Genre, RoyaltyPercentage};
 use crate::bounded_contexts::music::domain::repositories::SongRepository;
@@ -64,6 +65,7 @@ pub struct UpdateSongRequest {
 pub struct SongQuery {
     pub genre: Option<String>,
     pub artist_id: Option<Uuid>,
+    pub q: Option<String>, // Search query for title
     pub limit: Option<usize>,
     pub offset: Option<usize>,
 }
@@ -84,6 +86,8 @@ pub struct SongController;
 
 impl SongController {
     /// GET /api/v1/music/songs - List songs with optional filters
+    /// 
+    /// OpenAPI documentation is in `openapi/paths.rs::_get_songs_doc`
     pub async fn get_songs(
         State(state): State<MusicAppState>,
         Query(query): Query<SongQuery>,
@@ -91,13 +95,92 @@ impl SongController {
         let limit = query.limit.unwrap_or(20);
         let offset = query.offset.unwrap_or(0);
         
-        // Get songs from repository
-        // For demo: return empty list until repo provides listing
-        let songs: Vec<Song> = Vec::new();
+        // Get songs from repository based on filters
+        let songs = if let Some(search_query) = &query.q {
+            // Search by title
+            state.song_repository
+                .search_by_title(search_query, Some(limit + offset))
+                .await
+                .map_err(|e| {
+                    tracing::error!("Error searching songs: {:?}", e);
+                    (StatusCode::INTERNAL_SERVER_ERROR, ResponseJson(serde_json::json!({
+                        "error": "Failed to search songs",
+                        "message": format!("{:?}", e)
+                    })))
+                })?
+        } else if let Some(artist_id) = query.artist_id {
+            // Filter by artist
+            use crate::bounded_contexts::music::domain::ArtistId;
+            let artist_id_vo = ArtistId::from_uuid(artist_id);
+            state.song_repository
+                .find_by_artist(&artist_id_vo)
+                .await
+                .map_err(|e| {
+                    tracing::error!("Error fetching songs by artist: {:?}", e);
+                    (StatusCode::INTERNAL_SERVER_ERROR, ResponseJson(serde_json::json!({
+                        "error": "Failed to fetch songs",
+                        "message": format!("{:?}", e)
+                    })))
+                })?
+        } else if let Some(genre_str) = &query.genre {
+            // Filter by genre
+            use crate::bounded_contexts::music::domain::Genre;
+            let genre = Genre::new(genre_str.clone())
+                .map_err(|e| {
+                    tracing::error!("Invalid genre: {:?}", e);
+                    (StatusCode::BAD_REQUEST, ResponseJson(serde_json::json!({
+                        "error": "Invalid genre",
+                        "message": format!("{:?}", e)
+                    })))
+                })?;
+            state.song_repository
+                .find_by_genre(&genre)
+                .await
+                .map_err(|e| {
+                    tracing::error!("Error fetching songs by genre: {:?}", e);
+                    (StatusCode::INTERNAL_SERVER_ERROR, ResponseJson(serde_json::json!({
+                        "error": "Failed to fetch songs",
+                        "message": format!("{:?}", e)
+                    })))
+                })?
+        } else {
+            // Get all songs with pagination
+            state.song_repository
+                .find_all(limit, offset)
+                .await
+                .map_err(|e| {
+                    tracing::error!("Error fetching songs: {:?}", e);
+                    (StatusCode::INTERNAL_SERVER_ERROR, ResponseJson(serde_json::json!({
+                        "error": "Failed to fetch songs",
+                        "message": format!("{:?}", e)
+                    })))
+                })?
+        };
+        
+        // Apply pagination to filtered results if needed
+        let (paginated_songs, total) = if query.q.is_some() || query.artist_id.is_some() || query.genre.is_some() {
+            // For filtered results, apply pagination manually
+            let total = songs.len();
+            let end = (offset + limit).min(total);
+            let paginated = songs.into_iter().skip(offset).take(limit).collect();
+            (paginated, total)
+        } else {
+            // For find_all, get total count
+            let total = state.song_repository
+                .count()
+                .await
+                .map_err(|e| {
+                    tracing::error!("Error counting songs: {:?}", e);
+                    (StatusCode::INTERNAL_SERVER_ERROR, ResponseJson(serde_json::json!({
+                        "error": "Failed to count songs",
+                        "message": format!("{:?}", e)
+                    })))
+                })?;
+            (songs, total)
+        };
         
         // Convert to response DTOs
-        let total = songs.len();
-        let song_responses: Vec<SongResponse> = songs
+        let song_responses: Vec<SongResponse> = paginated_songs
             .into_iter()
             .map(|song| SongResponse {
                 song_id: song.id().to_uuid(),
@@ -124,10 +207,35 @@ impl SongController {
     }
     
     /// POST /api/v1/music/songs - Create a new song
+    /// 
+    /// OpenAPI documentation is in `openapi/paths.rs::_create_song_doc`
+    /// Requires authentication - only artists can create songs
     pub async fn create_song(
+        AuthenticatedUser { user_id, role, .. }: AuthenticatedUser,
         State(state): State<MusicAppState>,
         Json(request): Json<CreateSongRequest>,
     ) -> Result<ResponseJson<CreateSongResponse>, (StatusCode, ResponseJson<serde_json::Value>)> {
+        // Validate that user is an artist or admin
+        if role != "artist" && role != "admin" {
+            return Err((
+                StatusCode::FORBIDDEN,
+                ResponseJson(serde_json::json!({
+                    "error": "Forbidden",
+                    "message": "Only artists can create songs"
+                })),
+            ));
+        }
+
+        // Validate that the artist_id matches the authenticated user (unless admin)
+        if role != "admin" && request.artist_id != user_id {
+            return Err((
+                StatusCode::FORBIDDEN,
+                ResponseJson(serde_json::json!({
+                    "error": "Forbidden",
+                    "message": "You can only create songs for yourself"
+                })),
+            ));
+        }
         // Validate input
         let title = SongTitle::new(request.title.clone())
             .map_err(|e| {
@@ -188,7 +296,7 @@ impl SongController {
         
         // Publish domain event
         let event = DomainEvent::SongListened {
-            user_id: Uuid::new_v4(), // TODO: Get from auth context
+            user_id, // Use authenticated user ID
             song_id: song.id().to_uuid(),
             artist_id: song.artist_id().to_uuid(),
             duration_seconds: song.duration().seconds(),
@@ -213,6 +321,8 @@ impl SongController {
     }
     
     /// GET /api/v1/music/songs/:id - Get song by ID
+    /// 
+    /// OpenAPI documentation is in `openapi/paths.rs::_get_song_doc`
     pub async fn get_song(
         State(state): State<MusicAppState>,
         Path(song_id): Path<Uuid>,
@@ -252,7 +362,11 @@ impl SongController {
     }
     
     /// PUT /api/v1/music/songs/:id - Update song
+    /// 
+    /// OpenAPI documentation is in `openapi/paths.rs::_update_song_doc`
+    /// Requires authentication - only song owner or admin can update
     pub async fn update_song(
+        AuthenticatedUser { user_id, role, .. }: AuthenticatedUser,
         State(state): State<MusicAppState>,
         Path(song_id): Path<Uuid>,
         Json(request): Json<UpdateSongRequest>,
@@ -274,6 +388,17 @@ impl SongController {
                     "message": format!("Song with ID {} not found", song_id)
                 })))
             })?;
+
+        // Validate permissions: only song owner (artist) or admin can update
+        if role != "admin" && song.artist_id().to_uuid() != user_id {
+            return Err((
+                StatusCode::FORBIDDEN,
+                ResponseJson(serde_json::json!({
+                    "error": "Forbidden",
+                    "message": "You can only update your own songs"
+                })),
+            ));
+        }
         
         // Update fields if provided
         if let Some(title) = request.title {
@@ -341,7 +466,11 @@ impl SongController {
     }
     
     /// DELETE /api/v1/music/songs/:id - Delete song
+    /// 
+    /// OpenAPI documentation is in `openapi/paths.rs::_delete_song_doc`
+    /// Requires authentication - only song owner or admin can delete
     pub async fn delete_song(
+        AuthenticatedUser { user_id, role, .. }: AuthenticatedUser,
         State(state): State<MusicAppState>,
         Path(song_id): Path<Uuid>,
     ) -> Result<ResponseJson<serde_json::Value>, (StatusCode, ResponseJson<serde_json::Value>)> {
@@ -362,6 +491,17 @@ impl SongController {
                     "message": format!("Song with ID {} not found", song_id)
                 })))
             })?;
+
+        // Validate permissions: only song owner (artist) or admin can delete
+        if role != "admin" && song.artist_id().to_uuid() != user_id {
+            return Err((
+                StatusCode::FORBIDDEN,
+                ResponseJson(serde_json::json!({
+                    "error": "Forbidden",
+                    "message": "You can only delete your own songs"
+                })),
+            ));
+        }
         
         // Delete from repository
         state.song_repository

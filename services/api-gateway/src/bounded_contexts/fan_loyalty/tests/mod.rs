@@ -1,6 +1,8 @@
-pub mod unit_tests;
-pub mod integration_tests;
-pub mod api_tests;
+// Módulos comentados porque los archivos no existen aún
+// pub mod unit_tests;
+// pub mod integration_tests;
+// pub mod api_tests;
+
 pub mod performance_tests;
 pub mod fan_loyalty_tdd_tests;
 pub mod test_environment;

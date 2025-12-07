@@ -7,8 +7,16 @@
 
 use api_gateway::gateways::{
     create_user_gateway, create_music_gateway, create_payment_gateway,
-    create_campaign_gateway, create_listen_reward_gateway, create_fan_ventures_gateway,
-    create_notification_gateway, create_fan_loyalty_gateway,
+    create_fan_loyalty_gateway,
+    // Gateways mock deshabilitados por defecto (solo con feature flag)
+    #[cfg(feature = "enable_mock_gateways")]
+    create_campaign_gateway,
+    #[cfg(feature = "enable_mock_gateways")]
+    create_listen_reward_gateway,
+    #[cfg(feature = "enable_mock_gateways")]
+    create_fan_ventures_gateway,
+    #[cfg(feature = "enable_mock_gateways")]
+    create_notification_gateway,
 };
 use api_gateway::shared::infrastructure::app_state::AppState;
 use api_gateway::openapi::router::create_openapi_router;
@@ -35,15 +43,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Crear AppState compartido
     let app_state = AppState::default().await?;
     
-    // Crear todos los gateways
+    // =============================================================================
+    // CREAR GATEWAYS - Solo los que están listos para producción
+    // =============================================================================
+    
+    // ✅ STABLE - Gateways con implementación real
     let user_gateway = create_user_gateway(app_state.clone()).await?;
-    let music_gateway = create_music_gateway(app_state.clone()).await?;
     let payment_gateway = create_payment_gateway(app_state.clone()).await?;
-    let campaign_gateway = create_campaign_gateway(app_state.clone()).await?;
-    let listen_reward_gateway = create_listen_reward_gateway(app_state.clone()).await?;
-    let fan_ventures_gateway = create_fan_ventures_gateway(app_state.clone()).await?;
-    let notification_gateway = create_notification_gateway(app_state.clone()).await?;
     let fan_loyalty_gateway = create_fan_loyalty_gateway(app_state.clone()).await?;
+    
+    // ⚠️ BETA - Gateways con implementación parcial (controllers reales pero gateway usa mocks)
+    let music_gateway = create_music_gateway(app_state.clone()).await?;
+    
+    // ❌ MOCK - Gateways deshabilitados hasta que estén implementados
+    // Estos gateways retornan solo {"message": "TODO"} y no deben ser expuestos al frontend
+    #[cfg(feature = "enable_mock_gateways")]
+    let campaign_gateway = create_campaign_gateway(app_state.clone()).await?;
+    #[cfg(feature = "enable_mock_gateways")]
+    let listen_reward_gateway = create_listen_reward_gateway(app_state.clone()).await?;
+    #[cfg(feature = "enable_mock_gateways")]
+    let fan_ventures_gateway = create_fan_ventures_gateway(app_state.clone()).await?;
+    #[cfg(feature = "enable_mock_gateways")]
+    let notification_gateway = create_notification_gateway(app_state.clone()).await?;
     
     // Crear router de documentación OpenAPI
     let docs_router = create_openapi_router();
@@ -65,14 +86,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Axum automáticamente elimina el prefijo cuando usamos .nest()
         // Los gateways individuales tienen sus propias rutas /health e /info
         // que estarán disponibles en /api/v1/{context}/health e /api/v1/{context}/info
+        
+        // ✅ STABLE - Gateways listos para producción
         .nest("/api/v1/users", user_gateway)
-        .nest("/api/v1/music", music_gateway)
         .nest("/api/v1/payments", payment_gateway)
-        .nest("/api/v1/campaigns", campaign_gateway)
-        .nest("/api/v1/listen-rewards", listen_reward_gateway)
-        .nest("/api/v1/fan-ventures", fan_ventures_gateway)
-        .nest("/api/v1/notifications", notification_gateway)
         .nest("/api/v1/fan-loyalty", fan_loyalty_gateway)
+        
+        // ⚠️ BETA - Gateways con implementación parcial
+        // Music: Controllers reales existen pero gateway usa handlers mock (ver Fase 5)
+        .nest("/api/v1/music", music_gateway)
+        
+        // ❌ MOCK - Gateways deshabilitados (solo disponibles con feature flag)
+        // Estos gateways retornan {"message": "TODO"} y no deben ser usados por el frontend
+        // Ver API_CONTRACT.md para más detalles
+        #[cfg(feature = "enable_mock_gateways")]
+        .nest("/api/v1/campaigns", campaign_gateway)
+        #[cfg(feature = "enable_mock_gateways")]
+        .nest("/api/v1/listen-rewards", listen_reward_gateway)
+        #[cfg(feature = "enable_mock_gateways")]
+        .nest("/api/v1/fan-ventures", fan_ventures_gateway)
+        #[cfg(feature = "enable_mock_gateways")]
+        .nest("/api/v1/notifications", notification_gateway)
         
         // =============================================================================
         // DOCUMENTATION ROUTES
@@ -111,14 +145,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   📄 OpenAPI JSON: http://{}/api-docs/openapi.json", addr);
     println!("");
     println!("🎵 Endpoints Disponibles:");
-    println!("   👤 Users: http://{}/api/v1/users", addr);
-    println!("   🎵 Music: http://{}/api/v1/music", addr);
-    println!("   💰 Payments: http://{}/api/v1/payments", addr);
-    println!("   🎯 Campaigns: http://{}/api/v1/campaigns", addr);
-    println!("   🎧 Listen Rewards: http://{}/api/v1/listen-rewards", addr);
-    println!("   💎 Fan Ventures: http://{}/api/v1/fan-ventures", addr);
-    println!("   🔔 Notifications: http://{}/api/v1/notifications", addr);
-    println!("   🏆 Fan Loyalty: http://{}/api/v1/fan-loyalty", addr);
+    println!("   ✅ 👤 Users: http://{}/api/v1/users (STABLE)", addr);
+    println!("   ✅ 💰 Payments: http://{}/api/v1/payments (STABLE)", addr);
+    println!("   ✅ 🏆 Fan Loyalty: http://{}/api/v1/fan-loyalty (STABLE)", addr);
+    println!("   ⚠️  🎵 Music: http://{}/api/v1/music (BETA - ver API_CONTRACT.md)", addr);
+    #[cfg(feature = "enable_mock_gateways")]
+    {
+        println!("   ❌ 🎯 Campaigns: http://{}/api/v1/campaigns (MOCK - deshabilitado)", addr);
+        println!("   ❌ 🎧 Listen Rewards: http://{}/api/v1/listen-rewards (MOCK - deshabilitado)", addr);
+        println!("   ❌ 💎 Fan Ventures: http://{}/api/v1/fan-ventures (MOCK - deshabilitado)", addr);
+        println!("   ❌ 🔔 Notifications: http://{}/api/v1/notifications (MOCK - deshabilitado)", addr);
+    }
+    println!("");
+    println!("📋 Ver API_CONTRACT.md para detalles de endpoints estables");
     println!("");
     println!("🏥 Health Check: http://{}/health", addr);
     println!("");
@@ -142,12 +181,15 @@ async fn unified_health_check() -> Json<serde_json::Value> {
             "users": "/api/v1/users",
             "music": "/api/v1/music",
             "payments": "/api/v1/payments",
-            "campaigns": "/api/v1/campaigns",
-            "listen_rewards": "/api/v1/listen-rewards",
-            "fan_ventures": "/api/v1/fan-ventures",
-            "notifications": "/api/v1/notifications",
             "fan_loyalty": "/api/v1/fan-loyalty"
-        }
+        },
+        "status": {
+            "users": "stable",
+            "payments": "stable",
+            "fan_loyalty": "stable",
+            "music": "beta"
+        },
+        "note": "Ver API_CONTRACT.md para detalles. Gateways mock deshabilitados por defecto."
     }))
 }
 
@@ -162,17 +204,21 @@ async fn api_info() -> Json<serde_json::Value> {
             "users": "/api/v1/users",
             "music": "/api/v1/music",
             "payments": "/api/v1/payments",
-            "campaigns": "/api/v1/campaigns",
-            "listen_rewards": "/api/v1/listen-rewards",
-            "fan_ventures": "/api/v1/fan-ventures",
-            "notifications": "/api/v1/notifications",
             "fan_loyalty": "/api/v1/fan-loyalty"
+        },
+        "status": {
+            "users": "stable",
+            "payments": "stable",
+            "fan_loyalty": "stable",
+            "music": "beta"
         },
         "documentation": {
             "swagger_ui": "/swagger-ui",
             "redoc": "/redoc",
-            "openapi_json": "/api-docs/openapi.json"
-        }
+            "openapi_json": "/api-docs/openapi.json",
+            "contract": "Ver API_CONTRACT.md para detalles de endpoints"
+        },
+        "note": "Gateways mock (campaigns, listen-rewards, fan-ventures, notifications) deshabilitados por defecto. Usar feature flag 'enable_mock_gateways' para habilitarlos."
     }))
 }
 
@@ -186,17 +232,21 @@ async fn gateway_info() -> Json<serde_json::Value> {
             "users": "/api/v1/users",
             "music": "/api/v1/music",
             "payments": "/api/v1/payments",
-            "campaigns": "/api/v1/campaigns",
-            "listen_rewards": "/api/v1/listen-rewards",
-            "fan_ventures": "/api/v1/fan-ventures",
-            "notifications": "/api/v1/notifications",
             "fan_loyalty": "/api/v1/fan-loyalty"
+        },
+        "status": {
+            "users": "stable",
+            "payments": "stable",
+            "fan_loyalty": "stable",
+            "music": "beta"
         },
         "health": "/health",
         "documentation": {
             "swagger_ui": "/swagger-ui",
-            "redoc": "/redoc"
-        }
+            "redoc": "/redoc",
+            "contract": "Ver API_CONTRACT.md"
+        },
+        "note": "Gateways mock deshabilitados. Ver API_CONTRACT.md para detalles."
     }))
 }
 

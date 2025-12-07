@@ -17,5 +17,8 @@ pub mod notifications;
 // Fan Loyalty Context
 pub mod fan_loyalty;
 
+// Payment Context
+pub mod payment;
+
 // Cross-context orchestrator
 pub mod orchestrator; 

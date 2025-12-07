@@ -98,9 +98,27 @@ services:
     networks:
       - vibestream-network
 
+  # Facial Recognition Service (Open Source - Gratuito)
+  facial-recognition-service:
+    build:
+      context: ./services/facial-recognition-service
+      dockerfile: Dockerfile
+    environment:
+      PORT: 8004
+      DEBUG: "false"
+      SIMILARITY_THRESHOLD: "0.6"
+      DB_PATH: /app/facial_templates.db
+    ports:
+      - "8004:8004"
+    volumes:
+      - facial_templates_data:/app
+    networks:
+      - vibestream-network
+
 volumes:
   postgres_data:
   redis_data:
+  facial_templates_data:
 
 networks:
   vibestream-network:

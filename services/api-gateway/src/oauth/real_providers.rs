@@ -262,7 +262,10 @@ impl AppleOAuthProvider {
         }
         
         let payload = parts[1];
-        let decoded = base64::decode_config(payload, base64::URL_SAFE_NO_PAD)
+        // base64 0.21 uses Engine trait instead of decode_config
+        use base64::{Engine as _, engine::general_purpose};
+        let decoded = general_purpose::URL_SAFE_NO_PAD
+            .decode(payload)
             .map_err(|e| AuthError::OAuthError(format!("Failed to decode Apple ID token: {}", e)))?;
         
         let user_info: AppleUserInfo = serde_json::from_slice(&decoded)

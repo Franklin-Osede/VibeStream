@@ -39,6 +39,35 @@ The system uses a microservices architecture with the following key components:
 - **Circuit Breakers**: Graceful failure recovery
 - **High Availability**: Horizontal scaling ready
 
+## 🚀 Quick Start
+
+### Setup Rápido (Recomendado)
+
+```bash
+# 1. Ejecutar script de setup automático
+./scripts/setup-dev.sh
+
+# 2. Iniciar servidor
+cd services/api-gateway
+cargo run --bin api-gateway-unified
+```
+
+**¡Listo!** El servidor estará disponible en `http://localhost:3000`
+
+📖 **Para más detalles**: Ver [SETUP.md](./SETUP.md) - Guía completa de setup paso a paso
+
+### Verificar que Funciona
+
+```bash
+# Health check
+curl http://localhost:3000/health
+
+# Documentación interactiva
+# Abre en navegador: http://localhost:3000/swagger-ui
+```
+
+---
+
 ## Technology Stack
 
 - **Language**: Rust

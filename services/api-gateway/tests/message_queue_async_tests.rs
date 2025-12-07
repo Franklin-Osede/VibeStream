@@ -4,21 +4,27 @@
 // 
 // RED PHASE: Tests que verifican que MessageQueue usa conexiones async
 // GREEN PHASE: Migrar MessageQueue a redis::aio
+// 
+// Usa testcontainers para levantar Redis automáticamente
 
 use api_gateway::services::MessageQueue;
 use tokio::time::{timeout, Duration};
+
+// Importar testcontainers setup
+use crate::testcontainers_setup::TestContainersSetup;
 
 // =============================================================================
 // TEST 1: MessageQueue debe usar conexiones async (no bloquear)
 // =============================================================================
 
 #[tokio::test]
-#[ignore] // Ignorar hasta que migremos a async
 async fn test_message_queue_uses_async_connections() {
-    // Arrange: Crear MessageQueue
-    let redis_url = std::env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    // Arrange: Setup testcontainers (solo Redis necesario)
+    let setup = TestContainersSetup::new();
+    setup.setup_env();
+    setup.wait_for_redis().await.expect("Redis debe estar listo");
     
+    let redis_url = setup.get_redis_url();
     let message_queue = MessageQueue::new(&redis_url)
         .await
         .expect("Failed to create MessageQueue");
@@ -47,12 +53,13 @@ async fn test_message_queue_uses_async_connections() {
 // =============================================================================
 
 #[tokio::test]
-#[ignore]
 async fn test_send_message_is_async() {
-    // Arrange
-    let redis_url = std::env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    // Arrange: Setup testcontainers (solo Redis necesario)
+    let setup = TestContainersSetup::new();
+    setup.setup_env();
+    setup.wait_for_redis().await.expect("Redis debe estar listo");
     
+    let redis_url = setup.get_redis_url();
     let message_queue = MessageQueue::new(&redis_url)
         .await
         .expect("Failed to create MessageQueue");
@@ -81,12 +88,13 @@ async fn test_send_message_is_async() {
 // =============================================================================
 
 #[tokio::test]
-#[ignore]
 async fn test_concurrent_operations() {
-    // Arrange
-    let redis_url = std::env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    // Arrange: Setup testcontainers (solo Redis necesario)
+    let setup = TestContainersSetup::new();
+    setup.setup_env();
+    setup.wait_for_redis().await.expect("Redis debe estar listo");
     
+    let redis_url = setup.get_redis_url();
     let message_queue = MessageQueue::new(&redis_url)
         .await
         .expect("Failed to create MessageQueue");
@@ -123,12 +131,13 @@ async fn test_concurrent_operations() {
 // =============================================================================
 
 #[tokio::test]
-#[ignore]
 async fn test_message_queue_clone_and_share() {
-    // Arrange
-    let redis_url = std::env::var("REDIS_URL")
-        .unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    // Arrange: Setup testcontainers (solo Redis necesario)
+    let setup = TestContainersSetup::new();
+    setup.setup_env();
+    setup.wait_for_redis().await.expect("Redis debe estar listo");
     
+    let redis_url = setup.get_redis_url();
     let message_queue = MessageQueue::new(&redis_url)
         .await
         .expect("Failed to create MessageQueue");

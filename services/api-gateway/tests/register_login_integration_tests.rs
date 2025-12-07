@@ -4,6 +4,8 @@
 // 
 // Tests de integración end-to-end para flujo de autenticación
 // Verifica que register y login funcionen correctamente con la base de datos real
+// 
+// Usa testcontainers para levantar PostgreSQL y Redis automáticamente
 
 use axum::{
     body::Body,
@@ -14,15 +16,26 @@ use serde_json::{json, Value};
 use api_gateway::gateways::create_user_gateway;
 use api_gateway::shared::infrastructure::app_state::AppState;
 
+// Importar testcontainers setup
+use crate::testcontainers_setup::TestContainersSetup;
+
 // =============================================================================
 // TEST 1: Register debe crear usuario y retornar token
 // =============================================================================
 
 #[tokio::test]
-#[ignore] // Requiere base de datos activa
 async fn test_register_creates_user_and_returns_token() {
-    // Arrange
-    let app_state = AppState::default().await.expect("Failed to create AppState");
+    // Arrange: Setup testcontainers
+    let setup = TestContainersSetup::new();
+    setup.setup_env();
+    setup.wait_for_postgres().await.expect("PostgreSQL debe estar listo");
+    setup.wait_for_redis().await.expect("Redis debe estar listo");
+    setup.run_migrations().await.expect("Migraciones deben ejecutarse");
+    
+    let app_state = AppState::new(
+        &setup.get_postgres_url(),
+        &setup.get_redis_url(),
+    ).await.expect("Failed to create AppState");
     let app = create_user_gateway(app_state)
         .await
         .expect("Failed to create user gateway");
@@ -113,10 +126,18 @@ async fn test_register_creates_user_and_returns_token() {
 // =============================================================================
 
 #[tokio::test]
-#[ignore]
 async fn test_login_authenticates_user_and_returns_token() {
-    // Arrange: Primero crear un usuario
-    let app_state = AppState::default().await.expect("Failed to create AppState");
+    // Arrange: Setup testcontainers y crear un usuario
+    let setup = TestContainersSetup::new();
+    setup.setup_env();
+    setup.wait_for_postgres().await.expect("PostgreSQL debe estar listo");
+    setup.wait_for_redis().await.expect("Redis debe estar listo");
+    setup.run_migrations().await.expect("Migraciones deben ejecutarse");
+    
+    let app_state = AppState::new(
+        &setup.get_postgres_url(),
+        &setup.get_redis_url(),
+    ).await.expect("Failed to create AppState");
     let app = create_user_gateway(app_state)
         .await
         .expect("Failed to create user gateway");
@@ -198,10 +219,18 @@ async fn test_login_authenticates_user_and_returns_token() {
 // =============================================================================
 
 #[tokio::test]
-#[ignore]
 async fn test_login_with_wrong_password_fails() {
-    // Arrange
-    let app_state = AppState::default().await.expect("Failed to create AppState");
+    // Arrange: Setup testcontainers
+    let setup = TestContainersSetup::new();
+    setup.setup_env();
+    setup.wait_for_postgres().await.expect("PostgreSQL debe estar listo");
+    setup.wait_for_redis().await.expect("Redis debe estar listo");
+    setup.run_migrations().await.expect("Migraciones deben ejecutarse");
+    
+    let app_state = AppState::new(
+        &setup.get_postgres_url(),
+        &setup.get_redis_url(),
+    ).await.expect("Failed to create AppState");
     let app = create_user_gateway(app_state)
         .await
         .expect("Failed to create user gateway");
@@ -270,10 +299,18 @@ async fn test_login_with_wrong_password_fails() {
 // =============================================================================
 
 #[tokio::test]
-#[ignore]
 async fn test_register_duplicate_email_fails() {
-    // Arrange
-    let app_state = AppState::default().await.expect("Failed to create AppState");
+    // Arrange: Setup testcontainers
+    let setup = TestContainersSetup::new();
+    setup.setup_env();
+    setup.wait_for_postgres().await.expect("PostgreSQL debe estar listo");
+    setup.wait_for_redis().await.expect("Redis debe estar listo");
+    setup.run_migrations().await.expect("Migraciones deben ejecutarse");
+    
+    let app_state = AppState::new(
+        &setup.get_postgres_url(),
+        &setup.get_redis_url(),
+    ).await.expect("Failed to create AppState");
     let app = create_user_gateway(app_state)
         .await
         .expect("Failed to create user gateway");
@@ -336,10 +373,18 @@ async fn test_register_duplicate_email_fails() {
 // =============================================================================
 
 #[tokio::test]
-#[ignore]
 async fn test_register_password_mismatch_fails() {
-    // Arrange
-    let app_state = AppState::default().await.expect("Failed to create AppState");
+    // Arrange: Setup testcontainers
+    let setup = TestContainersSetup::new();
+    setup.setup_env();
+    setup.wait_for_postgres().await.expect("PostgreSQL debe estar listo");
+    setup.wait_for_redis().await.expect("Redis debe estar listo");
+    setup.run_migrations().await.expect("Migraciones deben ejecutarse");
+    
+    let app_state = AppState::new(
+        &setup.get_postgres_url(),
+        &setup.get_redis_url(),
+    ).await.expect("Failed to create AppState");
     let app = create_user_gateway(app_state)
         .await
         .expect("Failed to create user gateway");

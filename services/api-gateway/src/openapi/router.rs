@@ -8,35 +8,42 @@ use axum::{
     response::Json,
     http::StatusCode,
 };
-// use utoipa_swagger_ui::SwaggerUi;
-// use utoipa_redoc::{Redoc, Servable};
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
+use utoipa_redoc::Redoc;
 use crate::openapi::{ApiDoc, generate_openapi_spec};
 
-/// Crear router para documentación OpenAPI
+/// Create router for OpenAPI documentation
 pub fn create_openapi_router() -> Router {
     Router::new()
-        // Endpoint para obtener el JSON de OpenAPI
+        // Swagger UI - Interactive API documentation
+        .merge(
+            SwaggerUi::new("/swagger-ui")
+                .url("/api-docs/openapi.json", ApiDoc::openapi())
+        )
+        // Redoc - Alternative documentation interface  
+        .merge(
+            Redoc::new("/redoc", ApiDoc::openapi())
+        )
+        // Endpoint to get OpenAPI JSON
         .route("/api-docs/openapi.json", get(openapi_spec_handler))
-        // Endpoint para información de la API
+        // Endpoint for API information
         .route("/api-docs/info", get(api_info_handler))
-        // Endpoint para validar cobertura de la API
+        // Endpoint to validate API coverage
         .route("/api-docs/validate", get(validate_coverage_handler))
-        // Placeholders para documentación
-        .route("/swagger-ui", get(|| async { "Swagger UI placeholder" }))
-        .route("/redoc", get(|| async { "Redoc placeholder" }))
 }
 
-/// Handler para servir la especificación OpenAPI en JSON
+/// Handler to serve OpenAPI specification in JSON
 async fn openapi_spec_handler() -> Result<Json<serde_json::Value>, StatusCode> {
     let spec = ApiDoc::openapi();
     Ok(Json(serde_json::to_value(spec).unwrap_or_else(|_| serde_json::Value::Null)))
 }
 
-/// Handler para información de la API
+/// Handler for API information
 async fn api_info_handler() -> Result<Json<serde_json::Value>, StatusCode> {
     Ok(Json(serde_json::json!({
         "title": "VibeStream API",
-        "version": "2.0.0",
+        "version": "1.0.0",
         "description": "Complete VibeStream ecosystem API with microservices architecture",
         "openapi_version": "3.1.0",
         "documentation": {
@@ -65,7 +72,7 @@ async fn api_info_handler() -> Result<Json<serde_json::Value>, StatusCode> {
     })))
 }
 
-/// Handler para validar cobertura de la API
+/// Handler to validate API coverage
 async fn validate_coverage_handler() -> Result<Json<serde_json::Value>, StatusCode> {
     use crate::openapi::validate_api_coverage;
     
@@ -85,7 +92,7 @@ async fn validate_coverage_handler() -> Result<Json<serde_json::Value>, StatusCo
     }
 }
 
-/// Crear router de documentación para un gateway específico
+/// Create documentation router for a specific gateway
 pub fn create_gateway_docs_router(gateway_name: String, port: u16) -> Router {
     let gateway_name_clone1 = gateway_name.clone();
     let gateway_name_clone2 = gateway_name.clone();
@@ -117,7 +124,7 @@ pub fn create_gateway_docs_router(gateway_name: String, port: u16) -> Router {
                     "gateway": gateway_name,
                     "port": port,
                     "status": "operational",
-                    "version": "2.0.0"
+                    "version": "1.0.0"
                 }))
             }
         }))

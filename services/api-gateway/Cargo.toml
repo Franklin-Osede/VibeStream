@@ -3,6 +3,12 @@ name = "api-gateway"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = []
+# Feature flag para habilitar gateways mock (solo para desarrollo/testing)
+# Por defecto deshabilitado para evitar que frontend consuma endpoints mock
+enable_mock_gateways = []
+
 [dependencies]
 # Core dependencies
 tokio = { version = "1.25", features = ["full"] }
@@ -99,13 +105,26 @@ rand = "0.8"
 tempfile = "3.8"
 serial_test = "3.0"
 
+# Testcontainers para tests de integración
+testcontainers = "0.15"
+testcontainers-modules = { version = "0.1.0-beta.1", features = ["postgres", "redis"] }
+
 # Optional dependencies for advanced features
 rdkafka = { version = "0.35", features = ["cmake-build"] }
 
-[[bin]]
-name = "api-gateway"
-path = "src/main.rs"
+# =============================================================================
+# BINARIES CONFIGURATION
+# =============================================================================
+# api-gateway-unified es el binario por defecto (primero en la lista)
+# Ejecutar con: cargo run (o cargo run --bin api-gateway-unified)
+# =============================================================================
 
 [[bin]]
 name = "api-gateway-unified"
-path = "src/main_unified.rs" 
+path = "src/main_unified.rs"
+
+# Binario deprecado - mantenido solo para compatibilidad
+# Usar api-gateway-unified en su lugar
+[[bin]]
+name = "api-gateway"
+path = "src/main.rs" 

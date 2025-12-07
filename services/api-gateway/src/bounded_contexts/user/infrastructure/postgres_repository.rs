@@ -588,4 +588,131 @@ impl UserRepository for UserPostgresRepository {
 
         Ok(())
     }
+
+    async fn get_followers(&self, user_id: &UserId, page: u32, page_size: u32) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
+        use crate::bounded_contexts::user::domain::aggregates::UserSummary;
+        let user_uuid = user_id.to_uuid();
+        let offset = page * page_size;
+        
+        let rows = sqlx::query(
+            r#"
+            SELECT 
+                u.id, u.username, u.email, u.display_name, u.avatar_url,
+                u.tier, u.role, u.is_verified, u.is_active,
+                u.total_rewards_earned, u.tier_points,
+                u.created_at
+            FROM users u
+            INNER JOIN user_followers uf ON u.id = uf.follower_id
+            WHERE uf.followee_id = $1
+            ORDER BY uf.created_at DESC
+            LIMIT $2 OFFSET $3
+            "#
+        )
+        .bind(user_uuid)
+        .bind(page_size as i64)
+        .bind(offset as i64)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(format!("Failed to get followers: {}", e)))?;
+        
+        let followers = rows.into_iter().map(|row| {
+            let id: Uuid = row.try_get("id")?;
+            let username_str: String = row.try_get("username")?;
+            let email_str: String = row.try_get("email")?;
+            
+            Ok(UserSummary {
+                id: UserId::from_uuid(id),
+                username: Username::new(username_str).map_err(|e| AppError::ValidationError(e))?,
+                email: Email::new(email_str).map_err(|e| AppError::ValidationError(e))?,
+                display_name: row.try_get("display_name")?,
+                avatar_url: row.try_get("avatar_url").ok().and_then(|url: Option<String>| {
+                    url.map(|u| ProfileUrl::new(u).ok())
+                }).flatten(),
+                tier: row.try_get("tier")?,
+                role: row.try_get("role")?,
+                is_verified: row.try_get("is_verified")?,
+                is_active: row.try_get("is_active")?,
+                total_listening_time: 0, // Not available in this query
+                total_rewards: row.try_get::<f64, _>("total_rewards_earned").unwrap_or(0.0),
+                tier_points: row.try_get::<i32, _>("tier_points").unwrap_or(0),
+                created_at: row.try_get("created_at")?,
+            })
+        }).collect::<Result<Vec<UserSummary>, AppError>>()?;
+        
+        Ok(followers)
+    }
+
+    async fn get_following(&self, user_id: &UserId, page: u32, page_size: u32) -> Result<Vec<crate::bounded_contexts::user::domain::aggregates::UserSummary>, AppError> {
+        use crate::bounded_contexts::user::domain::aggregates::UserSummary;
+        let user_uuid = user_id.to_uuid();
+        let offset = page * page_size;
+        
+        let rows = sqlx::query(
+            r#"
+            SELECT 
+                u.id, u.username, u.email, u.display_name, u.avatar_url,
+                u.tier, u.role, u.is_verified, u.is_active,
+                u.total_rewards_earned, u.tier_points,
+                u.created_at
+            FROM users u
+            INNER JOIN user_followers uf ON u.id = uf.followee_id
+            WHERE uf.follower_id = $1
+            ORDER BY uf.created_at DESC
+            LIMIT $2 OFFSET $3
+            "#
+        )
+        .bind(user_uuid)
+        .bind(page_size as i64)
+        .bind(offset as i64)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(format!("Failed to get following: {}", e)))?;
+        
+        let following = rows.into_iter().map(|row| {
+            let id: Uuid = row.try_get("id")?;
+            let username_str: String = row.try_get("username")?;
+            let email_str: String = row.try_get("email")?;
+            
+            Ok(UserSummary {
+                id: UserId::from_uuid(id),
+                username: Username::new(username_str).map_err(|e| AppError::ValidationError(e))?,
+                email: Email::new(email_str).map_err(|e| AppError::ValidationError(e))?,
+                display_name: row.try_get("display_name")?,
+                avatar_url: row.try_get("avatar_url").ok().and_then(|url: Option<String>| {
+                    url.map(|u| ProfileUrl::new(u).ok())
+                }).flatten(),
+                tier: row.try_get("tier")?,
+                role: row.try_get("role")?,
+                is_verified: row.try_get("is_verified")?,
+                is_active: row.try_get("is_active")?,
+                total_listening_time: 0, // Not available in this query
+                total_rewards: row.try_get::<f64, _>("total_rewards_earned").unwrap_or(0.0),
+                tier_points: row.try_get::<i32, _>("tier_points").unwrap_or(0),
+                created_at: row.try_get("created_at")?,
+            })
+        }).collect::<Result<Vec<UserSummary>, AppError>>()?;
+        
+        Ok(following)
+    }
+
+    async fn is_following(&self, follower_id: &UserId, followee_id: &UserId) -> Result<bool, AppError> {
+        let follower_uuid = follower_id.to_uuid();
+        let followee_uuid = followee_id.to_uuid();
+        
+        let result = sqlx::query(
+            r#"
+            SELECT EXISTS(
+                SELECT 1 FROM user_followers 
+                WHERE follower_id = $1 AND followee_id = $2
+            ) as is_following
+            "#
+        )
+        .bind(follower_uuid)
+        .bind(followee_uuid)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(format!("Failed to check if following: {}", e)))?;
+        
+        Ok(result.try_get::<bool, _>("is_following").unwrap_or(false))
+    }
 } 

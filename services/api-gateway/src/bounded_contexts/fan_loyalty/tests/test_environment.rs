@@ -43,21 +43,54 @@ impl FanLoyaltyTestEnvironment {
     }
 }
 
-/// Create in-memory test database
+/// Create test database using PostgreSQL
+/// 
+/// Uses TEST_DATABASE_URL if set, otherwise falls back to default test database.
+/// Supports both real PostgreSQL and testcontainers for isolated tests.
 async fn create_test_database() -> Result<PgPool, Box<dyn std::error::Error>> {
-    // For TDD, we'll use an in-memory SQLite database for fast tests
-    // In production, this would be PostgreSQL
+    // Try to use TEST_DATABASE_URL from environment (for testcontainers or CI)
+    let database_url = std::env::var("TEST_DATABASE_URL")
+        .unwrap_or_else(|_| {
+            // Fallback to default test database URL
+            "postgresql://vibestream:vibestream@localhost:5433/vibestream_test".to_string()
+        });
     
-    let database_url = "sqlite::memory:";
-    let pool = sqlx::SqlitePool::connect(database_url).await?;
+    // Connect to PostgreSQL
+    let pool = sqlx::PgPool::connect(&database_url).await?;
     
-    // Run migrations for test database
-    sqlx::migrate!("./migrations").run(&pool).await?;
+    // Run migrations if needed
+    // Try multiple migration paths
+    let migrations_paths = vec![
+        "../../migrations",
+        "../migrations",
+        "migrations",
+        "../../../migrations",
+    ];
     
-    // Convert to PgPool for compatibility
-    // Note: This is a simplification for TDD
-    // In real implementation, we'd use proper PostgreSQL test database
-    Ok(unsafe { std::mem::transmute(pool) })
+    let mut migrations_run = false;
+    for path in migrations_paths {
+        if std::path::Path::new(path).exists() {
+            match sqlx::migrate::Migrator::new(std::path::Path::new(path)).await {
+                Ok(migrator) => {
+                    if let Err(e) = migrator.run(&pool).await {
+                        eprintln!("Warning: Failed to run migrations from {}: {}", path, e);
+                    } else {
+                        migrations_run = true;
+                        break;
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Warning: Failed to create migrator from {}: {}", path, e);
+                }
+            }
+        }
+    }
+    
+    if !migrations_run {
+        eprintln!("Warning: No migrations were run. Tables may not exist.");
+    }
+    
+    Ok(pool)
 }
 
 /// Create test Redis client

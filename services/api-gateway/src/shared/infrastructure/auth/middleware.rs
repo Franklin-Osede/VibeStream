@@ -8,7 +8,7 @@ use axum::{
     middleware::Next,
     response::Response,
 };
-use crate::shared::infrastructure::auth::{JwtService, Claims};
+use crate::shared::infrastructure::auth::{JwtService, Claims, config::get_jwt_secret};
 use std::sync::Arc;
 
 /// Extract JWT token from Authorization header
@@ -32,9 +32,18 @@ pub async fn jwt_auth_middleware(
     mut request: Request,
     next: Next,
 ) -> Response {
-    // Get JWT secret from environment
-    let jwt_secret = std::env::var("JWT_SECRET")
-        .unwrap_or_else(|_| "default_secret_change_in_production".to_string());
+    // Get JWT secret from environment (REQUIRED - no fallback for security)
+    let jwt_secret = match get_jwt_secret() {
+        Ok(secret) => secret,
+        Err(e) => {
+            tracing::error!("JWT_SECRET configuration error: {}", e);
+            return Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(axum::body::Body::from(format!("JWT configuration error: {}. Please set JWT_SECRET environment variable.", e)))
+                .unwrap()
+                .into();
+        }
+    };
     
     // Validate JWT token
     let jwt_service = match JwtService::new(&jwt_secret) {
@@ -172,8 +181,17 @@ pub async fn optional_jwt_auth_middleware(
     mut request: Request,
     next: Next,
 ) -> Response {
-    let jwt_secret = std::env::var("JWT_SECRET")
-        .unwrap_or_else(|_| "default_secret_change_in_production".to_string());
+    // Get JWT secret from environment (REQUIRED - no fallback for security)
+    // For optional middleware, we skip validation if JWT_SECRET is not set
+    let jwt_secret = match crate::shared::infrastructure::auth::get_jwt_secret() {
+        Ok(secret) => secret,
+        Err(_) => {
+            // For optional middleware, we just skip validation if JWT_SECRET is not set
+            // but log a warning
+            tracing::warn!("JWT_SECRET not set - optional auth middleware will not validate tokens");
+            return next.run(request).await;
+        }
+    };
     
     if let Ok(jwt_service) = JwtService::new(&jwt_secret) {
         if let Some(token) = extract_token(request.headers()) {

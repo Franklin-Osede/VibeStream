@@ -4,6 +4,8 @@
 // 
 // RED PHASE: Tests que verifican que las rutas protegidas requieren auth
 // GREEN PHASE: Aplicar middleware a rutas protegidas
+// 
+// Usa testcontainers para levantar PostgreSQL y Redis automáticamente
 
 use axum::{
     body::Body,
@@ -14,15 +16,26 @@ use api_gateway::gateways::create_user_gateway;
 use api_gateway::shared::infrastructure::app_state::AppState;
 use api_gateway::shared::infrastructure::auth::JwtService;
 
+// Importar testcontainers setup
+use crate::testcontainers_setup::TestContainersSetup;
+
 // =============================================================================
 // TEST 1: Rutas protegidas deben requerir JWT token
 // =============================================================================
 
 #[tokio::test]
-#[ignore] // Ignorar hasta que implementemos el middleware
 async fn test_protected_route_requires_auth() {
-    // Arrange: Crear gateway
-    let app_state = AppState::default().await.expect("Failed to create AppState");
+    // Arrange: Setup testcontainers y crear gateway
+    let setup = TestContainersSetup::new();
+    setup.setup_env();
+    setup.wait_for_postgres().await.expect("PostgreSQL debe estar listo");
+    setup.wait_for_redis().await.expect("Redis debe estar listo");
+    setup.run_migrations().await.expect("Migraciones deben ejecutarse");
+    
+    let app_state = AppState::new(
+        &setup.get_postgres_url(),
+        &setup.get_redis_url(),
+    ).await.expect("Failed to create AppState");
     let app = create_user_gateway(app_state)
         .await
         .expect("Failed to create user gateway");
@@ -50,8 +63,17 @@ async fn test_protected_route_requires_auth() {
 
 #[tokio::test]
 async fn test_public_routes_no_auth_required() {
-    // Arrange
-    let app_state = AppState::default().await.expect("Failed to create AppState");
+    // Arrange: Setup testcontainers
+    let setup = TestContainersSetup::new();
+    setup.setup_env();
+    setup.wait_for_postgres().await.expect("PostgreSQL debe estar listo");
+    setup.wait_for_redis().await.expect("Redis debe estar listo");
+    setup.run_migrations().await.expect("Migraciones deben ejecutarse");
+    
+    let app_state = AppState::new(
+        &setup.get_postgres_url(),
+        &setup.get_redis_url(),
+    ).await.expect("Failed to create AppState");
     let app = create_user_gateway(app_state)
         .await
         .expect("Failed to create user gateway");
@@ -78,10 +100,18 @@ async fn test_public_routes_no_auth_required() {
 // =============================================================================
 
 #[tokio::test]
-#[ignore]
 async fn test_protected_route_with_valid_token() {
-    // Arrange
-    let app_state = AppState::default().await.expect("Failed to create AppState");
+    // Arrange: Setup testcontainers
+    let setup = TestContainersSetup::new();
+    setup.setup_env();
+    setup.wait_for_postgres().await.expect("PostgreSQL debe estar listo");
+    setup.wait_for_redis().await.expect("Redis debe estar listo");
+    setup.run_migrations().await.expect("Migraciones deben ejecutarse");
+    
+    let app_state = AppState::new(
+        &setup.get_postgres_url(),
+        &setup.get_redis_url(),
+    ).await.expect("Failed to create AppState");
     let app = create_user_gateway(app_state)
         .await
         .expect("Failed to create user gateway");
@@ -126,10 +156,18 @@ async fn test_protected_route_with_valid_token() {
 // =============================================================================
 
 #[tokio::test]
-#[ignore]
 async fn test_protected_route_with_invalid_token() {
-    // Arrange
-    let app_state = AppState::default().await.expect("Failed to create AppState");
+    // Arrange: Setup testcontainers
+    let setup = TestContainersSetup::new();
+    setup.setup_env();
+    setup.wait_for_postgres().await.expect("PostgreSQL debe estar listo");
+    setup.wait_for_redis().await.expect("Redis debe estar listo");
+    setup.run_migrations().await.expect("Migraciones deben ejecutarse");
+    
+    let app_state = AppState::new(
+        &setup.get_postgres_url(),
+        &setup.get_redis_url(),
+    ).await.expect("Failed to create AppState");
     let app = create_user_gateway(app_state)
         .await
         .expect("Failed to create user gateway");
@@ -162,8 +200,17 @@ async fn test_protected_route_with_invalid_token() {
 
 #[tokio::test]
 async fn test_register_and_login_are_public() {
-    // Arrange
-    let app_state = AppState::default().await.expect("Failed to create AppState");
+    // Arrange: Setup testcontainers
+    let setup = TestContainersSetup::new();
+    setup.setup_env();
+    setup.wait_for_postgres().await.expect("PostgreSQL debe estar listo");
+    setup.wait_for_redis().await.expect("Redis debe estar listo");
+    setup.run_migrations().await.expect("Migraciones deben ejecutarse");
+    
+    let app_state = AppState::new(
+        &setup.get_postgres_url(),
+        &setup.get_redis_url(),
+    ).await.expect("Failed to create AppState");
     let app = create_user_gateway(app_state)
         .await
         .expect("Failed to create user gateway");

@@ -440,4 +440,3 @@ mod tests {
         assert_eq!(gateway.amount_to_stripe_cents(&amount), 10050);
     }
 } 
-} 

@@ -39,7 +39,7 @@ impl MockUserApplicationService {
 
 #[derive(Clone)]
 pub struct UserApplicationService<R: UserRepository> {
-    repository: Arc<R>,
+    pub(crate) repository: Arc<R>,
     domain_service: Arc<dyn UserDomainService + Send + Sync>,
 }
 

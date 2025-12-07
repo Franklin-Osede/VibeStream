@@ -158,6 +158,32 @@ impl SongRepository for PostgresSongRepository {
         Ok(())
     }
 
+    async fn find_all(&self, limit: usize, offset: usize) -> RepositoryResult<Vec<Song>> {
+        let limit_val = limit as i64;
+        let offset_val = offset as i64;
+        
+        let rows = sqlx::query(
+            r#"SELECT id, title, artist_id, duration_seconds, genre, royalty_percentage,
+                      listen_count, revenue_generated, is_available_for_campaign,
+                      is_available_for_ownership, created_at, updated_at
+               FROM songs 
+               ORDER BY created_at DESC
+               LIMIT $1 OFFSET $2"#
+        )
+        .bind(limit_val)
+        .bind(offset_val)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
+
+        let mut songs = Vec::new();
+        for row in rows {
+            songs.push(self.row_to_song(row)?);
+        }
+
+        Ok(songs)
+    }
+
     async fn find_by_artist(&self, artist_id: &ArtistId) -> RepositoryResult<Vec<Song>> {
         let rows = sqlx::query(
             r#"SELECT id, title, artist_id, duration_seconds, genre, royalty_percentage,
@@ -274,6 +300,16 @@ impl SongRepository for PostgresSongRepository {
         }
 
         Ok(songs)
+    }
+
+    async fn count(&self) -> RepositoryResult<usize> {
+        let row = sqlx::query("SELECT COUNT(*) as count FROM songs")
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| RepositoryError::DatabaseError(e.to_string()))?;
+
+        let count: i64 = row.try_get("count").map_err(|e| RepositoryError::SerializationError(e.to_string()))?;
+        Ok(count as usize)
     }
 
     async fn count_by_artist(&self, artist_id: &ArtistId) -> RepositoryResult<usize> {

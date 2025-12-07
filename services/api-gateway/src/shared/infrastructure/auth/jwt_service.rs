@@ -8,7 +8,7 @@ use crate::shared::domain::errors::AppError;
 // JWT SERVICE - Implementación real de autenticación
 // =============================================================================
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: String,        // User ID
     pub username: String,   // Username

@@ -7,3 +7,4 @@ pub mod database;
 pub mod mock_services;
 pub mod postgres_repositories;
 pub mod api_handlers;
+pub mod facial_service;

@@ -1,28 +1,55 @@
-use api_gateway::gateways::{
-    create_user_gateway, create_music_gateway, create_payment_gateway,
-    create_campaign_gateway, create_listen_reward_gateway, create_fan_ventures_gateway,
-    create_notification_gateway, create_fan_loyalty_gateway,  // Re-enabled after fixing all errors
-};
-use api_gateway::shared::infrastructure::app_state::AppState;
-use api_gateway::openapi::router::create_openapi_router;
-use axum::{
-    routing::get,
-    Router,
-    response::Json,
-    http::StatusCode,
-};
+// =============================================================================
+// ⚠️  DEPRECATED: Este archivo está deprecado
+// =============================================================================
+// 
+// Este binario (api-gateway) está deprecado en favor del gateway unificado.
+// 
+// Para ejecutar el gateway unificado (recomendado):
+//   cargo run --bin api-gateway-unified
+// 
+// O simplemente:
+//   cargo run
+// 
+// El gateway unificado proporciona:
+// - Un solo puerto (3000) en lugar de múltiples puertos
+// - Enrutamiento por path: /api/v1/users/*, /api/v1/music/*, etc.
+// - CORS centralizado
+// - Health checks unificados
+// - Documentación OpenAPI consolidada
+// 
+// =============================================================================
+
 use tracing_subscriber::fmt::init;
-use std::net::SocketAddr;
-use tokio::net::TcpListener;
-use utoipa_swagger_ui::SwaggerUi;
-use utoipa_redoc::{Redoc, Servable};
 
 #[tokio::main]
+#[deprecated(note = "Usar api-gateway-unified en su lugar. Ejecutar: cargo run --bin api-gateway-unified")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Configurar logging
     init();
     
-    println!("🚀 Starting VibeStream API Gateway with Independent Gateways...");
+    eprintln!("");
+    eprintln!("⚠️  ═══════════════════════════════════════════════════════════════");
+    eprintln!("⚠️   WARNING: Este binario está DEPRECADO");
+    eprintln!("⚠️  ═══════════════════════════════════════════════════════════════");
+    eprintln!("");
+    eprintln!("   Este binario (api-gateway) está deprecado en favor del");
+    eprintln!("   gateway unificado que proporciona un solo puerto y mejor");
+    eprintln!("   arquitectura.");
+    eprintln!("");
+    eprintln!("   Para ejecutar el gateway unificado:");
+    eprintln!("     cargo run --bin api-gateway-unified");
+    eprintln!("");
+    eprintln!("   O simplemente:");
+    eprintln!("     cargo run");
+    eprintln!("");
+    eprintln!("   El gateway unificado estará disponible en:");
+    eprintln!("     http://localhost:3000");
+    eprintln!("");
+    eprintln!("⚠️  ═══════════════════════════════════════════════════════════════");
+    eprintln!("");
+    
+    // Salir con código de error para indicar que no se debe usar
+    std::process::exit(1);
 
     // Crear AppState compartido
     let app_state = AppState::default().await?;
