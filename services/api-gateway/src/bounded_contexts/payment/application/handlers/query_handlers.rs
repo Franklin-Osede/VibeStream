@@ -7,6 +7,9 @@ use crate::bounded_contexts::payment::{
     domain::{
         value_objects::*,
         repository::*,
+        aggregates::*,
+        entities::*,
+        events::*,
     },
     application::queries::*,
 };

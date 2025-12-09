@@ -521,24 +521,96 @@ impl SongController {
         })))
     }
     
-    /// GET /api/v1/music/songs/discover - Discover songs
+    /// GET /api/v1/music/songs/discover - Discover songs (Popular/Best of all time)
     pub async fn discover_songs(
         State(state): State<MusicAppState>,
         Query(query): Query<SongQuery>,
     ) -> Result<ResponseJson<SongListResponse>, (StatusCode, ResponseJson<serde_json::Value>)> {
-        // For now, return all songs as "discovered"
-        // TODO: Implement actual discovery algorithm
-        Self::get_songs(State(state), Query(query)).await
+        let limit = query.limit.unwrap_or(20);
+        let offset = query.offset.unwrap_or(0);
+        
+        let songs = state.song_repository
+            .find_popular(Some(limit))
+            .await
+            .map_err(|e| {
+                tracing::error!("Error fetching popular songs: {:?}", e);
+                (StatusCode::INTERNAL_SERVER_ERROR, ResponseJson(serde_json::json!({
+                    "error": "Failed to fetch popular songs",
+                    "message": format!("{:?}", e)
+                })))
+            })?;
+            
+        let total = songs.len(); // Approximate total for these specific lists
+        
+        // Convert to response DTOs
+        let song_responses: Vec<SongResponse> = songs
+            .into_iter()
+            .map(|song| SongResponse {
+                song_id: song.id().to_uuid(),
+                title: song.title().to_string(),
+                artist_id: song.artist_id().to_uuid(),
+                duration_seconds: song.duration().seconds(),
+                genre: song.genre().to_string(),
+                royalty_percentage: song.royalty_percentage().value(),
+                listen_count: song.listen_count().value(),
+                revenue_generated: song.revenue_generated(),
+                created_at: song.created_at(),
+                updated_at: song.updated_at(),
+            })
+            .collect();
+            
+        Ok(ResponseJson(SongListResponse {
+            songs: song_responses,
+            total,
+            limit,
+            offset,
+        }))
     }
     
-    /// GET /api/v1/music/songs/trending - Get trending songs
+    /// GET /api/v1/music/songs/trending - Get trending songs (New & Popular)
     pub async fn get_trending_songs(
         State(state): State<MusicAppState>,
         Query(query): Query<SongQuery>,
     ) -> Result<ResponseJson<SongListResponse>, (StatusCode, ResponseJson<serde_json::Value>)> {
-        // For now, return all songs as "trending"
-        // TODO: Implement actual trending algorithm based on listen count, likes, etc.
-        Self::get_songs(State(state), Query(query)).await
+        let limit = query.limit.unwrap_or(20);
+        let offset = query.offset.unwrap_or(0);
+        
+        let songs = state.song_repository
+            .find_trending(Some(limit))
+            .await
+            .map_err(|e| {
+                tracing::error!("Error fetching trending songs: {:?}", e);
+                (StatusCode::INTERNAL_SERVER_ERROR, ResponseJson(serde_json::json!({
+                    "error": "Failed to fetch trending songs",
+                    "message": format!("{:?}", e)
+                })))
+            })?;
+            
+        let total = songs.len();
+        
+        // Convert to response DTOs
+        let song_responses: Vec<SongResponse> = songs
+            .into_iter()
+            .map(|song| SongResponse {
+                song_id: song.id().to_uuid(),
+                title: song.title().to_string(),
+                artist_id: song.artist_id().to_uuid(),
+                duration_seconds: song.duration().seconds(),
+                genre: song.genre().to_string(),
+                royalty_percentage: song.royalty_percentage().value(),
+                listen_count: song.listen_count().value(),
+                revenue_generated: song.revenue_generated(),
+                created_at: song.created_at(),
+                updated_at: song.updated_at(),
+            })
+            .collect();
+            
+        Ok(ResponseJson(SongListResponse {
+            songs: song_responses,
+            total,
+            limit,
+            offset,
+        }))
     }
     
     /// POST /api/v1/music/songs/:id/like - Like a song

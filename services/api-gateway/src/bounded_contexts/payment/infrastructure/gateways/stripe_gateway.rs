@@ -232,7 +232,8 @@ impl PaymentGateway for StripeGateway {
         let start_time = Instant::now();
 
         // For test environment, return mock success
-        if self.config.environment == "test" {
+        // For local_mock environment, return mock success
+        if self.config.environment == "local_mock" {
             let processing_time = start_time.elapsed().as_millis() as u64;
             
             return Ok(GatewayResult {
@@ -244,6 +245,7 @@ impl PaymentGateway for StripeGateway {
                 processing_time_ms: processing_time,
                 fees_charged: Amount::new(payment.payment().amount().value() * 0.029, payment.payment().amount().currency().clone())
                     .map_err(|e| AppError::DomainError(e))?,
+                client_secret: None,
             });
         }
 
@@ -298,6 +300,7 @@ impl PaymentGateway for StripeGateway {
             gateway_message,
             processing_time_ms: processing_time,
             fees_charged,
+            client_secret: response.client_secret,
         })
     }
 

@@ -25,10 +25,37 @@ pub async fn create_payment_gateway(app_state: AppState) -> Result<Router, Box<d
     let royalty_repository = Arc::new(PostgresRoyaltyRepository::new(pool.clone()));
     let wallet_repository = Arc::new(PostgresWalletRepository::new(pool.clone()));
     
-    // Crear WebhookRouter
-    let webhook_router = Arc::new(WebhookRouter::new());
+    // Initialize WebhookRouter with handlers
+    let mut router = WebhookRouter::new();
+
+    // 1. Configure Stripe Gateway
+    let stripe_api_key = std::env::var("STRIPE_API_KEY").unwrap_or_else(|_| "sk_test_placeholder".to_string());
+    let stripe_webhook_secret = std::env::var("STRIPE_WEBHOOK_SECRET").unwrap_or_else(|_| "whsec_placeholder".to_string());
+    let stripe_env = std::env::var("STRIPE_ENVIRONMENT").unwrap_or_else(|_| "test".to_string());
+
+    let stripe_config = crate::bounded_contexts::payment::infrastructure::gateways::GatewayConfig {
+        api_key: stripe_api_key,
+        webhook_secret: stripe_webhook_secret,
+        environment: stripe_env,
+    };
+
+    // 2. Create Stripe Gateway & Handler
+    // Note: In a real scenario, we might want to share this gateway instance with the command handlers too
+    // For now we create a specific instance for webhooks
+    if let Ok(stripe_gateway) = crate::bounded_contexts::payment::infrastructure::gateways::StripeGateway::new(stripe_config).await {
+        let stripe_gateway = Arc::new(stripe_gateway);
+        let stripe_handler = crate::bounded_contexts::payment::infrastructure::webhooks::StripeWebhookHandler::new(
+            stripe_gateway,
+            payment_repository.clone(), // Clone the Arc, valid for dynamic dispatch
+        );
+        router.add_handler(Arc::new(stripe_handler));
+    } else {
+        tracing::error!("Failed to initialize Stripe Gateway for webhooks");
+    }
+
+    let webhook_router = Arc::new(router);
     
-    // Crear controller
+    // Create controller
     let payment_controller = create_payment_controller(
         payment_repository,
         royalty_repository,

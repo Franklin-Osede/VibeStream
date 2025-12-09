@@ -499,10 +499,10 @@ pub async fn get_user_profile(
                 website: None,   // TODO: Add website to UserResponse
                 social_links: HashMap::new(), // TODO: Add social_links to UserResponse
                 is_public: true, // TODO: Add is_public to UserResponse
-                tier: "bronze".to_string(), // TODO: Add tier to UserResponse
-                role: "user".to_string(),   // TODO: Add role to UserResponse
-                is_verified: false,         // TODO: Add is_verified to UserResponse
-                is_active: true,            // TODO: Add is_active to UserResponse
+                tier: user_response.tier,
+                role: user_response.role, 
+                is_verified: user_response.is_verified,
+                is_active: user_response.is_active,
                 wallet_address: None,       // TODO: Add wallet_address to UserResponse
                 created_at: user_response.created_at,
                 updated_at: user_response.created_at, // TODO: Add updated_at to UserResponse

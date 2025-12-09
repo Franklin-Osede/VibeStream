@@ -52,6 +52,10 @@ pub struct UserResponse {
     pub display_name: Option<String>,
     pub bio: Option<String>,
     pub profile_image_url: Option<String>,
+    pub tier: String,
+    pub role: String,
+    pub is_verified: bool,
+    pub is_active: bool,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 

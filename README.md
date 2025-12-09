@@ -15,29 +15,36 @@ The system uses a microservices architecture with the following key components:
 - **Redis Message Broker**: Asynchronous communication between services
 - **PostgreSQL**: Persistent data storage with domain-driven design
 
-## Key Features
+## Key Features & Functionalities
 
-### Real-time Music Streaming
-- **High-Quality Audio**: Professional streaming with low latency
-- **Cross-Platform**: Mobile (React Native) and Web (Next.js) support
-- **VR Concerts**: Immersive virtual reality experiences
+### 🎵 Next-Gen Music Streaming
+VibeStream isn't just a player; it's an immersive audiophile ecosystem.
+- **Lossless Audio Quality**: Hi-Fi streaming support (FLAC/ALAC) for purists.
+- **Smart Discovery Engine**: AI-driven "Daily Mix" and "Trending Now" algorithms that adapt to your mood and blockchain activity.
+- **Cross-Platform Experience**: Seamless handoff between Web (Next.js) and Mobile (React Native).
 
-### Blockchain Integration
-- **Multi-Chain Support**: Ethereum and Solana networks
-- **Real-time Payments**: Instant micropayments for music consumption
-- **Smart Contracts**: Automated royalty distribution
-- **Fractional Ownership**: Tokenized song ownership
+### 💎 Fan Ventures (Invest in Music)
+Transform from a listener to a stakeholder.
+- **Song Tokenization**: Artists can tokenize rights to their tracks.
+- **Revenue Sharing**: Buy "Fan Tokens" for specific songs/albums and earn a percentage of streaming royalties automatically via smart contracts.
+- **Trading Marketplace**: Buy and sell royalty tokens in a dedicated secondary market.
 
-### Privacy & Security
-- **Zero-Knowledge Proofs**: Private listening verification without revealing data
-- **JWT Authentication**: Secure user authentication and authorization
-- **Anti-Fraud Detection**: Prevents gaming of the reward system
+### 🏆 Fan Loyalty & Gamification
+Get rewarded for your fandom.
+- **Listen-to-Earn**: Earn `VIBE` tokens simply by streaming your favorite tracks.
+- **Proof-of-Fandom**: On-chain badges and NFTs for top listeners (e.g., "Top 1% Taylor Swift Fan").
+- **Tiered Rewards System**: Unlock exclusive perks (merch, presales, meet-and-greets) by leveling up your fan status.
 
-### Bank-Grade Reliability
-- **Microservices Architecture**: Independent scaling and fault isolation
-- **Event-Driven Communication**: Asynchronous message processing
-- **Circuit Breakers**: Graceful failure recovery
-- **High Availability**: Horizontal scaling ready
+### 🛡️ Privacy by Design (Zero-Knowledge)
+Your taste is your secret.
+- **Private Listening Proofs**: Generate ZK-proofs to claim rewards without exposing your entire listening history to the public blockchain.
+- **Anonymous Age Verification**: Verify eligibility for explicit content without uploading ID documents.
+
+### 💳 Web3 Payments & Wallet Integration
+- **Multi-Chain Support**: Native support for Ethereum (ETH/ERC20) and Solana (SOL/SPL).
+- **Instant Tipping**: Micro-transactions to tip artists directly in crypto.
+- **Smart Contract Royalties**: Artists get paid instantly, not months later.
+
 
 ## 🚀 Quick Start
 

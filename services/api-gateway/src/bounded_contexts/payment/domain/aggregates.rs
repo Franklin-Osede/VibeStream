@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::shared::domain::errors::AppError;
+use crate::shared::domain::events::DomainEvent;
 use super::entities::*;
 use super::value_objects::*;
 use super::events::*;
@@ -67,57 +68,53 @@ impl PaymentAggregate {
         // Generate specific completion events based on payment purpose
         match &event.purpose {
             PaymentPurpose::NFTPurchase { campaign_id, nft_quantity } => {
-                let nft_event = NFTPurchasePaymentCompleted {
-                    payment_id: event.payment_id.clone(),
-                    buyer_id: event.payer_id,
-                    campaign_id: *campaign_id,
-                    nft_quantity: *nft_quantity,
-                    total_amount: event.amount.clone(),
-                    platform_fee: event.platform_fee.clone(),
-                    artist_revenue: event.net_amount.clone(),
-                    occurred_at: event.occurred_at,
-                };
+                let nft_event = NFTPurchasePaymentCompleted::new(
+                    event.payment_id.clone(),
+                    event.payer_id,
+                    *campaign_id,
+                    *nft_quantity,
+                    event.amount.clone(),
+                    event.platform_fee.clone(),
+                    event.net_amount.clone(),
+                );
                 self.add_event(Box::new(nft_event));
             }
             PaymentPurpose::SharePurchase { contract_id, ownership_percentage } => {
-                let share_event = SharePurchasePaymentCompleted {
-                    payment_id: event.payment_id.clone(),
-                    buyer_id: event.payer_id,
-                    contract_id: *contract_id,
-                    ownership_percentage: *ownership_percentage,
-                    purchase_amount: event.amount.clone(),
-                    platform_fee: event.platform_fee.clone(),
-                    artist_revenue: event.net_amount.clone(),
-                    occurred_at: event.occurred_at,
-                };
+                let share_event = SharePurchasePaymentCompleted::new(
+                    event.payment_id.clone(),
+                    event.payer_id,
+                    *contract_id,
+                    *ownership_percentage,
+                    event.amount.clone(),
+                    event.platform_fee.clone(),
+                    event.net_amount.clone(),
+                );
                 self.add_event(Box::new(share_event));
             }
             PaymentPurpose::ShareTrade { share_id, from_user, to_user } => {
-                let trade_event = ShareTradePaymentCompleted {
-                    payment_id: event.payment_id.clone(),
-                    share_id: *share_id,
-                    from_user_id: *from_user,
-                    to_user_id: *to_user,
-                    trade_amount: event.amount.clone(),
-                    platform_fee: event.platform_fee.clone(),
-                    occurred_at: event.occurred_at,
-                };
+                let trade_event = ShareTradePaymentCompleted::new(
+                    event.payment_id.clone(),
+                    *share_id,
+                    *from_user,
+                    *to_user,
+                    event.amount.clone(),
+                    event.platform_fee.clone(),
+                );
                 self.add_event(Box::new(trade_event));
             }
             PaymentPurpose::ListenReward { session_id, song_id, listen_duration } => {
                 // For listen rewards, we need additional context
                 // This would typically come from the listen session
-                let reward_event = ListenRewardDistributed {
-                    payment_id: event.payment_id.clone(),
-                    user_id: event.payee_id,
-                    session_id: *session_id,
-                    song_id: *song_id,
-                    artist_id: event.payer_id, // In this case, platform pays user
-                    reward_amount: event.amount.clone(),
-                    listen_duration_seconds: *listen_duration,
-                    quality_score: 1.0, // Default, should come from session
-                    occurred_at: event.occurred_at,
-                };
+                let reward_event = ListenRewardDistributed::new(
+                    event.payment_id.clone(),
+                    event.payee_id,
+                    *session_id,
+                    *song_id,
+                    event.payer_id, // In this case, platform pays user
+                    event.amount.clone(),
+                    *listen_duration,
+                    1.0, // Default, should come from session
+                );
                 self.add_event(Box::new(reward_event));
             }
             _ => {}
@@ -174,14 +171,13 @@ impl PaymentAggregate {
         if self.payment.amount().value() > 10000.0 {
             warnings.push("High value transaction - manual review recommended".to_string());
             
-            let alert = HighValueTransactionAlert {
-                payment_id: self.payment.id().clone(),
-                amount: self.payment.amount().clone(),
-                threshold_amount: Amount::new(10000.0, self.payment.amount().currency().clone())?,
-                user_id: self.payment.payer_id(),
-                requires_manual_review: true,
-                occurred_at: Utc::now(),
-            };
+            let alert = HighValueTransactionAlert::new(
+                self.payment.id().clone(),
+                self.payment.amount().clone(),
+                Amount::new(10000.0, self.payment.amount().currency().clone())?,
+                self.payment.payer_id(),
+                true,
+            );
             // This would normally be added to events, but we can't mutate here
         }
         
@@ -256,17 +252,16 @@ impl RoyaltyDistributionAggregate {
             period_end,
         )?;
         
-        let event = RoyaltyDistributionCreated {
-            distribution_id: distribution.id(),
+        let event = RoyaltyDistributionCreated::new(
+            distribution.id(),
             song_id,
             artist_id,
             total_revenue,
-            artist_amount: distribution.artist_amount().clone(),
-            platform_fee: distribution.platform_fee().clone(),
+            distribution.artist_amount().clone(),
+            distribution.platform_fee().clone(),
             period_start,
             period_end,
-            occurred_at: Utc::now(),
-        };
+        );
         
         let mut aggregate = Self {
             distribution,
@@ -335,14 +330,13 @@ impl RoyaltyDistributionAggregate {
             .map(|p| p.payment().id().clone())
             .collect();
         
-        let event = RoyaltyDistributionCompleted {
-            distribution_id: self.distribution.id(),
-            song_id: self.distribution.song_id(),
-            artist_id: self.distribution.artist_id(),
-            total_amount_distributed: self.distribution.artist_amount().clone(),
+        let event = RoyaltyDistributionCompleted::new(
+            self.distribution.id(),
+            self.distribution.song_id(),
+            self.distribution.artist_id(),
+            self.distribution.artist_amount().clone(),
             payment_ids,
-            occurred_at: Utc::now(),
-        };
+        );
         
         self.add_event(Box::new(event));
         self.version += 1;
@@ -455,16 +449,15 @@ impl RevenueSharingAggregate {
             shareholder_distributions.insert(shareholder_id, shareholder_dist);
         }
         
-        let event = RevenueSharingDistributionCreated {
+        let event = RevenueSharingDistributionCreated::new(
             distribution_id,
             contract_id,
             song_id,
-            total_revenue: total_revenue.clone(),
-            shareholder_count: shareholder_distributions.len() as u32,
+            total_revenue.clone(),
+            shareholder_distributions.len() as u32,
             period_start,
             period_end,
-            occurred_at: Utc::now(),
-        };
+        );
         
         let mut aggregate = Self {
             distribution_id,
@@ -530,14 +523,13 @@ impl RevenueSharingAggregate {
             
             dist.payment_status = ShareholderPaymentStatus::Processing;
             
-            let event = RevenueSharingPaymentProcessed {
-                distribution_id: self.distribution_id,
+            let event = RevenueSharingPaymentProcessed::new(
+                self.distribution_id,
                 payment_id,
-                shareholder_id: *shareholder_id,
-                share_percentage: dist.ownership_percentage,
-                payment_amount: dist.distribution_amount.clone(),
-                occurred_at: Utc::now(),
-            };
+                *shareholder_id,
+                dist.ownership_percentage,
+                dist.distribution_amount.clone(),
+            );
             
             self.add_event(Box::new(event));
         }

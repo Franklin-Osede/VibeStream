@@ -6,26 +6,30 @@ use axum::{
     Router, Extension,
 };
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 use std::sync::Arc;
 use chrono::{DateTime, Utc};
 
 use crate::bounded_contexts::payment::application::{
-    // Commands
-    InitiatePaymentCommand, InitiatePaymentCommandHandler, InitiatePaymentResult,
-    ProcessPaymentCommand, ProcessPaymentCommandHandler,
-    CompletePaymentCommand, CompletePaymentCommandHandler,
-    CancelPaymentCommand, CancelPaymentCommandHandler,
-    InitiateRefundCommand, InitiateRefundCommandHandler,
-    DistributeRoyaltiesCommand, DistributeRoyaltiesCommandHandler,
-    CreateWalletCommand, CreateWalletCommandHandler,
-    // Queries
-    GetPaymentQuery, GetPaymentQueryHandler, PaymentDetailDTO,
-    GetPaymentByTransactionQuery, SearchPaymentsQuery, SearchPaymentsResult,
-    GetUserPaymentHistoryQuery, GetUserPaymentSummaryQuery,
-    GetPaymentStatisticsQuery, GetPaymentAnalyticsQuery,
-    GetRoyaltyDistributionsQuery, GetArtistRevenueSummaryQuery,
-    GetWalletQuery, GetWalletBalanceQuery,
+    commands::{
+        InitiatePaymentCommand, InitiatePaymentCommandHandler, InitiatePaymentResult,
+        ProcessPaymentCommand, ProcessPaymentCommandHandler,
+        CompletePaymentCommand, CompletePaymentCommandHandler,
+        CancelPaymentCommand, CancelPaymentCommandHandler,
+        InitiateRefundCommand, InitiateRefundCommandHandler,
+        DistributeRoyaltiesCommand, DistributeRoyaltiesCommandHandler,
+        CreateWalletCommand, CreateWalletCommandHandler,
+    },
+    queries::{
+        GetPaymentQuery, GetPaymentQueryHandler,
+        GetPaymentByTransactionQuery, SearchPaymentsQuery, SearchPaymentsResult,
+        GetUserPaymentHistoryQuery, GetUserPaymentSummaryQuery,
+        GetPaymentStatisticsQuery, GetPaymentAnalyticsQuery,
+        GetRoyaltyDistributionsQuery, GetArtistRevenueSummaryQuery,
+        GetWalletQuery, GetWalletBalanceQuery,
+    },
+    dto::*, // Import all DTOs including moved ones
 };
 
 use crate::bounded_contexts::payment::infrastructure::repositories::{
@@ -46,189 +50,8 @@ use crate::shared::domain::errors::AppError;
 // REQUEST/RESPONSE DTOs
 // =============================================================================
 
-// Payment DTOs
-#[derive(Debug, Deserialize)]
-pub struct InitiatePaymentRequest {
-    pub payer_id: Uuid,
-    pub payee_id: Uuid,
-    pub amount: f64,
-    pub currency: String,
-    pub payment_type: String, // "song_purchase", "subscription", "tip", "fractional_investment"
-    pub related_entity_id: Option<Uuid>, // Song ID, Contract ID, etc.
-    pub payment_method: String, // "card", "crypto", "paypal", "stripe"
-    pub metadata: Option<serde_json::Value>,
-}
+// Payment DTOs are now imported from application/dto.rs
 
-#[derive(Debug, Serialize)]
-pub struct InitiatePaymentResponse {
-    pub payment_id: Uuid,
-    pub status: String,
-    pub amount: f64,
-    pub currency: String,
-    pub payment_url: Option<String>, // For redirect-based payments
-    pub expires_at: DateTime<Utc>,
-    pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ProcessPaymentRequest {
-    pub gateway_transaction_id: String,
-    pub gateway_status: String,
-    pub gateway_metadata: Option<serde_json::Value>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct InitiateRefundRequest {
-    pub refund_amount: Option<f64>, // If None, full refund
-    pub reason: String,
-    pub metadata: Option<serde_json::Value>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct RefundResponse {
-    pub refund_id: Uuid,
-    pub payment_id: Uuid,
-    pub status: String,
-    pub refund_amount: f64,
-    pub created_at: DateTime<Utc>,
-}
-
-// Royalty DTOs
-#[derive(Debug, Deserialize)]
-pub struct DistributeRoyaltiesRequest {
-    pub song_id: Option<Uuid>,
-    pub artist_id: Option<Uuid>,
-    pub album_id: Option<Uuid>,
-    pub period_start: DateTime<Utc>,
-    pub period_end: DateTime<Utc>,
-    pub total_revenue: f64,
-    pub currency: String,
-    pub distribution_rules: Vec<RoyaltyRule>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct RoyaltyRule {
-    pub recipient_id: Uuid,
-    pub recipient_type: String, // "artist", "producer", "songwriter", "label"
-    pub percentage: f64,
-    pub amount: Option<f64>, // Fixed amount override
-}
-
-#[derive(Debug, Serialize)]
-pub struct DistributeRoyaltiesResponse {
-    pub distribution_id: Uuid,
-    pub total_amount: f64,
-    pub recipient_count: usize,
-    pub distributions: Vec<RoyaltyDistributionItem>,
-    pub status: String,
-    pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct RoyaltyDistributionItem {
-    pub recipient_id: Uuid,
-    pub recipient_type: String,
-    pub amount: f64,
-    pub percentage: f64,
-    pub status: String,
-}
-
-// Wallet DTOs
-#[derive(Debug, Deserialize)]
-pub struct CreateWalletRequest {
-    pub user_id: Uuid,
-    pub wallet_type: String, // "internal", "ethereum", "solana", "polygon"
-    pub currency: String,
-    pub is_primary: bool,
-}
-
-#[derive(Debug, Serialize)]
-pub struct CreateWalletResponse {
-    pub wallet_id: Uuid,
-    pub address: String,
-    pub wallet_type: String,
-    pub currency: String,
-    pub balance: f64,
-    pub is_primary: bool,
-    pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct WalletBalanceResponse {
-    pub wallet_id: Uuid,
-    pub balance: f64,
-    pub currency: String,
-    pub available_balance: f64,
-    pub pending_balance: f64,
-    pub last_updated: DateTime<Utc>,
-}
-
-// Search DTOs
-#[derive(Debug, Deserialize)]
-pub struct SearchPaymentsRequest {
-    pub user_id: Option<Uuid>,
-    pub payment_type: Option<String>,
-    pub status: Option<String>,
-    pub currency: Option<String>,
-    pub min_amount: Option<f64>,
-    pub max_amount: Option<f64>,
-    pub date_from: Option<DateTime<Utc>>,
-    pub date_to: Option<DateTime<Utc>>,
-    pub limit: Option<usize>,
-    pub offset: Option<usize>,
-}
-
-// Statistics DTOs
-#[derive(Debug, Serialize)]
-pub struct PaymentStatistics {
-    pub total_payments: u64,
-    pub total_volume: f64,
-    pub successful_payments: u64,
-    pub failed_payments: u64,
-    pub refunded_payments: u64,
-    pub average_amount: f64,
-    pub currencies: std::collections::HashMap<String, f64>,
-    pub payment_methods: std::collections::HashMap<String, u64>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct PaymentAnalytics {
-    pub time_range: String,
-    pub daily_volume: Vec<DailyVolumeItem>,
-    pub top_payment_types: Vec<PaymentTypeItem>,
-    pub gateway_performance: Vec<GatewayPerformanceItem>,
-    pub fraud_detection_stats: FraudDetectionStats,
-}
-
-#[derive(Debug, Serialize)]
-pub struct DailyVolumeItem {
-    pub date: DateTime<Utc>,
-    pub volume: f64,
-    pub transaction_count: u64,
-}
-
-#[derive(Debug, Serialize)]
-pub struct PaymentTypeItem {
-    pub payment_type: String,
-    pub count: u64,
-    pub volume: f64,
-}
-
-#[derive(Debug, Serialize)]
-pub struct GatewayPerformanceItem {
-    pub gateway: String,
-    pub success_rate: f64,
-    pub average_processing_time: f64,
-    pub total_volume: f64,
-}
-
-#[derive(Debug, Serialize)]
-pub struct FraudDetectionStats {
-    pub total_checks: u64,
-    pub flagged_transactions: u64,
-    pub false_positives: u64,
-    pub prevented_fraud_amount: f64,
-}
 
 // API Response wrapper
 #[derive(Debug, Serialize)]
@@ -341,7 +164,19 @@ impl PaymentController {
     // PAYMENT OPERATIONS
     // =============================================================================
 
-    async fn initiate_payment(
+    #[utoipa::path(
+        post,
+        path = "/api/v1/payments",
+        request_body = InitiatePaymentRequest,
+        responses(
+            (status = 200, description = "Payment initiated successfully", body = ApiResponse<InitiatePaymentResponse>),
+            (status = 400, description = "Invalid input"),
+            (status = 402, description = "Insufficient funds"),
+            (status = 403, description = "Fraud detected")
+        ),
+        tag = "payments"
+    )]
+    pub async fn initiate_payment(
         State(controller): State<Arc<Self>>,
         Extension(current_user_id): Extension<Uuid>,
         Json(request): Json<InitiatePaymentRequest>,
@@ -385,12 +220,26 @@ impl PaymentController {
         }
     }
 
-    async fn process_payment(
+    #[utoipa::path(
+        post,
+        path = "/api/v1/payments/{payment_id}/process",
+        request_body = ProcessPaymentRequest,
+        params(
+            ("payment_id" = Uuid, Path, description = "Payment ID to process")
+        ),
+        responses(
+            (status = 200, description = "Payment processed successfully", body = ApiResponse<PaymentDTO>),
+            (status = 404, description = "Payment not found"),
+            (status = 502, description = "Payment gateway error")
+        ),
+        tag = "payments"
+    )]
+    pub async fn process_payment(
         State(controller): State<Arc<Self>>,
         Path(payment_id): Path<Uuid>,
         Extension(current_user_id): Extension<Uuid>,
         Json(request): Json<ProcessPaymentRequest>,
-    ) -> Result<Json<ApiResponse<PaymentDetailDTO>>, StatusCode> {
+    ) -> Result<Json<ApiResponse<PaymentDTO>>, StatusCode> {
         let command = ProcessPaymentCommand {
             payment_id,
             gateway_transaction_id: request.gateway_transaction_id,
@@ -419,7 +268,7 @@ impl PaymentController {
         State(controller): State<Arc<Self>>,
         Path(payment_id): Path<Uuid>,
         Extension(current_user_id): Extension<Uuid>,
-    ) -> Result<Json<ApiResponse<PaymentDetailDTO>>, StatusCode> {
+    ) -> Result<Json<ApiResponse<PaymentDTO>>, StatusCode> {
         let command = CompletePaymentCommand {
             payment_id,
             completed_by: current_user_id,
@@ -444,7 +293,7 @@ impl PaymentController {
         State(controller): State<Arc<Self>>,
         Path(payment_id): Path<Uuid>,
         Extension(current_user_id): Extension<Uuid>,
-    ) -> Result<Json<ApiResponse<PaymentDetailDTO>>, StatusCode> {
+    ) -> Result<Json<ApiResponse<PaymentDTO>>, StatusCode> {
         let command = CancelPaymentCommand {
             payment_id,
             cancelled_by: current_user_id,
@@ -487,10 +336,22 @@ impl PaymentController {
     // PAYMENT QUERIES
     // =============================================================================
 
-    async fn get_payment(
+    #[utoipa::path(
+        get,
+        path = "/api/v1/payments/{payment_id}",
+        params(
+            ("payment_id" = Uuid, Path, description = "Payment ID")
+        ),
+        responses(
+            (status = 200, description = "Payment details", body = ApiResponse<PaymentDTO>),
+            (status = 404, description = "Payment not found")
+        ),
+        tag = "payments"
+    )]
+    pub async fn get_payment(
         State(controller): State<Arc<Self>>,
         Path(payment_id): Path<Uuid>,
-    ) -> Result<Json<ApiResponse<PaymentDetailDTO>>, StatusCode> {
+    ) -> Result<Json<ApiResponse<PaymentDTO>>, StatusCode> {
         let query = GetPaymentQuery { payment_id };
         let handler = GetPaymentQueryHandler::new(controller.payment_repository.clone());
 
@@ -507,7 +368,7 @@ impl PaymentController {
     async fn get_payment_by_transaction(
         State(controller): State<Arc<Self>>,
         Path(transaction_id): Path<String>,
-    ) -> Result<Json<ApiResponse<PaymentDetailDTO>>, StatusCode> {
+    ) -> Result<Json<ApiResponse<PaymentDTO>>, StatusCode> {
         let query = GetPaymentByTransactionQuery { transaction_id };
         
         // Handler would be implemented

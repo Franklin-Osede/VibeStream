@@ -38,6 +38,7 @@ pub struct GatewayResult {
     pub gateway_message: String,
     pub processing_time_ms: u64,
     pub fees_charged: Amount,
+    pub client_secret: Option<String>,
 }
 
 /// Result from gateway refund processing

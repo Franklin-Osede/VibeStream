@@ -157,6 +157,7 @@ impl PaymentGateway for CoinbaseGateway {
                 processing_time_ms: processing_time,
                 fees_charged: Amount::new(payment.payment().amount().value() * 0.01, payment.payment().amount().currency().clone())
                     .map_err(|e| AppError::DomainError(e))?,
+                client_secret: None,
             });
         }
 
@@ -192,6 +193,7 @@ impl PaymentGateway for CoinbaseGateway {
             processing_time_ms: processing_time,
             fees_charged: Amount::new(payment.payment().amount().value() * 0.01, payment.payment().amount().currency().clone())
                 .map_err(|e| AppError::DomainError(e))?,
+            client_secret: None,
         })
     }
 

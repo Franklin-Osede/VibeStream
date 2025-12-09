@@ -3,9 +3,10 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::bounded_contexts::payment::domain::value_objects::Currency;
+use utoipa::ToSchema;
 
 /// Payment DTO for API responses
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct PaymentDTO {
     pub id: Uuid,
     pub transaction_id: Option<Uuid>,
@@ -18,6 +19,7 @@ pub struct PaymentDTO {
     pub purpose: PaymentPurposeDTO,
     pub status: String,
     pub blockchain_hash: Option<String>,
+    pub client_secret: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub completed_at: Option<DateTime<Utc>>,
@@ -25,7 +27,7 @@ pub struct PaymentDTO {
 }
 
 /// Amount DTO
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AmountDTO {
     pub value: f64,
     pub currency: Currency,
@@ -51,7 +53,7 @@ impl AmountDTO {
 }
 
 /// Payment Method DTO
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct PaymentMethodDTO {
     pub method_type: String,
     pub display_name: String,
@@ -61,7 +63,7 @@ pub struct PaymentMethodDTO {
 }
 
 /// Payment Purpose DTO
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct PaymentPurposeDTO {
     pub purpose_type: String,
     pub title: String,
@@ -70,7 +72,7 @@ pub struct PaymentPurposeDTO {
 }
 
 /// Payment Summary DTO
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct PaymentSummaryDTO {
     pub total_payments: u64,
     pub total_volume: Vec<AmountDTO>,
@@ -82,7 +84,8 @@ pub struct PaymentSummaryDTO {
 }
 
 /// Paginated Response DTO
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[aliases(PaginatedPaymentResponse = PaginatedResponseDTO<PaymentDTO>)]
 pub struct PaginatedResponseDTO<T> {
     pub data: Vec<T>,
     pub pagination: PaginationInfoDTO,
@@ -90,7 +93,7 @@ pub struct PaginatedResponseDTO<T> {
 }
 
 /// Pagination Info DTO
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct PaginationInfoDTO {
     pub current_page: u32,
     pub page_size: u32,
@@ -100,7 +103,7 @@ pub struct PaginationInfoDTO {
 }
 
 /// Error Response DTO
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ErrorResponseDTO {
     pub error_code: String,
     pub error_message: String,
@@ -110,7 +113,8 @@ pub struct ErrorResponseDTO {
 }
 
 /// Success Response DTO
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[aliases(SuccessPaymentResponse = SuccessResponseDTO<PaymentDTO>)]
 pub struct SuccessResponseDTO<T> {
     pub success: bool,
     pub data: T,
@@ -120,7 +124,7 @@ pub struct SuccessResponseDTO<T> {
 }
 
 /// Royalty Distribution DTO
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct RoyaltyDistributionDTO {
     pub distribution_id: Uuid,
     pub song_id: Uuid,
@@ -138,7 +142,7 @@ pub struct RoyaltyDistributionDTO {
 }
 
 /// Fraud Alert DTO
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct FraudAlertDTO {
     pub alert_id: Uuid,
     pub payment_id: Uuid,
@@ -152,7 +156,7 @@ pub struct FraudAlertDTO {
 }
 
 /// Payment Batch DTO
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct PaymentBatchDTO {
     pub batch_id: Uuid,
     pub batch_type: String,

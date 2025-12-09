@@ -106,6 +106,10 @@ impl<R: UserRepository + Send + Sync> UserCommandHandler for UserApplicationServ
             display_name: user_aggregate.profile.display_name.clone(),
             bio: user_aggregate.profile.bio.clone(),
             profile_image_url: user_aggregate.profile.avatar_url.as_ref().map(|u| u.to_string()),
+            tier: user_aggregate.user.tier.to_string(),
+            role: user_aggregate.user.role.to_string(),
+            is_verified: user_aggregate.user.is_verified,
+            is_active: user_aggregate.user.is_active,
             created_at: user_aggregate.user.created_at,
         })
     }
@@ -139,6 +143,10 @@ impl<R: UserRepository + Send + Sync> UserCommandHandler for UserApplicationServ
             display_name: user_aggregate.profile.display_name.clone(),
             bio: user_aggregate.profile.bio.clone(),
             profile_image_url: user_aggregate.profile.avatar_url.as_ref().map(|u| u.to_string()),
+            tier: user_aggregate.user.tier.to_string(),
+            role: user_aggregate.user.role.to_string(),
+            is_verified: user_aggregate.user.is_verified,
+            is_active: user_aggregate.user.is_active,
             created_at: user_aggregate.user.created_at,
         })
     }
@@ -182,6 +190,10 @@ impl<R: UserRepository + Send + Sync> UserQueryHandler for UserApplicationServic
             display_name: user_aggregate.profile.display_name.clone(),
             bio: user_aggregate.profile.bio.clone(),
             profile_image_url: user_aggregate.profile.avatar_url.as_ref().map(|u| u.to_string()),
+            tier: user_aggregate.user.tier.to_string(),
+            role: user_aggregate.user.role.to_string(),
+            is_verified: user_aggregate.user.is_verified,
+            is_active: user_aggregate.user.is_active,
             created_at: user_aggregate.user.created_at,
         })
     }
@@ -200,6 +212,10 @@ impl<R: UserRepository + Send + Sync> UserQueryHandler for UserApplicationServic
             display_name: user_aggregate.profile.display_name.clone(),
             bio: user_aggregate.profile.bio.clone(),
             profile_image_url: user_aggregate.profile.avatar_url.as_ref().map(|u| u.to_string()),
+            tier: user_aggregate.user.tier.to_string(),
+            role: user_aggregate.user.role.to_string(),
+            is_verified: user_aggregate.user.is_verified,
+            is_active: user_aggregate.user.is_active,
             created_at: user_aggregate.user.created_at,
         }).collect();
         

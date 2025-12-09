@@ -105,7 +105,7 @@ impl Amount {
 }
 
 /// Currency Enumeration
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum Currency {
     USD,
     ETH,
@@ -363,7 +363,7 @@ impl PaymentPurpose {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum PaymentCategory {
     Purchase,
     Investment,
@@ -400,6 +400,8 @@ pub enum PaymentStatus {
         refund_amount: f64,
         refund_date: DateTime<Utc>,
     },
+    /// Payment is on hold
+    OnHold,
 }
 
 impl PaymentStatus {
@@ -419,6 +421,13 @@ impl PaymentStatus {
     pub fn can_be_refunded(&self) -> bool {
         matches!(self, PaymentStatus::Completed)
     }
+}
+
+/// Payment Filter for queries
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct PaymentFilter {
+    pub user_id: Option<Uuid>,
+    pub status: Option<PaymentStatus>,
 }
 
 /// Pricing strategy based on platform growth phase
@@ -653,6 +662,54 @@ impl DynamicFeeConfig {
     }
 }
 
+
+/// Payment Event Type Enumeration
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PaymentEventType {
+    PaymentInitiated,
+    PaymentProcessingStarted,
+    PaymentCompleted,
+    PaymentFailed,
+    PaymentCancelled,
+    PaymentRefundStarted,
+    PaymentRefunded,
+    PaymentDisputed,
+    PaymentExpired,
+}
+
+
+/// Filter for Royalty Distributions
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct RoyaltyDistributionFilter {
+    pub artist_id: Option<Uuid>,
+    pub song_id: Option<Uuid>,
+    pub status: Option<String>,
+    pub start_date: Option<DateTime<Utc>>,
+    pub end_date: Option<DateTime<Utc>>,
+}
+
+/// Filter for Revenue Sharing Distributions
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct RevenueSharingFilter {
+    pub contract_id: Option<Uuid>,
+    pub shareholder_id: Option<Uuid>,
+    pub status: Option<String>,
+    pub start_date: Option<DateTime<Utc>>,
+    pub end_date: Option<DateTime<Utc>>,
+}
+
+/// Filter for Fraud Alerts
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct FraudAlertFilter {
+    pub user_id: Option<Uuid>,
+    pub payment_id: Option<Uuid>,
+    pub risk_score_min: Option<f64>,
+    pub risk_score_max: Option<f64>,
+    pub status: Option<String>,
+    pub start_date: Option<DateTime<Utc>>,
+    pub end_date: Option<DateTime<Utc>>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -696,4 +753,4 @@ mod tests {
         // Invalid empty address
         assert!(WalletAddress::new("".to_string()).is_err());
     }
-} 
+}

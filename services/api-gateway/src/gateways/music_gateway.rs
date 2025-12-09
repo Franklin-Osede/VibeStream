@@ -60,8 +60,8 @@ pub async fn create_music_gateway(app_state: AppState) -> Result<Router, Box<dyn
         .route("/artists/:id/albums", get(ArtistController::get_artist_albums))
         
         // Endpoints temporales (públicos por ahora)
-        .route("/songs/discover", get(discover_songs))
-        .route("/songs/trending", get(get_trending_songs))
+        .route("/songs/discover", get(SongController::discover_songs))
+        .route("/songs/trending", get(SongController::get_trending_songs))
         .route("/artists", get(get_artists))
         .route("/artists/:id/songs", get(get_artist_songs))
         .route("/search", get(search_music))
@@ -160,17 +160,7 @@ async fn gateway_info() -> ResponseJson<serde_json::Value> {
 // NOTE: Main CRUD endpoints (songs, albums, playlists) already use real controllers
 // These handlers are for discovery, analytics, and admin features that are not yet implemented
 
-async fn discover_songs() -> ResponseJson<serde_json::Value> {
-    ResponseJson(json!({
-        "message": "Discover songs endpoint - TODO: Implement with real service"
-    }))
-}
 
-async fn get_trending_songs() -> ResponseJson<serde_json::Value> {
-    ResponseJson(json!({
-        "message": "Get trending songs endpoint - TODO: Implement with real service"
-    }))
-}
 
 // =============================================================================
 // SONG INTERACTION HANDLERS

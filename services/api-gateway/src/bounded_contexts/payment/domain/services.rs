@@ -9,6 +9,15 @@ use super::entities::*;
 use super::value_objects::*;
 use super::repository::*;
 
+pub type FraudDetectionResult = FraudAnalysisResult;
+
+#[derive(Debug, Clone)]
+pub struct RefundProcessingResult {
+    pub success: bool,
+    pub refund_id: Option<Uuid>,
+    pub error_message: Option<String>,
+}
+
 /// Payment Processing Service
 /// 
 /// Handles the business logic for payment processing, including validation,
@@ -39,7 +48,7 @@ pub trait PaymentProcessingService: Send + Sync {
         original_payment: &mut PaymentAggregate,
         refund_amount: Amount,
         reason: String,
-    ) -> Result<RefundResult, AppError>;
+    ) -> Result<RefundProcessingResult, AppError>;
     
     /// Cancel payment
     async fn cancel_payment(
@@ -283,6 +292,45 @@ pub trait PaymentNotificationService: Send + Sync {
         amount: &Amount,
         period_start: DateTime<Utc>,
         period_end: DateTime<Utc>,
+    ) -> Result<(), AppError>;
+    
+    /// Send payment blocked notification
+    async fn send_payment_blocked_notification(
+        &self,
+        payment: &PaymentAggregate,
+        reason: &str,
+    ) -> Result<(), AppError>;
+    
+    /// Send verification required notification
+    async fn send_verification_required_notification(
+        &self,
+        payment: &PaymentAggregate,
+    ) -> Result<(), AppError>;
+    
+    /// Send refund completed notification
+    async fn send_refund_completed_notification(
+        &self,
+        payment: &PaymentAggregate,
+        refund_amount: &Amount,
+    ) -> Result<(), AppError>;
+    
+    /// Send refund failed notification
+    async fn send_refund_failed_notification(
+        &self,
+        payment: &PaymentAggregate,
+        reason: &str,
+    ) -> Result<(), AppError>;
+    
+    /// Send royalty distribution completed notification
+    async fn send_royalty_distribution_completed_notification(
+        &self,
+        distribution: &RoyaltyDistributionAggregate,
+    ) -> Result<(), AppError>;
+    
+    /// Send revenue sharing completed notification
+    async fn send_revenue_sharing_completed_notification(
+        &self,
+        distribution: &RevenueSharingAggregate,
     ) -> Result<(), AppError>;
 }
 

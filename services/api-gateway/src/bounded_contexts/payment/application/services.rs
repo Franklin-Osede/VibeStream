@@ -530,16 +530,7 @@ impl FraudDetectionService for MockFraudDetectionService {
         })
     }
     
-    async fn create_alert(&self, _payment_id: PaymentId, _risk_score: f64, _indicators: Vec<String>) -> Result<FraudAlert, AppError> {
-        Ok(FraudAlert::new(
-            Uuid::new_v4(),
-            *_payment_id.value(),
-            Uuid::new_v4(),
-            _risk_score,
-            _indicators,
-            "Monitor".to_string(),
-        ))
-    }
+
 }
 
 #[cfg(test)]

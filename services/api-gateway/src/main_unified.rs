@@ -24,7 +24,7 @@ use axum::{
     routing::get,
     Router,
     response::Json,
-    http::{StatusCode, Method},
+    http::{StatusCode, Method, HeaderValue},
 };
 use tower_http::{
     cors::{CorsLayer, Any},
@@ -32,6 +32,7 @@ use tower_http::{
 };
 use tracing_subscriber::fmt::init;
 use std::net::SocketAddr;
+use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -118,7 +119,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // =============================================================================
         .layer(
             CorsLayer::new()
-                .allow_origin(Any)
+                .allow_origin([
+                    "http://localhost:3000".parse::<HeaderValue>().unwrap(),
+                    "http://localhost:5173".parse::<HeaderValue>().unwrap(),
+                    "http://localhost:8080".parse::<HeaderValue>().unwrap(),
+                    "https://vibestream.com".parse::<HeaderValue>().unwrap(),
+                    "https://api.vibestream.com".parse::<HeaderValue>().unwrap(),
+                ])
                 .allow_methods([
                     Method::GET,
                     Method::POST,
@@ -127,10 +134,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Method::PATCH,
                     Method::OPTIONS,
                 ])
-                .allow_headers(Any)
+                .allow_headers([
+                    axum::http::header::AUTHORIZATION,
+                    axum::http::header::CONTENT_TYPE,
+                    axum::http::header::ACCEPT,
+                    axum::http::header::ORIGIN,
+                ])
                 .allow_credentials(true)
         )
-        .layer(TraceLayer::new_for_http());
+        .layer(TraceLayer::new_for_http())
+        .layer(
+            GovernorLayer {
+                config: Box::leak(
+                    Box::new(
+                        GovernorConfigBuilder::default()
+                            .per_second(50)
+                            .burst_size(100)
+                            .finish()
+                            .unwrap()
+                    )
+                )
+            }
+        );
     
     // Configurar puerto único
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));

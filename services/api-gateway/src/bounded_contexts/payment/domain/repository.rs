@@ -8,6 +8,7 @@ use crate::shared::domain::errors::AppError;
 use super::aggregates::*;
 use super::entities::*;
 use super::value_objects::*;
+use super::events::*;
 
 pub type PaymentRepositoryResult<T> = Result<T, AppError>;
 
@@ -56,11 +57,29 @@ pub trait PaymentRepository: Send + Sync {
     /// Check if payment exists
     async fn exists(&self, id: &PaymentId) -> PaymentRepositoryResult<bool>;
     
+    /// Find payment by idempotency key
+    async fn find_by_idempotency_key(&self, key: &str) -> PaymentRepositoryResult<Option<PaymentAggregate>>;
+    
+    /// Find payments by filter
+    async fn find_by_filter(&self, filter: PaymentFilter, offset: u64, limit: u64) -> PaymentRepositoryResult<Vec<PaymentAggregate>>;
+    
+    /// Save a payment batch
+    async fn save_batch(&self, batch: &PaymentBatch) -> PaymentRepositoryResult<()>;
+    
     /// Get payment count by status
     async fn count_by_status(&self, status: &PaymentStatus) -> PaymentRepositoryResult<u64>;
     
+    /// Get payment count by filter
+    async fn count_by_filter(&self, filter: PaymentFilter) -> PaymentRepositoryResult<u64>;
+    
     /// Get total payment volume for date range
     async fn get_total_volume(&self, start: DateTime<Utc>, end: DateTime<Utc>) -> PaymentRepositoryResult<HashMap<Currency, f64>>;
+    
+    /// Get payment events
+    async fn get_payment_events(&self, payment_id: &PaymentId) -> PaymentRepositoryResult<Vec<PaymentEvent>>;
+    
+    /// Find payment batch by ID
+    async fn find_batch_by_id(&self, batch_id: Uuid) -> PaymentRepositoryResult<Option<PaymentBatch>>;
 }
 
 /// Repository for Royalty Distribution Aggregates
@@ -166,6 +185,25 @@ pub trait PaymentAnalyticsRepository: Send + Sync {
     
     /// Get fraud detection metrics
     async fn get_fraud_metrics(&self, start: DateTime<Utc>, end: DateTime<Utc>) -> PaymentRepositoryResult<FraudMetrics>;
+}
+
+/// Repository for Fraud Detection
+#[async_trait]
+pub trait FraudRepository: Send + Sync {
+    /// Find alerts by filter
+    async fn find_alerts_by_filter(&self, filter: FraudAlertFilter, offset: u64, limit: u64) -> PaymentRepositoryResult<Vec<super::entities::FraudAlert>>;
+    
+    /// Find stuck payments
+    async fn find_stuck_payments(&self, older_than_minutes: u32, offset: u64, limit: u64) -> PaymentRepositoryResult<Vec<PaymentAggregate>>;
+    
+    /// Get failed transactions analysis
+    async fn get_failed_transactions_analysis(
+        &self, 
+        start: Option<DateTime<Utc>>, 
+        end: Option<DateTime<Utc>>,
+        group_by_error: Option<bool>,
+        group_by_method: Option<bool>
+    ) -> PaymentRepositoryResult<HashMap<String, u64>>;
 }
 
 /// Payment Event Store Repository

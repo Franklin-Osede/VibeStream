@@ -46,7 +46,7 @@ struct PayPalAmount {
     currency_code: String,
     value: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    breakdown: Option<PayPalBreakdown>,
+    breakdown: Option<Box<PayPalBreakdown>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -345,6 +345,7 @@ impl PaymentGateway for PayPalGateway {
                 processing_time_ms: processing_time,
                 fees_charged: Amount::new(payment.payment().amount().value() * 0.034, payment.payment().amount().currency().clone())
                     .map_err(|e| AppError::DomainError(e))?,
+                client_secret: None,
             });
         }
 
@@ -409,6 +410,7 @@ impl PaymentGateway for PayPalGateway {
             gateway_message,
             processing_time_ms: processing_time,
             fees_charged,
+            client_secret: None,
         })
     }
 

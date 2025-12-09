@@ -265,7 +265,11 @@ pub struct ApiResponse<T> {
         paths::_add_song_to_playlist_doc,
         paths::_remove_song_from_playlist_doc,
         // Campaign endpoints
-        paths::_create_campaign_doc
+        paths::_create_campaign_doc,
+        // Payment endpoints
+        crate::bounded_contexts::payment::presentation::controllers::PaymentController::initiate_payment,
+        crate::bounded_contexts::payment::presentation::controllers::PaymentController::process_payment,
+        crate::bounded_contexts::payment::presentation::controllers::PaymentController::get_payment
     ),
     components(
         schemas(
@@ -291,7 +295,16 @@ pub struct ApiResponse<T> {
             ApiError,
             ApiResponse<serde_json::Value>,
             paths::RefreshTokenRequest,
-            paths::RefreshTokenResponse
+            paths::RefreshTokenRequest,
+            paths::RefreshTokenResponse,
+            // Payment Schemas
+            crate::bounded_contexts::payment::application::dto::PaymentDTO,
+            crate::bounded_contexts::payment::application::dto::AmountDTO,
+            crate::bounded_contexts::payment::application::dto::PaymentMethodDTO,
+            crate::bounded_contexts::payment::application::dto::PaymentPurposeDTO,
+            crate::bounded_contexts::payment::application::dto::InitiatePaymentRequest,
+            crate::bounded_contexts::payment::application::dto::InitiatePaymentResponse,
+            crate::bounded_contexts::payment::application::dto::ProcessPaymentRequest
         )
     ),
     tags(

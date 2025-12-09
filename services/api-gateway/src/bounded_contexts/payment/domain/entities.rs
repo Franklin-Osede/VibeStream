@@ -72,15 +72,14 @@ impl Payment {
             metadata,
         };
         
-        let event = PaymentInitiated {
-            payment_id: payment_id.clone(),
+        let event = PaymentInitiated::new(
+            payment_id.clone(),
             payer_id,
             payee_id,
-            amount: amount.clone(),
+            amount.clone(),
             purpose,
             platform_fee,
-            occurred_at: Utc::now(),
-        };
+        );
         
         Ok((payment, event))
     }
@@ -97,13 +96,12 @@ impl Payment {
         self.transaction_id = Some(transaction_id.clone());
         self.updated_at = Utc::now();
         
-        Ok(PaymentProcessingStarted {
-            payment_id: self.id.clone(),
+        Ok(PaymentProcessingStarted::new(
+            self.id.clone(),
             transaction_id,
-            payer_id: self.payer_id,
-            amount: self.amount.clone(),
-            occurred_at: Utc::now(),
-        })
+            self.payer_id,
+            self.amount.clone(),
+        ))
     }
     
     /// Complete the payment successfully
@@ -119,17 +117,16 @@ impl Payment {
         self.completed_at = Some(Utc::now());
         self.updated_at = Utc::now();
         
-        Ok(PaymentCompleted {
-            payment_id: self.id.clone(),
-            payer_id: self.payer_id,
-            payee_id: self.payee_id,
-            amount: self.amount.clone(),
-            net_amount: self.net_amount.clone(),
-            platform_fee: self.platform_fee.clone().unwrap_or(Amount::new(0.0, self.amount.currency().clone()).unwrap()),
+        Ok(PaymentCompleted::new(
+            self.id.clone(),
+            self.payer_id,
+            self.payee_id,
+            self.amount.clone(),
+            self.net_amount.clone(),
+            self.platform_fee.clone().unwrap_or(Amount::new(0.0, self.amount.currency().clone()).unwrap()),
             blockchain_hash,
-            purpose: self.purpose.clone(),
-            occurred_at: Utc::now(),
-        })
+            self.purpose.clone(),
+        ))
     }
     
     /// Mark payment as failed
@@ -147,14 +144,13 @@ impl Payment {
         self.failure_reason = Some(error_message.clone());
         self.updated_at = Utc::now();
         
-        Ok(PaymentFailed {
-            payment_id: self.id.clone(),
-            payer_id: self.payer_id,
-            amount: self.amount.clone(),
+        Ok(PaymentFailed::new(
+            self.id.clone(),
+            self.payer_id,
+            self.amount.clone(),
             error_code,
             error_message,
-            occurred_at: Utc::now(),
-        })
+        ))
     }
     
     /// Cancel the payment
@@ -168,13 +164,12 @@ impl Payment {
         self.status = PaymentStatus::Cancelled { reason: reason.clone() };
         self.updated_at = Utc::now();
         
-        Ok(PaymentCancelled {
-            payment_id: self.id.clone(),
-            payer_id: self.payer_id,
-            amount: self.amount.clone(),
+        Ok(PaymentCancelled::new(
+            self.id.clone(),
+            self.payer_id,
+            self.amount.clone(),
             reason,
-            occurred_at: Utc::now(),
-        })
+        ))
     }
     
     /// Start refund process
@@ -194,13 +189,12 @@ impl Payment {
         self.status = PaymentStatus::Refunding;
         self.updated_at = Utc::now();
         
-        Ok(PaymentRefundStarted {
-            payment_id: self.id.clone(),
-            original_amount: self.amount.clone(),
+        Ok(PaymentRefundStarted::new(
+            self.id.clone(),
+            self.amount.clone(),
             refund_amount,
             reason,
-            occurred_at: Utc::now(),
-        })
+        ))
     }
     
     /// Complete refund
@@ -218,13 +212,12 @@ impl Payment {
         };
         self.updated_at = Utc::now();
         
-        Ok(PaymentRefunded {
-            payment_id: self.id.clone(),
-            original_amount: self.amount.clone(),
+        Ok(PaymentRefunded::new(
+            self.id.clone(),
+            self.amount.clone(),
             refund_amount,
             refund_date,
-            occurred_at: Utc::now(),
-        })
+        ))
     }
     
     // Getters
@@ -420,6 +413,69 @@ impl PaymentBatch {
     pub fn total_amount(&self) -> &Amount { &self.total_amount }
     pub fn status(&self) -> &BatchStatus { &self.status }
     pub fn payment_count(&self) -> usize { self.payments.len() }
+}
+
+
+/// Fraud Alert Entity
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct FraudAlert {
+    id: Uuid,
+    payment_id: Uuid,
+    user_id: Uuid,
+    risk_score: f64,
+    fraud_indicators: Vec<String>,
+    action_taken: String,
+    review_status: ReviewStatus,
+    reviewed_by: Option<Uuid>,
+    reviewed_at: Option<DateTime<Utc>>,
+    review_notes: Option<String>,
+    created_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ReviewStatus {
+    Pending,
+    UnderReview,
+    Cleared,
+    ConfirmedFraud,
+    FalsePositive,
+}
+
+impl FraudAlert {
+    pub fn new(
+        payment_id: Uuid,
+        user_id: Uuid,
+        risk_score: f64,
+        fraud_indicators: Vec<String>,
+        action_taken: String,
+    ) -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            payment_id,
+            user_id,
+            risk_score,
+            fraud_indicators,
+            action_taken,
+            review_status: ReviewStatus::Pending,
+            reviewed_by: None,
+            reviewed_at: None,
+            review_notes: None,
+            created_at: Utc::now(),
+        }
+    }
+    
+    // Getters
+    pub fn id(&self) -> Uuid { self.id }
+    pub fn payment_id(&self) -> Uuid { self.payment_id }
+    pub fn user_id(&self) -> Uuid { self.user_id }
+    pub fn risk_score(&self) -> f64 { self.risk_score }
+    pub fn fraud_indicators(&self) -> Vec<String> { self.fraud_indicators.clone() }
+    pub fn action_taken(&self) -> String { self.action_taken.clone() }
+    pub fn review_status(&self) -> &ReviewStatus { &self.review_status }
+    pub fn reviewed_by(&self) -> Option<Uuid> { self.reviewed_by }
+    pub fn reviewed_at(&self) -> Option<DateTime<Utc>> { self.reviewed_at }
+    pub fn review_notes(&self) -> Option<String> { self.review_notes.clone() }
+    pub fn created_at(&self) -> DateTime<Utc> { self.created_at }
 }
 
 #[cfg(test)]
