@@ -9,7 +9,12 @@ use chrono::{DateTime, Utc};
 use std::sync::Arc;
 
 use crate::shared::domain::errors::AppError;
-use crate::bounded_contexts::payment::domain::repositories::PaymentRepository;
+use crate::bounded_contexts::payment::domain::repository::{
+    PaymentRepository, 
+    PaymentBatch, 
+    BatchType,
+    BatchStatus
+};
 use crate::bounded_contexts::payment::infrastructure::webhooks::{
     WebhookHandler, WebhookProcessingResult, WebhookEventData, WebhookEventType
 };
@@ -182,7 +187,7 @@ pub struct ReconciliationResult {
 pub struct WebhookQueueWorker {
     processor: Arc<WebhookQueueProcessor>,
     gateway: String,
-    running: Arc<tokio::sync::atomic::AtomicBool>,
+    running: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl WebhookQueueWorker {
@@ -193,7 +198,7 @@ impl WebhookQueueWorker {
         Self {
             processor,
             gateway,
-            running: Arc::new(tokio::sync::atomic::AtomicBool::new(false)),
+            running: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         }
     }
 
@@ -206,14 +211,46 @@ impl WebhookQueueWorker {
         tracing::info!("Starting webhook queue worker for gateway: {}", self.gateway);
         
         while self.running.load(std::sync::atomic::Ordering::Relaxed) {
-            // In a real implementation, this would:
-            // 1. Pop message from Redis queue (BRPOP)
-            // 2. Process webhook
-            // 3. Handle retries on failure
-            // 4. Store reconciliation records
-            
-            // For now, we'll just sleep to avoid busy waiting
-            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            // 1. Pop message from Redis queue (BRPOP with 5s timeout)
+            match self.processor.message_queue.receive_message(&queue_name, 5).await {
+                Ok(Some(message_json)) => {
+                    // 2. Deserialize message
+                    match serde_json::from_str::<WebhookQueueMessage>(&message_json) {
+                        Ok(message) => {
+                            tracing::info!("Processing webhook {} from {}", message.id, message.gateway);
+                            
+                            // 3. Process webhook
+                            match self.processor.process_webhook_from_queue(&message).await {
+                                Ok(result) => {
+                                    if result.success {
+                                        tracing::info!("Successfully processed webhook {}", message.id);
+                                    } else {
+                                        tracing::warn!("Webhook {} processed but failed business logic: {:?}", message.id, result.error_message);
+                                    }
+                                }
+                                Err(e) => {
+                                    tracing::error!("Failed to process webhook {}: {}", message.id, e);
+                                    // TODO: Implement retry logic (re-enqueue with backoff)
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to deserialize webhook message: {}", e);
+                            // Message is lost if we can't deserialize it. 
+                            // In prod, maybe move to a DLQ (Dead Letter Queue).
+                        }
+                    }
+                }
+                Ok(None) => {
+                    // Timeout passed, no message. Just continue loop to check running flag.
+                    continue;
+                }
+                Err(e) => {
+                    tracing::error!("Error receiving message from queue {}: {}", queue_name, e);
+                    // Sleep a bit to avoid hammer-looping on Redis connection errors
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                }
+            }
         }
         
         Ok(())

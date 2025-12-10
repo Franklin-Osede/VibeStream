@@ -4,7 +4,7 @@ use axum::{
 };
 use std::sync::Arc;
 
-use super::controllers::{PaymentController, RoyaltyController};
+use super::controllers::PaymentController;
 
 /// Create payment routes
 pub fn payment_routes(payment_controller: Arc<PaymentController>) -> Router {
@@ -26,31 +26,22 @@ pub fn payment_routes(payment_controller: Arc<PaymentController>) -> Router {
         .route("/payments/statistics", get(PaymentController::get_payment_statistics))
         .route("/payments/analytics", get(PaymentController::get_payment_analytics))
         
-        .with_state(payment_controller)
-}
-
-/// Create royalty routes
-pub fn royalty_routes(royalty_controller: Arc<RoyaltyController>) -> Router {
-    Router::new()
         // Royalty operations
-        .route("/royalties/distribute", post(RoyaltyController::create_royalty_distribution))
-        .route("/royalties/:id/process", post(RoyaltyController::process_royalty_distribution))
+        .route("/royalties/distribute", post(PaymentController::distribute_royalties))
+        .route("/royalties/:id/process", post(PaymentController::process_royalty_distribution))
         
         // Royalty queries
-        .route("/royalties", get(RoyaltyController::get_royalty_distributions))
-        .route("/royalties/artist/:artist_id/summary", get(RoyaltyController::get_artist_revenue_summary))
+        .route("/royalties", get(PaymentController::get_royalty_distributions))
+        .route("/royalties/artist/:artist_id/summary", get(PaymentController::get_artist_revenue_summary))
         
-        .with_state(royalty_controller)
+        .with_state(payment_controller)
 }
 
 /// Create all payment-related routes
 pub fn create_payment_routes(
     payment_controller: Arc<PaymentController>,
-    royalty_controller: Arc<RoyaltyController>,
 ) -> Router {
-    Router::new()
-        .merge(payment_routes(payment_controller))
-        .merge(royalty_routes(royalty_controller))
+    payment_routes(payment_controller)
 }
 
 #[cfg(test)]

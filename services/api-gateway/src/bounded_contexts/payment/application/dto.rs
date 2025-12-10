@@ -169,6 +169,164 @@ pub struct PaymentBatchDTO {
     pub completed_at: Option<DateTime<Utc>>,
 }
 
+/// Payment Statistics DTO
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct PaymentStatistics {
+    pub total_payments: u64,
+    pub total_volume: f64,
+    pub successful_payments: u64,
+    pub failed_payments: u64,
+    pub refunded_payments: u64,
+    pub average_amount: f64,
+    pub currencies: std::collections::HashMap<String, f64>,
+    pub payment_methods: std::collections::HashMap<String, u64>,
+}
+
+/// Payment Analytics DTO
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct PaymentAnalytics {
+    pub time_range: String,
+    pub daily_volume: Vec<DailyVolumeDTO>,
+    pub top_payment_types: Vec<PaymentTypeStatsDTO>,
+    pub gateway_performance: Vec<GatewayPerformanceDTO>,
+    pub fraud_detection_stats: FraudDetectionStats,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct DailyVolumeDTO {
+    pub date: DateTime<Utc>,
+    pub volume: f64,
+    pub count: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct DistributeRoyaltiesRequest {
+    pub song_id: Uuid,
+    pub artist_id: Option<Uuid>,
+    pub album_id: Option<Uuid>,
+    pub period_start: DateTime<Utc>,
+    pub period_end: DateTime<Utc>,
+    pub total_revenue: f64,
+    pub currency: Currency,
+    pub distribution_rules: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct DistributeRoyaltiesResponse {
+    pub distribution_id: Uuid,
+    pub total_amount: f64,
+    pub recipient_count: u32,
+    pub distributions: Vec<RoyaltyDistributionDTO>,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct CreateWalletRequest {
+    pub user_id: Uuid,
+    pub wallet_type: String, // "hot", "cold", "managed"
+    pub currency: Option<String>,
+    pub is_primary: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct CreateWalletResponse {
+    pub wallet_id: Uuid,
+    pub address: String,
+    pub wallet_type: String,
+    pub currency: String,
+    pub balance: f64,
+    pub is_primary: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct WalletBalanceResponse {
+    pub wallet_id: Uuid,
+    pub balance: f64,
+    pub currency: String,
+    pub available_balance: f64,
+    pub pending_balance: f64,
+    pub last_updated: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct InitiateRefundRequest {
+    pub payment_id: Option<Uuid>, // Optional if in URL
+    pub refund_amount: Option<f64>,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct RefundResponse {
+    pub refund_id: Uuid,
+    pub payment_id: Uuid,
+    pub status: String,
+    pub refund_amount: f64,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct InitiatePaymentRequest {
+    pub payer_id: Uuid,
+    pub payee_id: Uuid,
+    pub amount: f64,
+    pub currency: Currency,
+    pub payment_type: String,
+    pub related_entity_id: Option<Uuid>,
+    pub payment_method: String,
+    pub metadata: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct InitiatePaymentResponse {
+    pub payment_id: Uuid,
+    pub status: String,
+    pub amount: f64,
+    pub currency: Currency,
+    pub payment_url: Option<String>,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ProcessPaymentRequest {
+    pub gateway_transaction_id: Option<String>,
+    pub gateway_status: Option<String>,
+    pub gateway_metadata: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct PaymentTrendData { // Moving here or ensuring visible
+    pub period: DateTime<Utc>,
+    pub payment_count: u64,
+    pub total_volume: std::collections::HashMap<String, f64>,
+    pub success_rate: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct PaymentTypeStatsDTO {
+    pub payment_type: String,
+    pub count: u64,
+    pub volume: f64,
+    pub percentage: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct GatewayPerformanceDTO {
+    pub gateway: String,
+    pub success_rate: f64,
+    pub average_processing_time_ms: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct FraudDetectionStats {
+    pub total_checks: u64,
+    pub flagged_transactions: u64,
+    pub false_positives: u64,
+    pub prevented_fraud_amount: f64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

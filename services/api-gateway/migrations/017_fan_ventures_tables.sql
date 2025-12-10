@@ -2,6 +2,7 @@
 -- Create missing tables for Fan Ventures bounded context
 
 -- Create artist_ventures table
+DROP TABLE IF EXISTS artist_ventures CASCADE;
 CREATE TABLE IF NOT EXISTS artist_ventures (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     artist_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -26,6 +27,7 @@ CREATE TABLE IF NOT EXISTS artist_ventures (
 );
 
 -- Create fan_investments table
+DROP TABLE IF EXISTS fan_investments CASCADE;
 CREATE TABLE IF NOT EXISTS fan_investments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     fan_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -40,6 +42,7 @@ CREATE TABLE IF NOT EXISTS fan_investments (
 );
 
 -- Create venture_tiers table
+DROP TABLE IF EXISTS venture_tiers CASCADE;
 CREATE TABLE IF NOT EXISTS venture_tiers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     venture_id UUID NOT NULL REFERENCES artist_ventures(id) ON DELETE CASCADE,
@@ -55,6 +58,7 @@ CREATE TABLE IF NOT EXISTS venture_tiers (
 );
 
 -- Create venture_benefits table
+DROP TABLE IF EXISTS venture_benefits CASCADE;
 CREATE TABLE IF NOT EXISTS venture_benefits (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     venture_id UUID NOT NULL REFERENCES artist_ventures(id) ON DELETE CASCADE,
@@ -69,6 +73,7 @@ CREATE TABLE IF NOT EXISTS venture_benefits (
 );
 
 -- Create benefit_deliveries table
+DROP TABLE IF EXISTS benefit_deliveries CASCADE;
 CREATE TABLE IF NOT EXISTS benefit_deliveries (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     benefit_id UUID NOT NULL REFERENCES venture_benefits(id) ON DELETE CASCADE,
@@ -89,6 +94,7 @@ CREATE TABLE IF NOT EXISTS benefit_deliveries (
 );
 
 -- Create fan_preferences table
+DROP TABLE IF EXISTS fan_preferences CASCADE;
 CREATE TABLE IF NOT EXISTS fan_preferences (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     fan_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

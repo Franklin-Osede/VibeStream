@@ -26,6 +26,9 @@ pub enum AppError {
     Forbidden(String),
     ConcurrencyConflict(String),
     NetworkError(String),
+    ServiceUnavailable(String),
+    InsufficientFundsError(String),
+    FraudDetected(String),
 }
 
 impl std::error::Error for AppError {}
@@ -128,6 +131,9 @@ impl From<AppError> for StatusCode {
             AppError::InternalServerError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::PermissionDenied(_) => StatusCode::FORBIDDEN,
             AppError::ConcurrencyError(_) => StatusCode::CONFLICT,
+            AppError::ServiceUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
+            AppError::InsufficientFundsError(_) => StatusCode::PAYMENT_REQUIRED,
+            AppError::FraudDetected(_) => StatusCode::FORBIDDEN,
         }
     }
 }

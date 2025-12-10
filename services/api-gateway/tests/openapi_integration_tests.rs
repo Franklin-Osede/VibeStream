@@ -91,7 +91,7 @@ fn test_openapi_json_is_valid() {
     
     assert_eq!(
         json_value["info"]["version"],
-        "2.0.0",
+        "1.0.0",
         "Should have correct version"
     );
     

@@ -269,7 +269,24 @@ pub struct ApiResponse<T> {
         // Payment endpoints
         crate::bounded_contexts::payment::presentation::controllers::PaymentController::initiate_payment,
         crate::bounded_contexts::payment::presentation::controllers::PaymentController::process_payment,
-        crate::bounded_contexts::payment::presentation::controllers::PaymentController::get_payment
+        crate::bounded_contexts::payment::presentation::controllers::PaymentController::get_payment,
+        crate::bounded_contexts::payment::presentation::controllers::PaymentController::complete_payment,
+        crate::bounded_contexts::payment::presentation::controllers::PaymentController::cancel_payment,
+        crate::bounded_contexts::payment::presentation::controllers::PaymentController::initiate_refund,
+        // Fan Loyalty endpoints
+        crate::bounded_contexts::fan_loyalty::infrastructure::api_handlers::verify_fan_handler,
+        crate::bounded_contexts::fan_loyalty::infrastructure::api_handlers::create_wristband_handler,
+        crate::bounded_contexts::fan_loyalty::infrastructure::api_handlers::activate_wristband_handler,
+        crate::bounded_contexts::fan_loyalty::infrastructure::api_handlers::get_wristband_handler,
+        crate::bounded_contexts::fan_loyalty::infrastructure::api_handlers::generate_qr_code_handler,
+        crate::bounded_contexts::fan_loyalty::infrastructure::api_handlers::validate_qr_code_handler,
+        crate::bounded_contexts::fan_loyalty::infrastructure::api_handlers::get_fan_verification_handler,
+        // Listen Rewards endpoints
+        crate::bounded_contexts::listen_reward::presentation::handlers::start_listen_session,
+        crate::bounded_contexts::listen_reward::presentation::handlers::complete_listen_session,
+        crate::bounded_contexts::listen_reward::presentation::handlers::get_user_rewards,
+        crate::bounded_contexts::listen_reward::presentation::handlers::distribute_rewards,
+        crate::bounded_contexts::listen_reward::presentation::handlers::get_listen_analytics
     ),
     components(
         schemas(
@@ -304,7 +321,32 @@ pub struct ApiResponse<T> {
             crate::bounded_contexts::payment::application::dto::PaymentPurposeDTO,
             crate::bounded_contexts::payment::application::dto::InitiatePaymentRequest,
             crate::bounded_contexts::payment::application::dto::InitiatePaymentResponse,
-            crate::bounded_contexts::payment::application::dto::ProcessPaymentRequest
+            crate::bounded_contexts::payment::application::dto::ProcessPaymentRequest,
+            // Listen Reward Schemas
+            crate::bounded_contexts::listen_reward::presentation::handlers::StartListenSessionRequest,
+            crate::bounded_contexts::listen_reward::presentation::handlers::StartListenSessionResponse,
+            crate::bounded_contexts::listen_reward::presentation::handlers::CompleteListenSessionRequest,
+            crate::bounded_contexts::listen_reward::presentation::handlers::CompleteListenSessionResponse,
+            crate::bounded_contexts::listen_reward::presentation::handlers::UserRewardsResponse,
+            crate::bounded_contexts::listen_reward::presentation::handlers::DistributeRewardsRequest,
+            crate::bounded_contexts::listen_reward::presentation::handlers::DistributeRewardsResponse,
+            crate::bounded_contexts::listen_reward::presentation::handlers::AnalyticsResponse,
+            crate::bounded_contexts::listen_reward::presentation::handlers::DeviceInfo,
+            crate::bounded_contexts::listen_reward::presentation::handlers::Location,
+            crate::bounded_contexts::listen_reward::presentation::handlers::EngagementMetrics,
+            crate::bounded_contexts::listen_reward::presentation::handlers::RewardBreakdown,
+            crate::bounded_contexts::listen_reward::presentation::handlers::TierProgress,
+            crate::bounded_contexts::listen_reward::presentation::handlers::TierBenefits,
+            crate::bounded_contexts::listen_reward::presentation::handlers::Achievement,
+            crate::bounded_contexts::listen_reward::presentation::handlers::SessionSummary,
+            crate::bounded_contexts::listen_reward::presentation::handlers::UserStatistics,
+            crate::bounded_contexts::listen_reward::presentation::handlers::BonusMultipliers,
+            crate::bounded_contexts::listen_reward::presentation::handlers::TopEarner,
+            crate::bounded_contexts::listen_reward::presentation::handlers::DistributionStats,
+            crate::bounded_contexts::listen_reward::presentation::handlers::QualityDistribution,
+            crate::bounded_contexts::listen_reward::presentation::handlers::TierDistribution,
+            crate::bounded_contexts::listen_reward::presentation::handlers::SongPerformance,
+            crate::bounded_contexts::listen_reward::presentation::handlers::FraudDetectionStats
         )
     ),
     tags(

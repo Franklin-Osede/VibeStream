@@ -4,15 +4,17 @@ use axum::{
     response::Json as ResponseJson,
 };
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
 use crate::auth::Claims;
-use crate::services::AppState;
+use crate::shared::infrastructure::app_state::AppState;
 
 // ====== REQUEST/RESPONSE TYPES ======
 
-#[derive(Debug, Serialize, Deserialize)]
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct StartListenSessionRequest {
     pub song_id: Uuid,
     pub device_info: DeviceInfo,
@@ -21,7 +23,8 @@ pub struct StartListenSessionRequest {
     pub location: Option<Location>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct DeviceInfo {
     pub device_type: String, // "mobile", "desktop", "smart_speaker"
     pub platform: String,    // "ios", "android", "web", "alexa"
@@ -29,14 +32,14 @@ pub struct DeviceInfo {
     pub fingerprint: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct Location {
     pub country: String,
     pub city: Option<String>,
     pub timezone: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct StartListenSessionResponse {
     pub session_id: Uuid,
     pub song_id: Uuid,
@@ -50,7 +53,7 @@ pub struct StartListenSessionResponse {
     pub session_token: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CompleteListenSessionRequest {
     pub session_id: Uuid,
     pub listen_duration_seconds: u32,
@@ -60,7 +63,7 @@ pub struct CompleteListenSessionRequest {
     pub engagement_metrics: EngagementMetrics,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct EngagementMetrics {
     pub skips: u32,
     pub repeats: u32,
@@ -70,7 +73,7 @@ pub struct EngagementMetrics {
     pub interaction_score: f64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CompleteListenSessionResponse {
     pub session_id: Uuid,
     pub completed_at: DateTime<Utc>,
@@ -82,7 +85,7 @@ pub struct CompleteListenSessionResponse {
     pub achievement_unlocked: Option<Achievement>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct RewardBreakdown {
     pub base_reward: f64,
     pub quality_bonus: f64,
@@ -92,7 +95,7 @@ pub struct RewardBreakdown {
     pub total_reward: f64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct TierProgress {
     pub current_tier: String,
     pub points_earned: u32,
@@ -101,7 +104,7 @@ pub struct TierProgress {
     pub progress_percentage: f64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct Achievement {
     pub id: String,
     pub name: String,
@@ -110,7 +113,7 @@ pub struct Achievement {
     pub rarity: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserRewardsResponse {
     pub user_id: Uuid,
     pub total_rewards_earned: f64,
@@ -123,7 +126,7 @@ pub struct UserRewardsResponse {
     pub statistics: UserStatistics,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct TierBenefits {
     pub tier_name: String,
     pub reward_multiplier: f64,
@@ -132,7 +135,7 @@ pub struct TierBenefits {
     pub priority_support: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct SessionSummary {
     pub session_id: Uuid,
     pub song_title: String,
@@ -143,7 +146,7 @@ pub struct SessionSummary {
     pub completed_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserStatistics {
     pub daily_average_listens: f64,
     pub favorite_genres: Vec<String>,
@@ -153,7 +156,7 @@ pub struct UserStatistics {
     pub preferred_listening_times: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct DistributeRewardsRequest {
     pub period_start: DateTime<Utc>,
     pub period_end: DateTime<Utc>,
@@ -162,7 +165,7 @@ pub struct DistributeRewardsRequest {
     pub bonus_multipliers: Option<BonusMultipliers>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct BonusMultipliers {
     pub new_user_bonus: f64,
     pub loyalty_bonus: f64,
@@ -170,7 +173,7 @@ pub struct BonusMultipliers {
     pub volume_bonus: f64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct DistributeRewardsResponse {
     pub distribution_id: Uuid,
     pub period_start: DateTime<Utc>,
@@ -184,7 +187,7 @@ pub struct DistributeRewardsResponse {
     pub processed_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct TopEarner {
     pub user_id: String,
     pub username: String,
@@ -193,7 +196,7 @@ pub struct TopEarner {
     pub avg_quality_score: f64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct DistributionStats {
     pub total_listening_hours: f64,
     pub unique_songs_played: u32,
@@ -201,7 +204,7 @@ pub struct DistributionStats {
     pub tier_distribution: TierDistribution,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct QualityDistribution {
     pub excellent: u32, // 90-100%
     pub good: u32,      // 70-89%
@@ -209,7 +212,7 @@ pub struct QualityDistribution {
     pub poor: u32,      // <50%
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct TierDistribution {
     pub free: u32,
     pub premium: u32,
@@ -230,6 +233,16 @@ pub struct RewardsQuery {
 // ====== HANDLERS ======
 
 /// POST /api/v1/listen/sessions - Start new listening session
+#[utoipa::path(
+    post,
+    path = "/api/v1/listen-rewards/sessions",
+    request_body = StartListenSessionRequest,
+    responses(
+        (status = 200, description = "Session started successfully", body = StartListenSessionResponse),
+        (status = 400, description = "Invalid request")
+    ),
+    tag = "listen-rewards"
+)]
 pub async fn start_listen_session(
     State(_state): State<AppState>,
     claims: Claims,
@@ -272,6 +285,20 @@ pub async fn start_listen_session(
 }
 
 /// PUT /api/v1/listen/sessions/{id}/complete - Complete listening session
+#[utoipa::path(
+    put,
+    path = "/api/v1/listen-rewards/sessions/{session_id}/complete",
+    request_body = CompleteListenSessionRequest,
+    params(
+        ("session_id" = Uuid, Path, description = "Session ID")
+    ),
+    responses(
+        (status = 200, description = "Session completed successfully", body = CompleteListenSessionResponse),
+        (status = 400, description = "Invalid request or verification failed"),
+        (status = 404, description = "Session not found")
+    ),
+    tag = "listen-rewards"
+)]
 pub async fn complete_listen_session(
     State(_state): State<AppState>,
     Path(session_id): Path<Uuid>,
@@ -346,6 +373,19 @@ pub async fn complete_listen_session(
 }
 
 /// GET /api/v1/listen/users/{id}/rewards - Get user's reward summary
+#[utoipa::path(
+    get,
+    path = "/api/v1/listen-rewards/users/{user_id}/rewards",
+    params(
+        ("user_id" = Uuid, Path, description = "User ID")
+    ),
+    responses(
+        (status = 200, description = "User rewards summary", body = UserRewardsResponse),
+        (status = 403, description = "Forbidden access"),
+        (status = 404, description = "User not found")
+    ),
+    tag = "listen-rewards"
+)]
 pub async fn get_user_rewards(
     State(_state): State<AppState>,
     Path(user_id): Path<Uuid>,
@@ -433,6 +473,17 @@ pub async fn get_user_rewards(
 }
 
 /// POST /api/v1/listen/rewards/distribute - Distribute rewards for a period
+#[utoipa::path(
+    post,
+    path = "/api/v1/listen-rewards/distribute",
+    request_body = DistributeRewardsRequest,
+    responses(
+        (status = 200, description = "Rewards distributed successfully", body = DistributeRewardsResponse),
+        (status = 403, description = "Forbidden - Admin only"),
+        (status = 400, description = "Invalid request")
+    ),
+    tag = "listen-rewards"
+)]
 pub async fn distribute_rewards(
     State(_state): State<AppState>,
     claims: Claims,
@@ -501,6 +552,15 @@ pub async fn distribute_rewards(
 }
 
 /// GET /api/v1/listen/analytics - Get listening analytics
+#[utoipa::path(
+    get,
+    path = "/api/v1/listen-rewards/analytics",
+    responses(
+        (status = 200, description = "Listening analytics", body = AnalyticsResponse),
+        (status = 403, description = "Forbidden - Admin only")
+    ),
+    tag = "listen-rewards"
+)]
 pub async fn get_listen_analytics(
     State(_state): State<AppState>,
     Query(params): Query<RewardsQuery>,
@@ -543,7 +603,7 @@ pub async fn get_listen_analytics(
     Ok(ResponseJson(response))
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct AnalyticsResponse {
     pub total_sessions: u32,
     pub total_rewards_distributed: f64,
@@ -555,7 +615,7 @@ pub struct AnalyticsResponse {
     pub fraud_detection: FraudDetectionStats,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct SongPerformance {
     pub song_id: Uuid,
     pub title: String,
@@ -565,7 +625,7 @@ pub struct SongPerformance {
     pub avg_quality: f64,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct FraudDetectionStats {
     pub suspicious_sessions: u32,
     pub blocked_sessions: u32,

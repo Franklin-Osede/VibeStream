@@ -27,14 +27,7 @@ pub struct Payment {
     metadata: PaymentMetadata,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct PaymentMetadata {
-    pub user_ip: Option<String>,
-    pub user_agent: Option<String>,
-    pub platform_version: String,
-    pub reference_id: Option<String>,
-    pub additional_data: serde_json::Value,
-}
+
 
 impl Payment {
     /// Create a new payment

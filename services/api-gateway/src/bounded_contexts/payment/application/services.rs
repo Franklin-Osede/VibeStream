@@ -9,7 +9,12 @@ use crate::bounded_contexts::payment::{
         aggregates::*,
         value_objects::*,
         repository::*,
+        aggregates::*,
+        value_objects::*,
+        repository::*,
         services::*,
+        entities::*,
+        events::*,
     },
     application::{
         commands::*,
@@ -200,7 +205,7 @@ impl PaymentApplicationService {
     }
     
     /// Handle refund workflow
-    pub async fn process_refund_workflow(&self, refund_command: InitiateRefundCommand) -> Result<RefundResult, AppError> {
+    pub async fn process_refund_workflow(&self, refund_command: InitiateRefundCommand) -> Result<crate::bounded_contexts::payment::application::commands::RefundResult, AppError> {
         // 1. Load original payment
         let original_payment_id = PaymentId::from_uuid(refund_command.original_payment_id);
         let mut original_payment = self.payment_repository
@@ -242,7 +247,7 @@ impl PaymentApplicationService {
             self.notification_service.send_refund_failed_notification(&original_payment, &refund_amount).await?;
         }
         
-        Ok(RefundResult {
+        Ok(crate::bounded_contexts::payment::application::commands::RefundResult {
             refund_payment_id: *refund_payment_id.value(),
             original_payment_id: refund_command.original_payment_id,
             refund_amount: refund_command.refund_amount,
@@ -639,3 +644,58 @@ impl PaymentNotificationService for MockNotificationService {
         Ok(())
     }
 } 
+
+pub struct MockRoyaltyDistributionService;
+
+#[async_trait]
+impl crate::bounded_contexts::payment::domain::services::RoyaltyDistributionService for MockRoyaltyDistributionService {
+    async fn calculate_royalty_distribution(
+        &self,
+        _song_id: Uuid,
+        total_revenue: Amount,
+        _period_start: DateTime<Utc>,
+        _period_end: DateTime<Utc>,
+    ) -> Result<crate::bounded_contexts::payment::domain::services::RoyaltyCalculationResult, AppError> {
+        Ok(crate::bounded_contexts::payment::domain::services::RoyaltyCalculationResult {
+            artist_amount: total_revenue.clone(),
+            platform_fee: Amount::new(0.0, total_revenue.currency().clone())?,
+            other_fees: HashMap::new(),
+            net_amount: total_revenue,
+            calculation_details: crate::bounded_contexts::payment::domain::services::RoyaltyCalculationDetails {
+                base_royalty_rate: 1.0,
+                bonus_multipliers: HashMap::new(),
+                deductions: HashMap::new(),
+                calculation_date: Utc::now(),
+            },
+        })
+    }
+    
+    async fn process_royalty_distribution(
+        &self,
+        _distribution_aggregate: &mut RoyaltyDistributionAggregate,
+    ) -> Result<(), AppError> {
+        Ok(())
+    }
+    
+    async fn get_artist_royalty_rates(
+        &self,
+        _artist_id: Uuid,
+        _song_id: Uuid,
+    ) -> Result<crate::bounded_contexts::payment::domain::services::RoyaltyRates, AppError> {
+        Ok(crate::bounded_contexts::payment::domain::services::RoyaltyRates {
+            base_rate: 0.8,
+            streaming_rate: 0.01,
+            download_rate: 0.5,
+            campaign_bonus_rate: 0.0,
+            effective_date: Utc::now(),
+        })
+    }
+    
+    async fn calculate_platform_fees(
+        &self,
+        _total_revenue: Amount,
+        _fee_structure: &crate::bounded_contexts::payment::domain::services::FeeStructure,
+    ) -> Result<Amount, AppError> {
+        Ok(Amount::new(0.0, _total_revenue.currency().clone())?)
+    }
+}

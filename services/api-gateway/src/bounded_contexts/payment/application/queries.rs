@@ -139,6 +139,46 @@ pub struct GetFailedTransactionsAnalysisQuery {
     pub group_by_payment_method: bool,
 }
 
+/// Request for searching payments (API level)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchPaymentsRequest {
+    pub user_id: Option<Uuid>,
+    pub payment_type: Option<String>,
+    pub status: Option<PaymentStatus>,
+    pub currency: Option<Currency>,
+    pub min_amount: Option<f64>,
+    pub max_amount: Option<f64>,
+    pub date_from: Option<DateTime<Utc>>,
+    pub date_to: Option<DateTime<Utc>>,
+    pub limit: Option<u32>,
+    pub offset: Option<u32>,
+}
+
+/// Query for searching payments (Domain level)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchPaymentsQuery {
+    pub user_id: Option<Uuid>,
+    pub payment_type: Option<String>,
+    pub status: Option<PaymentStatus>,
+    pub currency: Option<Currency>,
+    pub min_amount: Option<f64>,
+    pub max_amount: Option<f64>,
+    pub date_from: Option<DateTime<Utc>>,
+    pub date_to: Option<DateTime<Utc>>,
+    pub limit: Option<u32>,
+    pub offset: Option<u32>,
+}
+
+/// Result of payment search
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchPaymentsResult {
+    pub payments: Vec<PaymentDTO>,
+    pub total_count: u64,
+    pub has_more: bool,
+}
+
+use crate::bounded_contexts::payment::application::dto::PaymentDTO; // Ensure PaymentDTO is available
+
 // Supporting types for queries
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

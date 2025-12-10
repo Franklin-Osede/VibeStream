@@ -98,7 +98,7 @@ pub trait RoyaltyDistributionRepository: Send + Sync {
     async fn find_by_artist_id(&self, artist_id: Uuid, pagination: &Pagination) -> PaymentRepositoryResult<Vec<RoyaltyDistributionAggregate>>;
     
     /// Find distributions by status
-    async fn find_by_status(&self, status: &entities::DistributionStatus, pagination: &Pagination) -> PaymentRepositoryResult<Vec<RoyaltyDistributionAggregate>>;
+    async fn find_by_status(&self, status: &DistributionStatus, pagination: &Pagination) -> PaymentRepositoryResult<Vec<RoyaltyDistributionAggregate>>;
     
     /// Find distributions within date range
     async fn find_by_period(&self, start: DateTime<Utc>, end: DateTime<Utc>, pagination: &Pagination) -> PaymentRepositoryResult<Vec<RoyaltyDistributionAggregate>>;

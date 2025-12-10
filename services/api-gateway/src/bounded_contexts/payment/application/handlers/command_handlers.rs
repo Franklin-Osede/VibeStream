@@ -25,8 +25,8 @@ pub trait PaymentCommandHandler: Send + Sync {
     async fn handle_complete_payment(&self, command: CompletePaymentCommand) -> Result<ProcessPaymentResult, AppError>;
     async fn handle_fail_payment(&self, command: FailPaymentCommand) -> Result<ProcessPaymentResult, AppError>;
     async fn handle_cancel_payment(&self, command: CancelPaymentCommand) -> Result<ProcessPaymentResult, AppError>;
-    async fn handle_initiate_refund(&self, command: InitiateRefundCommand) -> Result<RefundResult, AppError>;
-    async fn handle_process_refund(&self, command: ProcessRefundCommand) -> Result<RefundResult, AppError>;
+    async fn handle_initiate_refund(&self, command: InitiateRefundCommand) -> Result<crate::bounded_contexts::payment::application::commands::RefundResult, AppError>;
+    async fn handle_process_refund(&self, command: ProcessRefundCommand) -> Result<crate::bounded_contexts::payment::application::commands::RefundResult, AppError>;
 }
 
 /// Command Handler for Royalty Operations
@@ -265,7 +265,7 @@ impl PaymentCommandHandler for PaymentCommandHandlerImpl {
         })
     }
     
-    async fn handle_initiate_refund(&self, command: InitiateRefundCommand) -> Result<RefundResult, AppError> {
+    async fn handle_initiate_refund(&self, command: InitiateRefundCommand) -> Result<crate::bounded_contexts::payment::application::commands::RefundResult, AppError> {
         // 1. Load original payment
         let original_payment_id = PaymentId::from_uuid(command.original_payment_id);
         let mut original_payment = self.payment_repository
@@ -285,7 +285,7 @@ impl PaymentCommandHandler for PaymentCommandHandlerImpl {
         // 4. Save updated original payment
         self.payment_repository.save(&original_payment).await?;
         
-        Ok(RefundResult {
+        Ok(crate::bounded_contexts::payment::application::commands::RefundResult {
             refund_payment_id: *refund_payment_id.value(),
             original_payment_id: command.original_payment_id,
             refund_amount: command.refund_amount,
@@ -294,7 +294,7 @@ impl PaymentCommandHandler for PaymentCommandHandlerImpl {
         })
     }
     
-    async fn handle_process_refund(&self, command: ProcessRefundCommand) -> Result<RefundResult, AppError> {
+    async fn handle_process_refund(&self, command: ProcessRefundCommand) -> Result<crate::bounded_contexts::payment::application::commands::RefundResult, AppError> {
         // 1. Load refund payment
         let refund_payment_id = PaymentId::from_uuid(command.refund_payment_id);
         let mut refund_payment = self.payment_repository
@@ -323,7 +323,7 @@ impl PaymentCommandHandler for PaymentCommandHandlerImpl {
         // 6. Send notification
         self.notification_service.send_refund_notification(&original_payment, &refund_amount).await?;
         
-        Ok(RefundResult {
+        Ok(crate::bounded_contexts::payment::application::commands::RefundResult {
             refund_payment_id: command.refund_payment_id,
             original_payment_id: command.original_payment_id,
             refund_amount: refund_amount.value(),
@@ -451,8 +451,8 @@ impl PaymentCommandHandlerImpl {
         }
     }
     
-    fn convert_payment_metadata_dto(&self, dto: PaymentMetadataDto) -> Result<PaymentMetadata, AppError> {
-        Ok(PaymentMetadata {
+    fn convert_payment_metadata_dto(&self, dto: PaymentMetadataDto) -> Result<crate::bounded_contexts::payment::domain::value_objects::PaymentMetadata, AppError> {
+        Ok(crate::bounded_contexts::payment::domain::value_objects::PaymentMetadata {
             user_ip: dto.user_ip,
             user_agent: None, // Not provided in DTO for security
             platform_version: dto.platform_version,

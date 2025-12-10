@@ -143,6 +143,16 @@ pub struct HealthCheckResponse {
 // ============================================================================
 
 /// Verify fan biometrics
+#[utoipa::path(
+    post,
+    path = "/api/v1/fan-loyalty/verify",
+    request_body = VerifyFanRequest,
+    responses(
+        (status = 200, description = "Fan verified successfully", body = VerifyFanResponse),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "fan-loyalty"
+)]
 pub async fn verify_fan_handler(
     State(container): State<Arc<RealFanLoyaltyContainer>>,
     Json(request): Json<VerifyFanRequest>,
@@ -186,6 +196,17 @@ pub async fn verify_fan_handler(
 }
 
 /// Create NFT wristband
+#[utoipa::path(
+    post,
+    path = "/api/v1/fan-loyalty/wristbands",
+    request_body = CreateWristbandRequest,
+    responses(
+        (status = 200, description = "Wristband created successfully", body = CreateWristbandResponse),
+        (status = 400, description = "Invalid request"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "fan-loyalty"
+)]
 pub async fn create_wristband_handler(
     State(container): State<Arc<RealFanLoyaltyContainer>>,
     Json(request): Json<CreateWristbandRequest>,
@@ -223,6 +244,19 @@ pub async fn create_wristband_handler(
 }
 
 /// Activate wristband
+#[utoipa::path(
+    post,
+    path = "/api/v1/fan-loyalty/wristbands/{wristband_id}/activate",
+    params(
+        ("wristband_id" = String, Path, description = "Wristband ID to activate")
+    ),
+    responses(
+        (status = 200, description = "Wristband activated successfully", body = ActivateWristbandResponse),
+        (status = 400, description = "Invalid request"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "fan-loyalty"
+)]
 pub async fn activate_wristband_handler(
     State(container): State<Arc<RealFanLoyaltyContainer>>,
     Path(wristband_id): Path<String>,
@@ -246,6 +280,20 @@ pub async fn activate_wristband_handler(
 }
 
 /// Get wristband details
+#[utoipa::path(
+    get,
+    path = "/api/v1/fan-loyalty/wristbands/{wristband_id}",
+    params(
+        ("wristband_id" = String, Path, description = "Wristband ID")
+    ),
+    responses(
+        (status = 200, description = "Wristband details", body = GetWristbandResponse),
+        (status = 404, description = "Wristband not found"),
+        (status = 400, description = "Invalid request"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "fan-loyalty"
+)]
 pub async fn get_wristband_handler(
     State(container): State<Arc<RealFanLoyaltyContainer>>,
     Path(wristband_id): Path<String>,
@@ -271,6 +319,19 @@ pub async fn get_wristband_handler(
 }
 
 /// Generate QR code for wristband
+#[utoipa::path(
+    post,
+    path = "/api/v1/fan-loyalty/wristbands/{wristband_id}/qr-code",
+    params(
+        ("wristband_id" = String, Path, description = "Wristband ID")
+    ),
+    responses(
+        (status = 200, description = "QR code generated", body = GenerateQrCodeResponse),
+        (status = 400, description = "Invalid request"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "fan-loyalty"
+)]
 pub async fn generate_qr_code_handler(
     State(container): State<Arc<RealFanLoyaltyContainer>>,
     Path(wristband_id): Path<String>,
@@ -294,6 +355,16 @@ pub async fn generate_qr_code_handler(
 }
 
 /// Validate QR code
+#[utoipa::path(
+    post,
+    path = "/api/v1/fan-loyalty/validate-qr",
+    request_body = ValidateQrCodeRequest,
+    responses(
+        (status = 200, description = "QR code validation result", body = ValidateQrCodeResponse),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "fan-loyalty"
+)]
 pub async fn validate_qr_code_handler(
     State(container): State<Arc<RealFanLoyaltyContainer>>,
     Json(request): Json<ValidateQrCodeRequest>,
@@ -339,6 +410,19 @@ pub async fn validate_qr_code_handler(
 }
 
 /// Get fan verification
+#[utoipa::path(
+    get,
+    path = "/api/v1/fan-loyalty/verify/{fan_id}",
+    params(
+        ("fan_id" = String, Path, description = "Fan ID")
+    ),
+    responses(
+        (status = 200, description = "Verification details", body = GetFanVerificationResponse),
+        (status = 404, description = "Verification not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "fan-loyalty"
+)]
 pub async fn get_fan_verification_handler(
     State(container): State<Arc<RealFanLoyaltyContainer>>,
     Path(fan_id): Path<String>,

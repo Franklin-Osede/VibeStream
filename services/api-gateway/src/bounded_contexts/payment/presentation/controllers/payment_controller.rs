@@ -13,27 +13,34 @@ use chrono::{DateTime, Utc};
 
 use crate::bounded_contexts::payment::application::{
     commands::{
-        InitiatePaymentCommand, InitiatePaymentCommandHandler, InitiatePaymentResult,
-        ProcessPaymentCommand, ProcessPaymentCommandHandler,
-        CompletePaymentCommand, CompletePaymentCommandHandler,
-        CancelPaymentCommand, CancelPaymentCommandHandler,
-        InitiateRefundCommand, InitiateRefundCommandHandler,
-        DistributeRoyaltiesCommand, DistributeRoyaltiesCommandHandler,
-        CreateWalletCommand, CreateWalletCommandHandler,
+        InitiatePaymentCommand, ProcessPaymentCommand, CompletePaymentCommand, 
+        CancelPaymentCommand, InitiateRefundCommand, 
+        CreateRoyaltyDistributionCommand, ProcessRoyaltyDistributionCommand,
+    },
+    handlers::{
+        command_handlers::{
+            PaymentCommandHandler, PaymentCommandHandlerImpl,
+            RoyaltyCommandHandler, RoyaltyCommandHandlerImpl,
+        },
+        query_handlers::*,
     },
     queries::{
-        GetPaymentQuery, GetPaymentQueryHandler,
-        GetPaymentByTransactionQuery, SearchPaymentsQuery, SearchPaymentsResult,
-        GetUserPaymentHistoryQuery, GetUserPaymentSummaryQuery,
-        GetPaymentStatisticsQuery, GetPaymentAnalyticsQuery,
+        GetPaymentQuery, SearchPaymentsQuery, SearchPaymentsRequest, SearchPaymentsResult,
+        GetPaymentByTransactionQuery, GetUserPaymentHistoryQuery, GetUserPaymentSummaryQuery,
+        GetPaymentStatisticsQuery, GetPaymentAnalyticsQuery, 
         GetRoyaltyDistributionsQuery, GetArtistRevenueSummaryQuery,
         GetWalletQuery, GetWalletBalanceQuery,
     },
-    dto::*, // Import all DTOs including moved ones
+    dto::*, 
+    dto::{PaymentStatistics, PaymentAnalytics, FraudDetectionStats},
+    services::{
+        PaymentApplicationService, RoyaltyDistributionApplicationService,
+        MockPaymentProcessingService, MockFraudDetectionService, MockNotificationService,
+    },
 };
 
 use crate::bounded_contexts::payment::infrastructure::repositories::{
-    PostgresPaymentRepository, PostgresRoyaltyRepository, PostgresWalletRepository,
+    PostgreSQLPaymentRepository, PostgresRoyaltyRepository, PostgresWalletRepository,
 };
 use crate::bounded_contexts::payment::infrastructure::webhooks::{
     WebhookRouter, StripeWebhookHandler, PayPalWebhookHandler, CoinbaseWebhookHandler,
@@ -87,20 +94,22 @@ impl<T> ApiResponse<T> {
 // =============================================================================
 
 pub struct PaymentController {
-    payment_repository: Arc<PostgresPaymentRepository>,
+    payment_repository: Arc<PostgreSQLPaymentRepository>,
     royalty_repository: Arc<PostgresRoyaltyRepository>,
     wallet_repository: Arc<PostgresWalletRepository>,
     webhook_router: Arc<WebhookRouter>,
     webhook_queue_processor: Option<Arc<WebhookQueueProcessor>>,
+    command_handler: Arc<PaymentCommandHandlerImpl>,
 }
 
 impl PaymentController {
     pub fn new(
-        payment_repository: Arc<PostgresPaymentRepository>,
+        payment_repository: Arc<PostgreSQLPaymentRepository>,
         royalty_repository: Arc<PostgresRoyaltyRepository>,
         wallet_repository: Arc<PostgresWalletRepository>,
         webhook_router: Arc<WebhookRouter>,
         webhook_queue_processor: Option<Arc<WebhookQueueProcessor>>,
+        command_handler: Arc<PaymentCommandHandlerImpl>,
     ) -> Self {
         Self {
             payment_repository,
@@ -108,57 +117,59 @@ impl PaymentController {
             wallet_repository,
             webhook_router,
             webhook_queue_processor,
+            command_handler,
         }
     }
 
     pub fn routes(controller: Arc<Self>) -> Router {
         Router::new()
             // Payment operations
-            .route("/payments", post(Self::initiate_payment))
-            .route("/payments/:payment_id/process", post(Self::process_payment))
-            .route("/payments/:payment_id/complete", post(Self::complete_payment))
-            .route("/payments/:payment_id/cancel", post(Self::cancel_payment))
-            .route("/payments/refund", post(Self::initiate_refund))
+            .route("/payments", post(initiate_payment))
+            .route("/payments/:payment_id/process", post(process_payment))
+            .route("/payments/:payment_id/complete", post(complete_payment))
+            .route("/payments/:payment_id/cancel", post(cancel_payment))
+            .route("/payments/refund", post(initiate_refund))
             
             // Payment queries
-            .route("/payments/:payment_id", get(Self::get_payment))
-            .route("/payments/transaction/:transaction_id", get(Self::get_payment_by_transaction))
-            .route("/payments/search", get(Self::search_payments))
-            .route("/payments/user/:user_id/history", get(Self::get_user_payment_history))
-            .route("/payments/user/:user_id/summary", get(Self::get_user_payment_summary))
+            .route("/payments/:payment_id", get(get_payment))
+            .route("/payments/transaction/:transaction_id", get(get_payment_by_transaction))
+            .route("/payments/search", get(search_payments))
+            .route("/payments/user/:user_id/history", get(get_user_payment_history))
+            .route("/payments/user/:user_id/summary", get(get_user_payment_summary))
             
             // Payment analytics
-            .route("/payments/statistics", get(Self::get_payment_statistics))
-            .route("/payments/analytics", get(Self::get_payment_analytics))
+            .route("/payments/statistics", get(get_payment_statistics))
+            .route("/payments/analytics", get(get_payment_analytics))
             
             // Royalty operations
-            .route("/royalties/distribute", post(Self::distribute_royalties))
-            .route("/royalties/:distribution_id/process", post(Self::process_royalty_distribution))
+            .route("/royalties/distribute", post(distribute_royalties))
+            .route("/royalties/:distribution_id/process", post(process_royalty_distribution))
             
             // Royalty queries
-            .route("/royalties", get(Self::get_royalty_distributions))
-            .route("/royalties/artist/:artist_id/summary", get(Self::get_artist_revenue_summary))
+            .route("/royalties", get(get_royalty_distributions))
+            .route("/royalties/artist/:artist_id/summary", get(get_artist_revenue_summary))
             
             // Wallet operations
-            .route("/wallets", get(Self::list_wallets).post(Self::create_wallet))
-            .route("/wallets/:wallet_id", get(Self::get_wallet).put(Self::update_wallet))
-            .route("/wallets/:wallet_id/balance", get(Self::get_wallet_balance))
+            .route("/wallets", get(list_wallets).post(create_wallet))
+            .route("/wallets/:wallet_id", get(get_wallet).put(update_wallet))
+            .route("/wallets/:wallet_id/balance", get(get_wallet_balance))
             
             // Payment gateway operations
-            .route("/gateways", get(Self::list_payment_gateways))
-            .route("/gateways/:gateway_id/process", post(Self::process_gateway_payment))
+            .route("/gateways", get(list_payment_gateways))
+            .route("/gateways/:gateway_id/process", post(process_gateway_payment))
             
             // Webhook endpoints
-            .route("/webhooks/stripe", post(Self::stripe_webhook))
-            .route("/webhooks/paypal", post(Self::paypal_webhook))
-            .route("/webhooks/coinbase", post(Self::coinbase_webhook))
-            .route("/webhooks/:gateway", post(Self::generic_webhook))
+            .route("/webhooks/stripe", post(stripe_webhook))
+            .route("/webhooks/paypal", post(paypal_webhook))
+            .route("/webhooks/coinbase", post(coinbase_webhook))
+            .route("/webhooks/:gateway", post(generic_webhook))
             
             // Reconciliation endpoints
-            .route("/reconcile/:payment_id", post(Self::reconcile_payment))
+            .route("/reconcile/:payment_id", post(reconcile_payment))
             
             .with_state(controller)
     }
+}
 
     // =============================================================================
     // PAYMENT OPERATIONS
@@ -177,33 +188,49 @@ impl PaymentController {
         tag = "payments"
     )]
     pub async fn initiate_payment(
-        State(controller): State<Arc<Self>>,
+        State(controller): State<Arc<PaymentController>>,
         Extension(current_user_id): Extension<Uuid>,
         Json(request): Json<InitiatePaymentRequest>,
     ) -> Result<Json<ApiResponse<InitiatePaymentResponse>>, StatusCode> {
+        // Construct purpose DTO (simplified mapping)
+        let purpose = PaymentPurposeDto {
+            purpose_type: request.payment_type.clone(),
+            campaign_id: if request.payment_type == "NFTPurchase" { Some(request.related_entity_id) } else { None },
+            contract_id: if request.payment_type == "SharePurchase" { Some(request.related_entity_id) } else { None },
+            song_id: if request.payment_type == "RoyaltyDistribution" { Some(request.related_entity_id) } else { None },
+            nft_quantity: None,
+            ownership_percentage: None,
+            share_id: None,
+            from_user: None,
+            to_user: None,
+            artist_id: None,
+            session_id: None,
+            listen_duration: None,
+            distribution_id: None,
+            original_payment_id: None,
+            reason: None,
+        };
+
         let command = InitiatePaymentCommand {
             payer_id: request.payer_id,
             payee_id: request.payee_id,
-            amount: request.amount,
-            currency: request.currency,
-            payment_type: request.payment_type,
-            related_entity_id: request.related_entity_id,
+            amount_value: request.amount,
+            amount_currency: request.currency,
             payment_method: request.payment_method,
+            purpose,
             metadata: request.metadata,
-            initiated_by: current_user_id,
+            idempotency_key: None, // Could come from headers
         };
 
-        let handler = InitiatePaymentCommandHandler::new(controller.payment_repository.clone());
-
-        match handler.handle(command).await {
+        match controller.command_handler.handle_initiate_payment(command).await {
             Ok(result) => {
                 let response = InitiatePaymentResponse {
                     payment_id: result.payment_id,
                     status: result.status,
-                    amount: result.amount,
-                    currency: result.currency,
-                    payment_url: result.payment_url,
-                    expires_at: result.expires_at,
+                    amount: result.net_amount, // Using net amount 
+                    currency: request.currency.to_string(), // Returning requested currency
+                    payment_url: None, // URL generated later or by specific gateway logic
+                    expires_at: None, // Default expiry
                     created_at: result.created_at,
                 };
                 Ok(Json(ApiResponse::success(response)))
@@ -212,8 +239,8 @@ impl PaymentController {
                 eprintln!("Initiate payment error: {:?}", err);
                 match err {
                     AppError::ValidationError(_) => Err(StatusCode::BAD_REQUEST),
-                    AppError::InsufficientFundsError(_) => Err(StatusCode::PAYMENT_REQUIRED),
-                    AppError::FraudDetectedError(_) => Err(StatusCode::FORBIDDEN),
+                    AppError::InsufficientFundsError(_) => Err(StatusCode::PAYMENT_REQUIRED), // Fixed enum variant name
+                    AppError::FraudDetected(_) => Err(StatusCode::FORBIDDEN),
                     _ => Err(StatusCode::INTERNAL_SERVER_ERROR),
                 }
             }
@@ -235,53 +262,87 @@ impl PaymentController {
         tag = "payments"
     )]
     pub async fn process_payment(
-        State(controller): State<Arc<Self>>,
+        State(controller): State<Arc<PaymentController>>,
         Path(payment_id): Path<Uuid>,
         Extension(current_user_id): Extension<Uuid>,
         Json(request): Json<ProcessPaymentRequest>,
-    ) -> Result<Json<ApiResponse<PaymentDTO>>, StatusCode> {
-        let command = ProcessPaymentCommand {
+    ) -> Result<Json<ApiResponse<PaymentDTO>>, StatusCode> { // Start returning proper result type or DTO? 
+        // Note: Controller returns PaymentDTO but Command returns ProcessPaymentResult. 
+        // We should map ProcessPaymentResult to PaymentDTO if possible, or return ProcessPaymentResult directly if API allows.
+        // Assuming we return ProcessPaymentResult for now as it contains status etc.
+        
+        let command = StartPaymentProcessingCommand {
             payment_id,
-            gateway_transaction_id: request.gateway_transaction_id,
-            gateway_status: request.gateway_status,
-            gateway_metadata: request.gateway_metadata,
-            processed_by: current_user_id,
+            processor_id: "System".to_string(), // Default or derive
+            external_transaction_id: request.gateway_transaction_id,
         };
 
-        let handler = ProcessPaymentCommandHandler::new(controller.payment_repository.clone());
-
-        match handler.handle(command).await {
-            Ok(payment) => Ok(Json(ApiResponse::success(payment))),
+        match controller.command_handler.handle_start_processing(command).await {
+            Ok(_) => {
+                // We need to return PaymentDTO, but handle_start_processing returns ProcessPaymentResult.
+                // We might need to fetch the payment again or construct DTO from result.
+                // For now, let's return a success response with what we have.
+                // This assumes PaymentDTO can be constructed partialy or we change response type.
+                // Re-fetching is safest.
+                let query = GetPaymentQuery { payment_id };
+                let query_handler = GetPaymentQueryHandler::new(controller.payment_repository.clone());
+                 match query_handler.handle(query).await {
+                    Ok(Some(payment)) => Ok(Json(ApiResponse::success(payment))),
+                    _ => Err(StatusCode::INTERNAL_SERVER_ERROR)
+                 }
+            }, 
             Err(err) => {
                 eprintln!("Process payment error: {:?}", err);
                 match err {
-                    AppError::NotFoundError(_) => Err(StatusCode::NOT_FOUND),
+                    AppError::NotFound(_) => Err(StatusCode::NOT_FOUND),
                     AppError::ValidationError(_) => Err(StatusCode::BAD_REQUEST),
-                    AppError::PaymentGatewayError(_) => Err(StatusCode::BAD_GATEWAY),
+                    // AppError::PaymentGatewayError(_) => Err(StatusCode::BAD_GATEWAY), // If exists
                     _ => Err(StatusCode::INTERNAL_SERVER_ERROR),
                 }
             }
         }
     }
 
-    async fn complete_payment(
-        State(controller): State<Arc<Self>>,
+    #[utoipa::path(
+        post,
+        path = "/api/v1/payments/{payment_id}/complete",
+        params(
+            ("payment_id" = Uuid, Path, description = "Payment ID to complete")
+        ),
+        responses(
+            (status = 200, description = "Payment completed successfully", body = ApiResponse<PaymentDTO>),
+            (status = 404, description = "Payment not found"),
+            (status = 400, description = "Invalid request")
+        ),
+        tag = "payments"
+    )]
+    pub async fn complete_payment(
+        State(controller): State<Arc<PaymentController>>,
         Path(payment_id): Path<Uuid>,
         Extension(current_user_id): Extension<Uuid>,
     ) -> Result<Json<ApiResponse<PaymentDTO>>, StatusCode> {
         let command = CompletePaymentCommand {
             payment_id,
-            completed_by: current_user_id,
+            blockchain_hash: None, // Need to get from request if manual completion
+            external_transaction_id: None,
+            gateway_response: None,
+            processing_fee: None,
         };
 
-        let handler = CompletePaymentCommandHandler::new(controller.payment_repository.clone());
-
-        match handler.handle(command).await {
-            Ok(payment) => Ok(Json(ApiResponse::success(payment))),
+        match controller.command_handler.handle_complete_payment(command).await {
+            Ok(_) => {
+                // Re-fetch for DTO
+                let query = GetPaymentQuery { payment_id };
+                let query_handler = GetPaymentQueryHandler::new(controller.payment_repository.clone());
+                 match query_handler.handle(query).await {
+                    Ok(Some(payment)) => Ok(Json(ApiResponse::success(payment))),
+                    _ => Err(StatusCode::INTERNAL_SERVER_ERROR)
+                 }
+             }
             Err(err) => {
                 eprintln!("Complete payment error: {:?}", err);
                 match err {
-                    AppError::NotFoundError(_) => Err(StatusCode::NOT_FOUND),
+                    AppError::NotFound(_) => Err(StatusCode::NOT_FOUND),
                     AppError::ValidationError(_) => Err(StatusCode::BAD_REQUEST),
                     _ => Err(StatusCode::INTERNAL_SERVER_ERROR),
                 }
@@ -289,25 +350,44 @@ impl PaymentController {
         }
     }
 
-    async fn cancel_payment(
-        State(controller): State<Arc<Self>>,
+    #[utoipa::path(
+        post,
+        path = "/api/v1/payments/{payment_id}/cancel",
+        params(
+            ("payment_id" = Uuid, Path, description = "Payment ID to cancel")
+        ),
+        responses(
+            (status = 200, description = "Payment cancelled successfully", body = ApiResponse<PaymentDTO>),
+            (status = 404, description = "Payment not found"),
+            (status = 400, description = "Invalid request")
+        ),
+        tag = "payments"
+    )]
+    pub async fn cancel_payment(
+        State(controller): State<Arc<PaymentController>>,
         Path(payment_id): Path<Uuid>,
         Extension(current_user_id): Extension<Uuid>,
     ) -> Result<Json<ApiResponse<PaymentDTO>>, StatusCode> {
         let command = CancelPaymentCommand {
             payment_id,
-            cancelled_by: current_user_id,
             reason: "User requested cancellation".to_string(),
+            cancelled_by: current_user_id,
         };
 
-        let handler = CancelPaymentCommandHandler::new(controller.payment_repository.clone());
-
-        match handler.handle(command).await {
-            Ok(payment) => Ok(Json(ApiResponse::success(payment))),
+        match controller.command_handler.handle_cancel_payment(command).await {
+            Ok(_) => {
+                // Re-fetch for DTO
+                let query = GetPaymentQuery { payment_id };
+                let query_handler = GetPaymentQueryHandler::new(controller.payment_repository.clone());
+                 match query_handler.handle(query).await {
+                    Ok(Some(payment)) => Ok(Json(ApiResponse::success(payment))),
+                    _ => Err(StatusCode::INTERNAL_SERVER_ERROR)
+                 }
+             }
             Err(err) => {
                 eprintln!("Cancel payment error: {:?}", err);
                 match err {
-                    AppError::NotFoundError(_) => Err(StatusCode::NOT_FOUND),
+                    AppError::NotFound(_) => Err(StatusCode::NOT_FOUND),
                     AppError::ValidationError(_) => Err(StatusCode::BAD_REQUEST),
                     _ => Err(StatusCode::INTERNAL_SERVER_ERROR),
                 }
@@ -315,21 +395,44 @@ impl PaymentController {
         }
     }
 
-    async fn initiate_refund(
-        State(controller): State<Arc<Self>>,
+    #[utoipa::path(
+        post,
+        path = "/api/v1/payments/refund",
+        request_body = InitiateRefundRequest,
+        responses(
+            (status = 200, description = "Refund initiated successfully", body = ApiResponse<crate::bounded_contexts::payment::application::commands::RefundResult>),
+            (status = 400, description = "Invalid input"),
+            (status = 404, description = "Original payment not found")
+        ),
+        tag = "payments"
+    )]
+    pub async fn initiate_refund(
+        State(controller): State<Arc<PaymentController>>,
         Extension(current_user_id): Extension<Uuid>,
         Json(request): Json<InitiateRefundRequest>,
-    ) -> Result<Json<ApiResponse<RefundResponse>>, StatusCode> {
-        // Implementation for refund initiation
-        let response = RefundResponse {
-            refund_id: Uuid::new_v4(),
-            payment_id: Uuid::new_v4(), // Would come from request
-            status: "pending".to_string(),
+    ) -> Result<Json<ApiResponse<crate::bounded_contexts::payment::application::commands::RefundResult>>, StatusCode> {
+        let original_payment_id = request.original_payment_id.ok_or(StatusCode::BAD_REQUEST)?;
+        
+        let command = InitiateRefundCommand {
+            original_payment_id,
             refund_amount: request.refund_amount.unwrap_or(0.0),
-            created_at: Utc::now(),
+            refund_currency: Currency::USD, // TODO: Get from request or original payment
+            reason: request.reason.unwrap_or_else(|| "User requested refund".to_string()),
+            initiated_by: current_user_id,
         };
 
-        Ok(Json(ApiResponse::success(response)))
+        match controller.payment_command_handler.handle_initiate_refund(command).await {
+            Ok(result) => Ok(Json(ApiResponse::success(result))),
+            Err(err) => {
+                eprintln!("Initiate refund error: {:?}", err);
+                match err {
+                   AppError::NotFound(_) => Err(StatusCode::NOT_FOUND),
+                   AppError::InvalidInput(_) => Err(StatusCode::BAD_REQUEST),
+                   AppError::InvalidState(_) => Err(StatusCode::CONFLICT),
+                   _ => Err(StatusCode::INTERNAL_SERVER_ERROR),
+                }
+            }
+        }
     }
 
     // =============================================================================
@@ -349,7 +452,7 @@ impl PaymentController {
         tag = "payments"
     )]
     pub async fn get_payment(
-        State(controller): State<Arc<Self>>,
+        State(controller): State<Arc<PaymentController>>,
         Path(payment_id): Path<Uuid>,
     ) -> Result<Json<ApiResponse<PaymentDTO>>, StatusCode> {
         let query = GetPaymentQuery { payment_id };
@@ -366,7 +469,7 @@ impl PaymentController {
     }
 
     async fn get_payment_by_transaction(
-        State(controller): State<Arc<Self>>,
+        State(controller): State<Arc<PaymentController>>,
         Path(transaction_id): Path<String>,
     ) -> Result<Json<ApiResponse<PaymentDTO>>, StatusCode> {
         let query = GetPaymentByTransactionQuery { transaction_id };
@@ -377,7 +480,7 @@ impl PaymentController {
     }
 
     async fn search_payments(
-        State(controller): State<Arc<Self>>,
+        State(controller): State<Arc<PaymentController>>,
         Query(params): Query<SearchPaymentsRequest>,
     ) -> Result<Json<ApiResponse<SearchPaymentsResult>>, StatusCode> {
         let query = SearchPaymentsQuery {
@@ -404,7 +507,7 @@ impl PaymentController {
     }
 
     async fn get_user_payment_history(
-        State(_controller): State<Arc<Self>>,
+        State(_controller): State<Arc<PaymentController>>,
         Path(user_id): Path<Uuid>,
         Extension(current_user_id): Extension<Uuid>,
         Query(params): Query<std::collections::HashMap<String, String>>,
@@ -424,7 +527,7 @@ impl PaymentController {
     }
 
     async fn get_user_payment_summary(
-        State(_controller): State<Arc<Self>>,
+        State(_controller): State<Arc<PaymentController>>,
         Path(user_id): Path<Uuid>,
         Extension(current_user_id): Extension<Uuid>,
     ) -> Result<Json<ApiResponse<()>>, StatusCode> {
@@ -441,7 +544,7 @@ impl PaymentController {
     // =============================================================================
 
     async fn get_payment_statistics(
-        State(_controller): State<Arc<Self>>,
+        State(_controller): State<Arc<PaymentController>>,
         Query(params): Query<std::collections::HashMap<String, String>>,
     ) -> Result<Json<ApiResponse<PaymentStatistics>>, StatusCode> {
         let stats = PaymentStatistics {
@@ -459,7 +562,7 @@ impl PaymentController {
     }
 
     async fn get_payment_analytics(
-        State(_controller): State<Arc<Self>>,
+        State(_controller): State<Arc<PaymentController>>,
         Query(params): Query<std::collections::HashMap<String, String>>,
     ) -> Result<Json<ApiResponse<PaymentAnalytics>>, StatusCode> {
         let analytics = PaymentAnalytics {
@@ -483,7 +586,7 @@ impl PaymentController {
     // =============================================================================
 
     async fn distribute_royalties(
-        State(controller): State<Arc<Self>>,
+        State(controller): State<Arc<PaymentController>>,
         Extension(current_user_id): Extension<Uuid>,
         Json(request): Json<DistributeRoyaltiesRequest>,
     ) -> Result<Json<ApiResponse<DistributeRoyaltiesResponse>>, StatusCode> {
@@ -521,7 +624,7 @@ impl PaymentController {
     }
 
     async fn process_royalty_distribution(
-        State(_controller): State<Arc<Self>>,
+        State(_controller): State<Arc<PaymentController>>,
         Path(distribution_id): Path<Uuid>,
         Extension(current_user_id): Extension<Uuid>,
     ) -> Result<Json<ApiResponse<()>>, StatusCode> {
@@ -530,14 +633,14 @@ impl PaymentController {
     }
 
     async fn get_royalty_distributions(
-        State(_controller): State<Arc<Self>>,
+        State(_controller): State<Arc<PaymentController>>,
         Query(params): Query<std::collections::HashMap<String, String>>,
     ) -> Result<Json<ApiResponse<()>>, StatusCode> {
         Ok(Json(ApiResponse::success(())))
     }
 
     async fn get_artist_revenue_summary(
-        State(_controller): State<Arc<Self>>,
+        State(_controller): State<Arc<PaymentController>>,
         Path(artist_id): Path<Uuid>,
         Query(params): Query<std::collections::HashMap<String, String>>,
     ) -> Result<Json<ApiResponse<()>>, StatusCode> {
@@ -549,7 +652,7 @@ impl PaymentController {
     // =============================================================================
 
     async fn create_wallet(
-        State(controller): State<Arc<Self>>,
+        State(controller): State<Arc<PaymentController>>,
         Extension(current_user_id): Extension<Uuid>,
         Json(request): Json<CreateWalletRequest>,
     ) -> Result<Json<ApiResponse<CreateWalletResponse>>, StatusCode> {
@@ -584,7 +687,7 @@ impl PaymentController {
     }
 
     async fn list_wallets(
-        State(_controller): State<Arc<Self>>,
+        State(_controller): State<Arc<PaymentController>>,
         Query(params): Query<std::collections::HashMap<String, String>>,
         Extension(current_user_id): Extension<Uuid>,
     ) -> Result<Json<ApiResponse<Vec<CreateWalletResponse>>>, StatusCode> {
@@ -593,7 +696,7 @@ impl PaymentController {
     }
 
     async fn get_wallet(
-        State(_controller): State<Arc<Self>>,
+        State(_controller): State<Arc<PaymentController>>,
         Path(wallet_id): Path<Uuid>,
         Extension(current_user_id): Extension<Uuid>,
     ) -> Result<Json<ApiResponse<CreateWalletResponse>>, StatusCode> {
@@ -602,7 +705,7 @@ impl PaymentController {
     }
 
     async fn update_wallet(
-        State(_controller): State<Arc<Self>>,
+        State(_controller): State<Arc<PaymentController>>,
         Path(wallet_id): Path<Uuid>,
         Extension(current_user_id): Extension<Uuid>,
     ) -> Result<Json<ApiResponse<CreateWalletResponse>>, StatusCode> {
@@ -611,7 +714,7 @@ impl PaymentController {
     }
 
     async fn get_wallet_balance(
-        State(_controller): State<Arc<Self>>,
+        State(_controller): State<Arc<PaymentController>>,
         Path(wallet_id): Path<Uuid>,
         Extension(current_user_id): Extension<Uuid>,
     ) -> Result<Json<ApiResponse<WalletBalanceResponse>>, StatusCode> {
@@ -632,7 +735,7 @@ impl PaymentController {
     // =============================================================================
 
     async fn list_payment_gateways(
-        State(_controller): State<Arc<Self>>,
+        State(_controller): State<Arc<PaymentController>>,
     ) -> Result<Json<ApiResponse<Vec<String>>>, StatusCode> {
         let gateways = vec![
             "stripe".to_string(),
@@ -645,7 +748,7 @@ impl PaymentController {
     }
 
     async fn process_gateway_payment(
-        State(_controller): State<Arc<Self>>,
+        State(_controller): State<Arc<PaymentController>>,
         Path(gateway_id): Path<String>,
         Extension(current_user_id): Extension<Uuid>,
     ) -> Result<Json<ApiResponse<()>>, StatusCode> {
@@ -658,7 +761,7 @@ impl PaymentController {
     // =============================================================================
 
     async fn stripe_webhook(
-        State(controller): State<Arc<Self>>,
+        State(controller): State<Arc<PaymentController>>,
         headers: axum::http::HeaderMap,
         body: String,
     ) -> Result<Json<ApiResponse<()>>, StatusCode> {
@@ -698,7 +801,7 @@ impl PaymentController {
     }
 
     async fn paypal_webhook(
-        State(controller): State<Arc<Self>>,
+        State(controller): State<Arc<PaymentController>>,
         headers: axum::http::HeaderMap,
         body: String,
     ) -> Result<Json<ApiResponse<()>>, StatusCode> {
@@ -738,7 +841,7 @@ impl PaymentController {
     }
 
     async fn coinbase_webhook(
-        State(controller): State<Arc<Self>>,
+        State(controller): State<Arc<PaymentController>>,
         headers: axum::http::HeaderMap,
         body: String,
     ) -> Result<Json<ApiResponse<()>>, StatusCode> {
@@ -779,7 +882,7 @@ impl PaymentController {
     /// POST /payments/reconcile/:payment_id
     /// Reconcile payment with webhook events
     async fn reconcile_payment(
-        State(controller): State<Arc<Self>>,
+        State(controller): State<Arc<PaymentController>>,
         Path(payment_id): Path<Uuid>,
     ) -> Result<Json<ApiResponse<ReconciliationResult>>, StatusCode> {
         if let Some(ref queue_processor) = controller.webhook_queue_processor {
@@ -796,7 +899,7 @@ impl PaymentController {
     }
 
     async fn generic_webhook(
-        State(controller): State<Arc<Self>>,
+        State(controller): State<Arc<PaymentController>>,
         Path(gateway): Path<String>,
         headers: axum::http::HeaderMap,
         body: String,
@@ -823,7 +926,7 @@ impl PaymentController {
             }
         }
     }
-}
+
 
 // Factory functions
 pub fn create_payment_controller(

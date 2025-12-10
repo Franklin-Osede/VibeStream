@@ -430,6 +430,27 @@ pub struct PaymentFilter {
     pub status: Option<PaymentStatus>,
 }
 
+/// Revenue Sharing Status
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RevenueSharingStatus {
+    Created,
+    Processing,
+    Completed,
+    Failed,
+    PartiallyCompleted,
+    Cancelled,
+}
+
+/// Payment Metadata containing context info
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PaymentMetadata {
+    pub user_ip: Option<String>,
+    pub user_agent: Option<String>,
+    pub platform_version: String,
+    pub reference_id: Option<String>,
+    pub additional_data: serde_json::Value,
+}
+
 /// Pricing strategy based on platform growth phase
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PlatformPhase {
