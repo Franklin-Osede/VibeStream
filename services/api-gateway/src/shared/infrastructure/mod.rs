@@ -1,6 +1,7 @@
 //! Shared infrastructure components (database, messaging, security, websocket, cdn, discovery).
 
 pub mod event_bus;
+pub mod clients;
 pub mod database;
 pub mod websocket;
 pub mod cdn;

@@ -372,7 +372,7 @@ impl EventBusFactory {
     /// * `Result<(Arc<dyn EventBus>, Option<tokio::task::JoinHandle<()>>), AppError>` - Event bus y worker handle
     pub async fn create_redis_streams_event_bus(redis_url: &str) -> Result<(Arc<dyn EventBus>, Option<tokio::task::JoinHandle<()>>), AppError> {
         let redis_event_bus = Arc::new(RedisStreamsEventBus::new(redis_url).await?);
-        let event_bus: Arc<dyn EventBus> = Arc::clone(&redis_event_bus);
+        let event_bus: Arc<dyn EventBus> = redis_event_bus.clone();
         
         // Registrar handlers reales para todos los contextos
         Self::register_handlers(Arc::clone(&event_bus)).await?;
@@ -391,7 +391,7 @@ impl EventBusFactory {
         let event_bus = Arc::new(InMemoryEventBus::new());
         
         // Registrar handlers reales (ahora funciona correctamente)
-        Self::register_handlers(Arc::clone(&event_bus)).await?;
+        Self::register_handlers(event_bus.clone() as Arc<dyn EventBus>).await?;
         
         tracing::warn!("⚠️  Using InMemoryEventBus - not suitable for production. Use create_redis_streams_event_bus instead.");
         

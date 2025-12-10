@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE notifications \n            SET title = $2, message = $3, notification_type = $4, \n                priority = $5, status = $6, metadata = $7, \n                read_at = $8, updated_at = $9\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Text",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Jsonb",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2ae144fa136f7648ea6d7492ccf36437bdff588f3fa97f055d5c61f7a09a97e6"
+}

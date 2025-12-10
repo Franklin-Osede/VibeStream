@@ -60,6 +60,48 @@ impl UserRepository for InMemoryUserRepository {
         Ok(self.find_by_username(username).await?.is_some())
     }
 
+    async fn get_followers(&self, user_id: &UserId, _page: u32, _page_size: u32) -> Result<Vec<UserSummary>, AppError> {
+        let followers_map = self.followers.read().unwrap();
+        let users_map = self.users.read().unwrap();
+        
+        let follower_ids = followers_map.get(user_id).cloned().unwrap_or_default();
+        let mut summaries = Vec::new();
+        
+        for id in follower_ids {
+            if let Some(user) = users_map.get(&id) {
+                summaries.push(user.get_summary());
+            }
+        }
+        
+        Ok(summaries)
+    }
+
+    async fn get_following(&self, user_id: &UserId, _page: u32, _page_size: u32) -> Result<Vec<UserSummary>, AppError> {
+        let followers_map = self.followers.read().unwrap();
+        let users_map = self.users.read().unwrap();
+        
+        let mut summaries = Vec::new();
+        
+        for (followee_id, follower_ids) in followers_map.iter() {
+            if follower_ids.contains(user_id) {
+                if let Some(user) = users_map.get(followee_id) {
+                    summaries.push(user.get_summary());
+                }
+            }
+        }
+        
+        Ok(summaries)
+    }
+
+    async fn is_following(&self, follower_id: &UserId, followee_id: &UserId) -> Result<bool, AppError> {
+        let followers_map = self.followers.read().unwrap();
+        if let Some(follower_ids) = followers_map.get(followee_id) {
+            Ok(follower_ids.contains(follower_id))
+        } else {
+            Ok(false)
+        }
+    }
+
     async fn search_users(&self, search_text: Option<&str>, limit: u32, offset: u32) -> Result<Vec<UserAggregate>, AppError> {
         let users = self.users.read().unwrap();
         let mut results: Vec<UserAggregate> = users.values()

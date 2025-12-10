@@ -363,7 +363,7 @@ pub async fn complete_listen_session(
         quality_score: request.actual_quality_score,
         verification_status: verification_status.to_string(),
         reward_breakdown,
-        tier_progress,
+        next_tier_progress: tier_progress,
         achievement_unlocked: achievement,
     };
 

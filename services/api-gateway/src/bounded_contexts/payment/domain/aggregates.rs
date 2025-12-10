@@ -17,6 +17,7 @@ use super::events::*;
 pub struct PaymentAggregate {
     payment: Payment,
     related_payments: Vec<PaymentId>, // For refunds, fees, etc.
+    #[serde(skip)]
     uncommitted_events: Vec<Box<dyn DomainEvent>>,
     version: u64,
 }
@@ -282,6 +283,7 @@ impl PaymentAggregate {
 pub struct RoyaltyDistributionAggregate {
     distribution: RoyaltyDistribution,
     payments: Vec<PaymentAggregate>,
+    #[serde(skip)]
     uncommitted_events: Vec<Box<dyn DomainEvent>>,
     version: u64,
 }
@@ -405,6 +407,11 @@ impl RoyaltyDistributionAggregate {
         Ok(())
     }
     
+    pub fn add_payment(&mut self, payment: PaymentAggregate) {
+        self.distribution.add_payment(payment.payment().id().clone());
+        self.payments.push(payment);
+    }
+    
     fn add_event(&mut self, event: Box<dyn DomainEvent>) {
         self.uncommitted_events.push(event);
     }
@@ -437,6 +444,7 @@ pub struct RevenueSharingAggregate {
     period_start: DateTime<Utc>,
     period_end: DateTime<Utc>,
     created_at: DateTime<Utc>,
+    #[serde(skip)]
     uncommitted_events: Vec<Box<dyn DomainEvent>>,
     version: u64,
 }
@@ -538,48 +546,31 @@ impl RevenueSharingAggregate {
         self.status = RevenueSharingStatus::Processing;
         
         // Create payments for each shareholder
+        let mut events = Vec::new();
+
         for (shareholder_id, dist) in &mut self.shareholder_distributions {
-            let payment_metadata = PaymentMetadata {
-                user_ip: None,
-                user_agent: None,
-                platform_version: "1.0.0".to_string(),
-                reference_id: Some(format!("revenue_dist_{}_{}", self.distribution_id, shareholder_id)),
-                additional_data: serde_json::json!({
-                    "distribution_id": self.distribution_id,
-                    "contract_id": self.contract_id,
-                    "ownership_percentage": dist.ownership_percentage,
-                }),
-            };
+            let previous_total = dist.distribution_amount.clone();
             
-            let payment_purpose = PaymentPurpose::RevenueDistribution {
-                contract_id: self.contract_id,
-                distribution_id: self.distribution_id,
-            };
+            // Calculate and add share
+            let share_amount = self.total_revenue.percentage_of(dist.ownership_percentage)?;
+            dist.distribution_amount = dist.distribution_amount.add(&share_amount)?;
             
-            let payment = PaymentAggregate::create_payment(
-                Uuid::nil(), // Platform as payer
-                *shareholder_id,
-                dist.distribution_amount.clone(),
-                PaymentMethod::PlatformBalance,
-                payment_purpose,
-                platform_fee_percentage.clone(),
-                payment_metadata,
-            )?;
-            
-            let payment_id = payment.payment().id().clone();
-            self.payments.push(payment);
-            
-            dist.payment_status = ShareholderPaymentStatus::Processing;
-            
-            let event = RevenueSharingPaymentProcessed::new(
+            // Create event
+            events.push(Box::new(RevenueShareDistributed::new(
                 self.distribution_id,
-                payment_id,
+                self.contract_id,
                 *shareholder_id,
-                dist.ownership_percentage,
+                share_amount,
                 dist.distribution_amount.clone(),
-            );
-            
-            self.add_event(Box::new(event));
+            )) as Box<dyn DomainEvent>);
+        }
+        
+        for event in events {
+            self.add_event(event);
+        }
+        
+        for event in events {
+            self.add_event(event);
         }
         
         self.version += 1;
@@ -603,6 +594,29 @@ impl RevenueSharingAggregate {
         
         self.version += 1;
         Ok(())
+    }
+    
+    pub fn add_payment(&mut self, payment: PaymentAggregate) {
+        self.payments.push(payment);
+    }
+    
+    pub fn shareholders(&self) -> std::collections::hash_map::Values<Uuid, ShareholderDistribution> {
+        self.shareholder_distributions.values()
+    }
+    
+    pub fn complete_distribution(&mut self) -> Result<(), AppError> {
+        self.status = RevenueSharingStatus::Completed;
+        self.version += 1;
+        Ok(())
+    }
+    
+    pub fn total_distributed(&self) -> Amount {
+        let mut total = 0.0;
+        for dist in self.shareholder_distributions.values() {
+            total += dist.distribution_amount.value();
+        }
+        // Assuming same currency as total_revenue
+        Amount::new(total, self.total_revenue.currency().clone()).unwrap_or(self.total_revenue.clone())
     }
     
     /// Check if all shareholder payments are completed

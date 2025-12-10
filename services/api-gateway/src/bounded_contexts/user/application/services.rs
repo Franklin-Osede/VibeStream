@@ -14,6 +14,7 @@ use crate::bounded_contexts::user::application::handlers::{
     UserCommandHandler, UserQueryHandler,
 };
 use crate::shared::domain::errors::AppError;
+use crate::shared::infrastructure::clients::facial_recognition_client::FacialRecognitionClient;
 use async_trait::async_trait;
 use std::sync::Arc;
 use serde_json::Value;
@@ -41,14 +42,16 @@ impl MockUserApplicationService {
 pub struct UserApplicationService<R: UserRepository> {
     pub(crate) repository: Arc<R>,
     domain_service: Arc<dyn UserDomainService + Send + Sync>,
+    pub facial_client: Option<Arc<FacialRecognitionClient>>,
 }
 
 impl<R: UserRepository + 'static> UserApplicationService<R> {
-    pub fn new(repository: Arc<R>) -> Self {
+    pub fn new(repository: Arc<R>, facial_client: Option<Arc<FacialRecognitionClient>>) -> Self {
         let domain_service = Arc::new(DefaultUserDomainService::new(repository.clone()));
         Self {
             repository,
             domain_service,
+            facial_client,
         }
     }
 

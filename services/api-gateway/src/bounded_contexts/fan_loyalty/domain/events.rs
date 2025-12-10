@@ -62,6 +62,19 @@ pub struct NftMintedEvent {
     pub minted_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QrCodeScannedEvent {
+    #[serde(default)]
+    pub qr_code: String,
+    pub wristband_id: Option<WristbandId>,
+    pub fan_id: Option<FanId>,
+    #[serde(default)]
+    pub scanner_id: String,
+    pub location: Option<crate::bounded_contexts::fan_loyalty::domain::services::LocationData>,
+    pub access_granted: bool,
+    pub scanned_at: DateTime<Utc>,
+}
+
 // ============================================================================
 // EVENT TRAITS
 // ============================================================================
@@ -128,6 +141,16 @@ impl DomainEvent for NftMintedEvent {
     
     fn occurred_at(&self) -> DateTime<Utc> {
         self.minted_at
+    }
+}
+
+impl DomainEvent for QrCodeScannedEvent {
+    fn event_type(&self) -> String {
+        "QrCodeScanned".to_string()
+    }
+    
+    fn occurred_at(&self) -> DateTime<Utc> {
+        self.scanned_at
     }
 }
 

@@ -287,48 +287,13 @@ pub struct ZkProofStatus {
 // DOMAIN EVENTS
 // ============================================================================
 
-/// Fan verified event
-#[derive(Debug, Clone)]
-pub struct FanVerifiedEvent {
-    pub fan_id: FanId,
-    pub verification_id: String,
-    pub confidence_score: f32,
-    pub wristband_eligible: bool,
-    pub benefits_unlocked: Vec<String>,
-    pub occurred_at: DateTime<Utc>,
-}
+// ============================================================================
+// DOMAIN EVENTS
+// ============================================================================
 
-/// Wristband created event
-#[derive(Debug, Clone)]
-pub struct WristbandCreatedEvent {
-    pub wristband_id: WristbandId,
-    pub fan_id: FanId,
-    pub concert_id: Uuid,
-    pub artist_id: Uuid,
-    pub wristband_type: WristbandType,
-    pub created_at: DateTime<Utc>,
-}
-
-/// Wristband activated event
-#[derive(Debug, Clone)]
-pub struct WristbandActivatedEvent {
-    pub wristband_id: WristbandId,
-    pub fan_id: FanId,
-    pub activation_reason: String,
-    pub activated_at: DateTime<Utc>,
-}
-
-/// QR code scanned event
-#[derive(Debug, Clone)]
-pub struct QrCodeScannedEvent {
-    pub qr_code: String,
-    pub wristband_id: Option<WristbandId>,
-    pub fan_id: Option<FanId>,
-    pub scanner_id: String,
-    pub location: Option<LocationData>,
-    pub access_granted: bool,
-    pub scanned_at: DateTime<Utc>,
-}
+pub use crate::bounded_contexts::fan_loyalty::domain::events::{
+    FanVerifiedEvent, WristbandCreatedEvent, WristbandActivatedEvent, QrCodeScannedEvent,
+};
 
 #[cfg(test)]
 mod tests {

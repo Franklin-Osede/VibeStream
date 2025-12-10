@@ -364,8 +364,28 @@ pub struct MockEventPublisher;
 
 #[async_trait]
 impl EventPublisher for MockEventPublisher {
-    async fn publish(&self, event: DomainEvent) -> Result<(), AppError> {
-        println!("Mock: Publishing event: {:?}", event.event_type());
+    async fn publish_fan_verified(&self, event: &crate::bounded_contexts::fan_loyalty::domain::services::FanVerifiedEvent) -> Result<(), String> {
+        println!("Mock: Publishing FanVerifiedEvent for fan: {:?}", event.fan_id);
+        Ok(())
+    }
+
+    async fn publish_wristband_created(&self, event: &crate::bounded_contexts::fan_loyalty::domain::services::WristbandCreatedEvent) -> Result<(), String> {
+        println!("Mock: Publishing WristbandCreatedEvent for wristband: {:?}", event.wristband_id);
+        Ok(())
+    }
+
+    async fn publish_wristband_activated(&self, event: &crate::bounded_contexts::fan_loyalty::domain::services::WristbandActivatedEvent) -> Result<(), String> {
+        println!("Mock: Publishing WristbandActivatedEvent for wristband: {:?}", event.wristband_id);
+        Ok(())
+    }
+
+    async fn publish_qr_code_scanned(&self, event: &crate::bounded_contexts::fan_loyalty::domain::services::QrCodeScannedEvent) -> Result<(), String> {
+        println!("Mock: Publishing QrCodeScannedEvent for code: {:?}", event.qr_code);
+        Ok(())
+    }
+
+    async fn publish(&self, event: &str) -> Result<(), String> {
+        println!("Mock: Publishing generic event: {}", event);
         Ok(())
     }
 }

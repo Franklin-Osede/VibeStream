@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO payment_batches (\n                id, batch_type, total_amount_value, total_amount_currency, payment_count, \n                successful_payments, failed_payments, status, created_at, \n                completed_at, processing_duration_ms\n            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)\n            ON CONFLICT (id) DO UPDATE SET\n                successful_payments = EXCLUDED.successful_payments,\n                failed_payments = EXCLUDED.failed_payments,\n                status = EXCLUDED.status,\n                completed_at = EXCLUDED.completed_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Numeric",
+        "Varchar",
+        "Int4",
+        "Int4",
+        "Int4",
+        "Varchar",
+        "Timestamptz",
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a40b96c3954ecd809390ba612709dc7e9f500361c6088779fef9163f777493c9"
+}

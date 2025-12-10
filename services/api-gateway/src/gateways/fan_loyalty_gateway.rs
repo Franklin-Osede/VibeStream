@@ -20,10 +20,15 @@ use crate::bounded_contexts::fan_loyalty::infrastructure::api_handlers::create_f
 
 /// Crear el gateway para Fan Loyalty System
 pub async fn create_fan_loyalty_gateway(app_state: AppState) -> Result<Router, Box<dyn std::error::Error>> {
+    // Get Redis URL from env or use default
+    let redis_url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".to_string());
+    let redis_client = redis::Client::open(redis_url).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+
     // Crear container de dependency injection para Fan Loyalty con PostgreSQL
     let fan_loyalty_container = RealFanLoyaltyFactory::create_container(
-        app_state.database_pool.clone(),
-        app_state.event_bus.clone(),
+        app_state.database_pool.get_pool().clone(),
+        redis_client,
+        app_state.blockchain_client.clone(),
     );
 
     // Crear router principal con API handlers
@@ -34,7 +39,7 @@ pub async fn create_fan_loyalty_gateway(app_state: AppState) -> Result<Router, B
         .route("/health", get(health_check))
         .route("/info", get(info))
         .nest("/api/v1", api_router)
-        .with_state(fan_loyalty_container);
+        .nest("/api/v1", api_router);
 
     Ok(router)
 }

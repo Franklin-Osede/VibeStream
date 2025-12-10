@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO fan_investments (\n                id, fan_id, venture_id, investment_amount, investment_type, status,\n                created_at, updated_at\n            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)\n            ON CONFLICT (id) DO UPDATE SET\n                investment_amount = EXCLUDED.investment_amount,\n                investment_type = EXCLUDED.investment_type,\n                status = EXCLUDED.status,\n                updated_at = EXCLUDED.updated_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Float8",
+        "Varchar",
+        "Varchar",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cb3658de14a0b02ff2f67d212c9b69552428200da6229206004145a4a5eb6bef"
+}

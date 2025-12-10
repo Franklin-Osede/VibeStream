@@ -19,8 +19,11 @@ use crate::bounded_contexts::fan_loyalty::infrastructure::postgres_repositories:
 };
 use crate::bounded_contexts::fan_loyalty::infrastructure::mock_services::{
     MockBiometricVerificationService, MockWristbandService, MockQrCodeService, 
-    MockNftService, MockZkProofService, MockEventPublisher
+    MockZkProofService, MockEventPublisher
 };
+
+use crate::bounded_contexts::fan_loyalty::infrastructure::nft_service::BlockchainNftService;
+use crate::shared::infrastructure::clients::blockchain_client::BlockchainClient;
 
 /// Real Dependency Injection Container for Fan Loyalty System
 #[derive(Clone)]
@@ -32,7 +35,7 @@ pub struct RealFanLoyaltyContainer {
     pub zk_proof_repository: Arc<dyn ZkProofRepository>,
     pub nft_repository: Arc<dyn NftRepository>,
 
-    // Services (Mock implementations for now, can be replaced with real ones)
+    // Services
     pub biometric_verification_service: Arc<dyn BiometricVerificationService>,
     pub wristband_service: Arc<dyn WristbandService>,
     pub qr_code_service: Arc<dyn QrCodeService>,
@@ -43,7 +46,7 @@ pub struct RealFanLoyaltyContainer {
 
 impl RealFanLoyaltyContainer {
     /// Create new real container with PostgreSQL repositories
-    pub fn new(pool: PgPool, _redis_client: Client) -> Self {
+    pub fn new(pool: PgPool, _redis_client: Client, blockchain_client: Arc<BlockchainClient>) -> Self {
         // Create real PostgreSQL repositories
         let fan_verification_repository = Arc::new(PostgresFanVerificationRepository::new(pool.clone()));
         let wristband_repository = Arc::new(PostgresWristbandRepository::new(pool.clone()));
@@ -55,7 +58,15 @@ impl RealFanLoyaltyContainer {
         let biometric_verification_service = Arc::new(MockBiometricVerificationService);
         let event_publisher = Arc::new(MockEventPublisher);
         
-        let nft_service = Arc::new(MockNftService::new(nft_repository.clone(), event_publisher.clone()));
+        // Use real BlockchainNftService
+        let contract_address = std::env::var("WRISTBAND_CONTRACT_ADDRESS")
+            .unwrap_or_else(|_| "0x1234567890abcdef1234567890abcdef12345678".to_string());
+            
+        let nft_service_impl = BlockchainNftService::new(
+            blockchain_client,
+            contract_address,
+        );
+        let nft_service = Arc::new(nft_service_impl);
         
         let wristband_service = Arc::new(MockWristbandService::new(
             wristband_repository.clone(),
@@ -65,11 +76,6 @@ impl RealFanLoyaltyContainer {
         
         let qr_code_service = Arc::new(MockQrCodeService::new(
             qr_code_repository.clone(),
-            event_publisher.clone(),
-        ));
-        
-        let nft_service = Arc::new(MockNftService::new(
-            nft_repository.clone(),
             event_publisher.clone(),
         ));
         
@@ -98,7 +104,7 @@ impl RealFanLoyaltyContainer {
 pub struct RealFanLoyaltyFactory;
 
 impl RealFanLoyaltyFactory {
-    pub fn create_container(pool: PgPool, redis_client: Client) -> Arc<RealFanLoyaltyContainer> {
-        Arc::new(RealFanLoyaltyContainer::new(pool, redis_client))
+    pub fn create_container(pool: PgPool, redis_client: Client, blockchain_client: Arc<BlockchainClient>) -> Arc<RealFanLoyaltyContainer> {
+        Arc::new(RealFanLoyaltyContainer::new(pool, redis_client, blockchain_client))
     }
 }

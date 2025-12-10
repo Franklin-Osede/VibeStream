@@ -108,6 +108,8 @@ impl Amount {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum Currency {
     USD,
+    EUR,
+    GBP,
     ETH,
     SOL,
     USDC,
@@ -118,6 +120,8 @@ impl Currency {
     pub fn symbol(&self) -> &'static str {
         match self {
             Currency::USD => "$",
+            Currency::EUR => "€",
+            Currency::GBP => "£",
             Currency::ETH => "Ξ",
             Currency::SOL => "◎",
             Currency::USDC => "USDC",
@@ -271,7 +275,7 @@ impl TransactionHash {
 }
 
 /// Payment Purpose - why the payment is being made
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum PaymentPurpose {
     /// Purchase of campaign NFT
     NFTPurchase {
@@ -376,7 +380,7 @@ pub enum PaymentCategory {
 }
 
 /// Payment Status Value Object
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum PaymentStatus {
     /// Payment has been initiated but not yet processed
     Pending,
@@ -570,7 +574,7 @@ impl PlatformFees {
         let fee_amount = amount.value() * (fee_percentage / 100.0);
         let total_fee = fee_amount + self.payment_fixed_fee;
         
-        Amount::new(total_fee, amount.currency())
+        Amount::new(total_fee, amount.currency().clone()).map_err(|e| e.to_string())
     }
     
     /// Calculate net amount after platform fees
@@ -582,7 +586,7 @@ impl PlatformFees {
             return Err("Platform fee exceeds gross amount".to_string());
         }
         
-        Amount::new(net_value, gross_amount.currency())
+        Amount::new(net_value, gross_amount.currency().clone()).map_err(|e| e.to_string())
     }
 }
 
@@ -652,17 +656,17 @@ impl DynamicFeeConfig {
     }
     
     /// Get appropriate fees for a specific user
-    pub fn get_user_fees(&self, user_id: &Uuid) -> &PlatformFees {
+    pub fn get_user_fees(&self, user_id: &Uuid) -> PlatformFees {
         if self.is_grandfathered(user_id) {
             // Return previous phase fees for grandfathered users
             match self.phase {
-                PlatformPhase::Growth => &PlatformFees::launch_phase(),
-                PlatformPhase::Scale => &PlatformFees::growth_phase(),
-                PlatformPhase::Mature => &PlatformFees::scale_phase(),
-                _ => &self.fees,
+                PlatformPhase::Growth => PlatformFees::launch_phase(),
+                PlatformPhase::Scale => PlatformFees::growth_phase(),
+                PlatformPhase::Mature => PlatformFees::scale_phase(),
+                _ => self.fees.clone(),
             }
         } else {
-            &self.fees
+            self.fees.clone()
         }
     }
     

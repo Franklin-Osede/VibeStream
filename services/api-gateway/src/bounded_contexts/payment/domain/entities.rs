@@ -51,7 +51,7 @@ impl Payment {
             transaction_id: None,
             payer_id,
             payee_id,
-            amount,
+            amount: amount.clone(),
             payment_method,
             purpose: purpose.clone(),
             status: PaymentStatus::Pending,
@@ -329,6 +329,9 @@ impl RoyaltyDistribution {
     pub fn platform_fee(&self) -> &Amount { &self.platform_fee }
     pub fn status(&self) -> &DistributionStatus { &self.status }
     pub fn payments(&self) -> &[PaymentId] { &self.payments }
+    pub fn period_start(&self) -> DateTime<Utc> { self.period_start }
+    pub fn period_end(&self) -> DateTime<Utc> { self.period_end }
+    pub fn created_at(&self) -> DateTime<Utc> { self.created_at }
 }
 
 /// Payment Batch Entity - for processing multiple payments together
@@ -397,6 +400,11 @@ impl PaymentBatch {
     
     pub fn fail(&mut self) {
         self.status = BatchStatus::Failed;
+    }
+
+    pub fn partially_complete(&mut self) {
+        self.status = BatchStatus::PartiallyCompleted;
+        self.completed_at = Some(Utc::now());
     }
     
     // Getters

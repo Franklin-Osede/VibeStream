@@ -172,7 +172,7 @@ impl PaymentApplicationService {
         let mut failed_payments = 0;
         let start_time = std::time::Instant::now();
         
-        for payment_id in batch_aggregate.payment_ids() {
+        for payment_id in batch_aggregate.payments() {
             match self.process_payment_end_to_end(*payment_id).await {
                 Ok(_) => successful_payments += 1,
                 Err(e) => {
@@ -187,9 +187,9 @@ impl PaymentApplicationService {
         // 3. Update batch status
         let mut batch_aggregate = batch_aggregate;
         if failed_payments == 0 {
-            batch_aggregate.complete_batch()?;
+            batch_aggregate.complete();
         } else {
-            batch_aggregate.partially_complete_batch(successful_payments, failed_payments)?;
+            batch_aggregate.partially_complete();
         }
         
         // 4. Save batch
@@ -197,7 +197,7 @@ impl PaymentApplicationService {
         
         Ok(PaymentBatchResult {
             batch_id,
-            total_payments: batch_aggregate.payment_ids().len() as u32,
+            total_payments: batch_aggregate.payments().len() as u32,
             total_amount: batch_aggregate.total_amount().value(),
             status: format!("{:?}", batch_aggregate.status()),
             created_at: batch_aggregate.created_at(),
@@ -230,7 +230,7 @@ impl PaymentApplicationService {
         self.payment_repository.save(&original_payment).await?;
         
         // 5. Process refund through payment gateway
-        let refund_result = self.payment_processing_service.process_refund(&original_payment, &refund_amount).await?;
+        let refund_result = self.payment_processing_service.process_refund(&original_payment, &refund_amount).await.map_err(|e| AppError::PaymentGatewayError(e.to_string()))?;
         
         // 6. Update refund status
         if refund_result.success {
@@ -248,7 +248,7 @@ impl PaymentApplicationService {
         }
         
         Ok(crate::bounded_contexts::payment::application::commands::RefundResult {
-            refund_payment_id: *refund_payment_id.value(),
+            refund_payment_id: refund_payment_id.value(),
             original_payment_id: refund_command.original_payment_id,
             refund_amount: refund_command.refund_amount,
             status: if refund_result.success { "Completed" } else { "Failed" }.to_string(),
@@ -312,7 +312,7 @@ impl RoyaltyDistributionApplicationService {
                 self.notification_service.clone(),
             );
             
-            payment_service.process_payment_end_to_end(*payment_aggregate.payment().id().value()).await?;
+            payment_service.process_payment_end_to_end(payment_aggregate.payment().id().value()).await?;
         }
         
         // 7. Complete distribution
@@ -447,7 +447,7 @@ impl RevenueSharingApplicationService {
                 self.notification_service.clone(),
             );
             
-            payment_service.process_payment_end_to_end(*payment_aggregate.payment().id().value()).await?;
+            payment_service.process_payment_end_to_end(payment_aggregate.payment().id().value()).await?;
         }
         
         // 7. Complete distribution
@@ -458,11 +458,11 @@ impl RevenueSharingApplicationService {
         self.notification_service.send_revenue_sharing_completed_notification(&distribution_aggregate).await?;
         
         Ok(RevenueSharingResult {
-            distribution_id: distribution_aggregate.distribution().id(),
+            distribution_id: distribution_aggregate.distribution_id(),
             total_shareholders: distribution_aggregate.shareholders().len() as u32,
             total_distributed: distribution_aggregate.total_distributed().value(),
             status: format!("{:?}", distribution_aggregate.distribution().status()),
-            created_at: distribution_aggregate.distribution().created_at,
+            created_at: distribution_aggregate.distribution().created_at(),
         })
     }
     

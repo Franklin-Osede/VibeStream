@@ -1,0 +1,33 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO payments (\n                id, payer_id, payee_id, amount_value, amount_currency, net_amount_value, net_amount_currency, \n                platform_fee_value, platform_fee_currency, payment_method_details, payment_method_type, \n                purpose_details, purpose_type, status, \n                blockchain_hash, created_at, updated_at, completed_at,\n                failure_reason, metadata\n            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)\n            ON CONFLICT (id) DO UPDATE SET\n                status = EXCLUDED.status,\n                blockchain_hash = EXCLUDED.blockchain_hash,\n                updated_at = EXCLUDED.updated_at,\n                completed_at = EXCLUDED.completed_at,\n                failure_reason = EXCLUDED.failure_reason",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Numeric",
+        "Varchar",
+        "Numeric",
+        "Varchar",
+        "Numeric",
+        "Varchar",
+        "Jsonb",
+        "Varchar",
+        "Jsonb",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz",
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "06cdfd1492c9b2e63c0a81acf224b197ebda22fe5a3c0b5b0fca412bba9f93f2"
+}

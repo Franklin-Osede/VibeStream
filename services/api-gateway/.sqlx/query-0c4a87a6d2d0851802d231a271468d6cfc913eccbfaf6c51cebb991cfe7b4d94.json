@@ -1,12 +1,12 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT 1 as test",
+  "query": "SELECT COUNT(*) as count FROM payments",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "test",
-        "type_info": "Int4"
+        "name": "count",
+        "type_info": "Int8"
       }
     ],
     "parameters": {
@@ -16,5 +16,5 @@
       null
     ]
   },
-  "hash": "dbfb19a9bfc3a4aaa367c5e44698718392f36f4dc4ccff6f371c0a3a1674db18"
+  "hash": "0c4a87a6d2d0851802d231a271468d6cfc913eccbfaf6c51cebb991cfe7b4d94"
 }

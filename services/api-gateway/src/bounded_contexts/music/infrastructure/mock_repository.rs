@@ -48,4 +48,6 @@ impl SongRepository for MockMusicRepository {
     }
     async fn count_by_artist(&self, _artist_id: &crate::bounded_contexts::music::domain::value_objects::ArtistId) -> RepositoryResult<usize> { Ok(0) }
     async fn get_total_listens(&self) -> RepositoryResult<u64> { Ok(0) }
+    async fn find_all(&self, _limit: usize, _offset: usize) -> RepositoryResult<Vec<Song>> { Ok(vec![]) }
+    async fn count(&self) -> RepositoryResult<usize> { Ok(0) }
 } 

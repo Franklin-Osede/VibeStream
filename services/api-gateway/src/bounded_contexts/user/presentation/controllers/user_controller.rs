@@ -24,6 +24,8 @@ use crate::bounded_contexts::user::application::{
 use crate::shared::infrastructure::database::postgres::PostgresUserRepository;
 use crate::shared::infrastructure::auth::{JwtService, PasswordService, AuthenticatedUser};
 use crate::shared::domain::errors::AppError;
+use crate::bounded_contexts::user::domain::repository::UserRepository;
+use crate::shared::infrastructure::clients::facial_recognition_client::VerifyFaceResponse;
 
 // Type alias para simplificar el estado
 type UserAppService = UserApplicationService<PostgresUserRepository>;
@@ -153,6 +155,11 @@ pub struct LinkWalletRequest {
     pub wallet_address: String,
     pub signature: Option<String>,
     pub message: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct VerifyBiometricsRequest {
+    pub image: String, // base64
 }
 
 // Use the query parameters directly without defining a new struct
@@ -801,6 +808,44 @@ pub async fn change_password(
     }))
 }
 
+/// POST /api/v1/users/biometrics/verify
+/// Verify user biometrics (face)
+#[utoipa::path(
+    post,
+    path = "/api/v1/users/biometrics/verify",
+    request_body = VerifyBiometricsRequest,
+    responses(
+        (status = 200, description = "Verification successful", body = ApiResponse<VerifyFaceResponse>),
+        (status = 503, description = "Service unavailable", body = ApiResponse<serde_json::Value>)
+    ),
+    tag = "users"
+)]
+#[axum::debug_handler]
+pub async fn verify_biometrics(
+    AuthenticatedUser { user_id, .. }: AuthenticatedUser,
+    State(user_service): State<UserAppService>,
+    Json(request): Json<VerifyBiometricsRequest>,
+) -> Result<Json<ApiResponse<VerifyFaceResponse>>, StatusCode> {
+    let client = user_service.facial_client.as_ref()
+        .ok_or_else(|| {
+             eprintln!("Facial client not configured");
+             StatusCode::SERVICE_UNAVAILABLE
+        })?;
+
+    let result = client.verify_face(user_id, request.image).await
+        .map_err(|e| {
+            eprintln!("Error verifying face: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    Ok(Json(ApiResponse {
+        success: true,
+        data: Some(result),
+        message: Some("Biometric verification completed".to_string()),
+        errors: None,
+    }))
+}
+
 /// POST /api/v1/users/{user_id}/link-wallet
 /// Link wallet to user account
 #[axum::debug_handler]
@@ -918,13 +963,13 @@ pub async fn get_user_followers(
             id: summary.id.value(),
             username: summary.username.value().to_string(),
             display_name: summary.display_name.clone(),
-            avatar_url: summary.avatar_url.as_ref().map(|url| url.value().to_string()),
+            avatar_url: summary.avatar_url.clone(),
             tier: format!("{}", summary.tier),
             role: format!("{}", summary.role),
             is_verified: summary.is_verified,
             is_active: summary.is_active,
-            tier_points: summary.tier_points.unwrap_or(0),
-            total_rewards: summary.total_rewards.unwrap_or(0.0),
+            tier_points: summary.tier_points.max(0) as u32,
+            total_rewards: summary.total_rewards,
             created_at: summary.created_at,
         }
     }).collect();
@@ -978,13 +1023,13 @@ pub async fn get_user_following(
             id: summary.id.value(),
             username: summary.username.value().to_string(),
             display_name: summary.display_name.clone(),
-            avatar_url: summary.avatar_url.as_ref().map(|url| url.value().to_string()),
+            avatar_url: summary.avatar_url.clone(),
             tier: format!("{}", summary.tier),
             role: format!("{}", summary.role),
             is_verified: summary.is_verified,
             is_active: summary.is_active,
-            tier_points: summary.tier_points.unwrap_or(0),
-            total_rewards: summary.total_rewards.unwrap_or(0.0),
+            tier_points: summary.tier_points.max(0) as u32,
+            total_rewards: summary.total_rewards,
             created_at: summary.created_at,
         }
     }).collect();

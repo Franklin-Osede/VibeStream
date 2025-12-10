@@ -43,6 +43,9 @@ pub fn configure_user_routes(
         // Account Management
         .route("/:user_id/change-password", post(change_password))
         .route("/:user_id/link-wallet", post(link_wallet))
+
+        // Biometrics
+        .route("/biometrics/verify", post(verify_biometrics))
         
         // Admin Analytics
         .route("/analytics", get(get_user_analytics))

@@ -1,0 +1,178 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT * FROM payments WHERE metadata->>'idempotency_key' = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "transaction_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "payer_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "payee_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "amount_value",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "amount_currency",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "payment_method_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "payment_method_details",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 8,
+        "name": "purpose_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
+        "name": "purpose_details",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 10,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 11,
+        "name": "status_details",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 12,
+        "name": "blockchain_hash",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 13,
+        "name": "blockchain_network",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 14,
+        "name": "platform_fee_value",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 15,
+        "name": "platform_fee_currency",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 16,
+        "name": "net_amount_value",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 17,
+        "name": "net_amount_currency",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 18,
+        "name": "metadata",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 19,
+        "name": "failure_reason",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 20,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 21,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 22,
+        "name": "completed_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 23,
+        "name": "version",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 24,
+        "name": "purpose_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 25,
+        "name": "gas_fee",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 26,
+        "name": "exchange_rate",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "6337731c4858fa27350b8df541ff2b6b4b9637d60835088b0c314b34ec8d369c"
+}

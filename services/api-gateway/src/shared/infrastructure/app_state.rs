@@ -2,6 +2,9 @@ use std::sync::Arc;
 use crate::services::{MessageQueue, DatabasePool};
 use crate::bounded_contexts::orchestrator::{EventBus, DomainEvent, RedisStreamsEventBus, RedisStreamsEventWorker};
 use crate::bounded_contexts::music::domain::repositories::{AlbumRepository, PlaylistRepository};
+use crate::shared::infrastructure::clients::facial_recognition_client::FacialRecognitionClient;
+use crate::shared::infrastructure::clients::zk_service_client::ZkServiceClient;
+use crate::shared::infrastructure::clients::blockchain_client::{BlockchainClient, BlockchainConfig};
 
 // =============================================================================
 // SIMPLIFIED APP STATE - Separado por contexto para reducir acoplamiento
@@ -24,6 +27,12 @@ pub struct AppState {
     // Worker para procesar eventos de Redis Streams (opcional, solo si usamos Redis Streams)
     // No se clona porque JoinHandle no es clonable, pero el worker sigue corriendo en background
     _event_worker_handle: Option<tokio::task::JoinHandle<()>>,
+    pub facial_client: Arc<FacialRecognitionClient>,
+    pub zk_client: Arc<ZkServiceClient>,
+    pub blockchain_client: Arc<BlockchainClient>,
+    
+    // Config
+    pub env: String,
 }
 
 impl Clone for AppState {
@@ -34,6 +43,10 @@ impl Clone for AppState {
             database_pool: self.database_pool.clone(),
             event_bus: Arc::clone(&self.event_bus),
             _event_worker_handle: None, // No clonamos el handle, pero el worker sigue activo
+            facial_client: self.facial_client.clone(),
+            zk_client: self.zk_client.clone(),
+            blockchain_client: self.blockchain_client.clone(),
+            env: self.env.clone(),
         }
     }
 }
@@ -61,11 +74,47 @@ impl AppState {
             .await
             .map_err(|e| format!("Failed to create Redis Streams Event Bus: {}", e))?;
         
+        let facial_client = Arc::new(FacialRecognitionClient::new(
+            std::env::var("FACIAL_SERVICE_URL").unwrap_or_else(|_| "http://localhost:8004".to_string())
+        ));
+        
+        let zk_client = Arc::new(ZkServiceClient::new(
+            std::env::var("ZK_SERVICE_URL").unwrap_or_else(|_| "http://localhost:8003".to_string())
+        ));
+
+        // Initialize Blockchain Client (Omnichain)
+        let blockchain_rpc_url = std::env::var("BLOCKCHAIN_RPC_URL")
+            .or_else(|_| std::env::var("ETHEREUM_RPC_URL"))
+            .unwrap_or_else(|_| "http://localhost:8545".to_string());
+            
+        let blockchain_chain_id = std::env::var("BLOCKCHAIN_CHAIN_ID")
+            .map(|s| s.parse().unwrap_or(1337))
+            .unwrap_or(1337);
+            
+        let blockchain_private_key = std::env::var("BLOCKCHAIN_PRIVATE_KEY")
+            .or_else(|_| std::env::var("OPERATOR_PRIVATE_KEY"))
+            .ok();
+
+        let blockchain_config = BlockchainConfig {
+            rpc_url: blockchain_rpc_url,
+            chain_id: blockchain_chain_id,
+            private_key: blockchain_private_key,
+        };
+
+        let blockchain_client = Arc::new(BlockchainClient::new(blockchain_config).await
+            .map_err(|e| format!("Failed to create blockchain client: {}", e))?);
+
+        let env = std::env::var("APP_ENV").unwrap_or_else(|_| "development".to_string());
+        
         let app_state = Self {
             message_queue,
             database_pool,
             event_bus,
             _event_worker_handle: event_worker_handle,
+            facial_client,
+            zk_client,
+            blockchain_client,
+            env,
         };
         
         // Ejecutar migraciones automáticamente si está habilitado

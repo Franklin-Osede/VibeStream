@@ -8,13 +8,12 @@
 use api_gateway::gateways::{
     create_user_gateway, create_music_gateway, create_payment_gateway,
     create_fan_loyalty_gateway,
+    create_fan_loyalty_gateway,
+    create_campaign_gateway,
+    create_fan_ventures_gateway,
     // Gateways mock deshabilitados por defecto (solo con feature flag)
     #[cfg(feature = "enable_mock_gateways")]
-    create_campaign_gateway,
-    #[cfg(feature = "enable_mock_gateways")]
     create_listen_reward_gateway,
-    #[cfg(feature = "enable_mock_gateways")]
-    create_fan_ventures_gateway,
     #[cfg(feature = "enable_mock_gateways")]
     create_notification_gateway,
 };
@@ -58,12 +57,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // ❌ MOCK - Gateways deshabilitados hasta que estén implementados
     // Estos gateways retornan solo {"message": "TODO"} y no deben ser expuestos al frontend
-    #[cfg(feature = "enable_mock_gateways")]
+    // ❌ MOCK / ACTIVATED
+    
+    // Phase 1: Real Implementation Activated
     let campaign_gateway = create_campaign_gateway(app_state.clone()).await?;
+    let fan_ventures_gateway = create_fan_ventures_gateway(app_state.clone()).await?;
+
     #[cfg(feature = "enable_mock_gateways")]
     let listen_reward_gateway = create_listen_reward_gateway(app_state.clone()).await?;
-    #[cfg(feature = "enable_mock_gateways")]
-    let fan_ventures_gateway = create_fan_ventures_gateway(app_state.clone()).await?;
     #[cfg(feature = "enable_mock_gateways")]
     let notification_gateway = create_notification_gateway(app_state.clone()).await?;
     
@@ -100,12 +101,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // ❌ MOCK - Gateways deshabilitados (solo disponibles con feature flag)
         // Estos gateways retornan {"message": "TODO"} y no deben ser usados por el frontend
         // Ver API_CONTRACT.md para más detalles
-        #[cfg(feature = "enable_mock_gateways")]
+        // ❌ MOCK - Gateways deshabilitados (solo disponibles con feature flag)
+        // Estos gateways retornan {"message": "TODO"} y no deben ser usados por el frontend
+        // Ver API_CONTRACT.md para más detalles
+        
+        // ACTIVATED - Phase 1 Integration
         .nest("/api/v1/campaigns", campaign_gateway)
+        .nest("/api/v1/fan-ventures", fan_ventures_gateway)
+        
         #[cfg(feature = "enable_mock_gateways")]
         .nest("/api/v1/listen-rewards", listen_reward_gateway)
-        #[cfg(feature = "enable_mock_gateways")]
-        .nest("/api/v1/fan-ventures", fan_ventures_gateway)
         #[cfg(feature = "enable_mock_gateways")]
         .nest("/api/v1/notifications", notification_gateway)
         

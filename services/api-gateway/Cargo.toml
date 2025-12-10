@@ -76,6 +76,7 @@ rand = "0.8"
 # Regex and utilities
 regex = "1.0"
 lazy_static = "1.4"
+ethers = { version = "2.0", features = ["ws", "rustls", "abigen"] }
 
 # Database
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "json", "migrate", "bigdecimal"] }

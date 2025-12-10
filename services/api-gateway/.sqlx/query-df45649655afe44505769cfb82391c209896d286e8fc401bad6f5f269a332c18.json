@@ -1,0 +1,88 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT * FROM payment_batches WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "batch_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "total_amount_value",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 3,
+        "name": "total_amount_currency",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "payment_count",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "processed_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "completed_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "successful_payments",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 10,
+        "name": "failed_payments",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 11,
+        "name": "processing_duration_ms",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "df45649655afe44505769cfb82391c209896d286e8fc401bad6f5f269a332c18"
+}

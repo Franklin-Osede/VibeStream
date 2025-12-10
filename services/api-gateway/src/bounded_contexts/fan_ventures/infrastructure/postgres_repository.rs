@@ -393,7 +393,7 @@ benefits: vec![], // TODO: Load benefits separately
             VentureTier {
                 id: row.id,
                 venture_id: row.venture_id,
-                name: row.name,
+                tier_name: row.name,
                 min_investment: row.min_investment,
                 max_investment: row.max_investment,
                 description: row.description,
@@ -435,7 +435,7 @@ benefits: serde_json::from_value(row.benefits.unwrap_or(serde_json::Value::Null)
             let tier = VentureTier {
                 id: row.id,
                 venture_id: row.venture_id,
-                name: row.name,
+                tier_name: row.name,
                 min_investment: row.min_investment,
                 max_investment: row.max_investment,
                 description: row.description,

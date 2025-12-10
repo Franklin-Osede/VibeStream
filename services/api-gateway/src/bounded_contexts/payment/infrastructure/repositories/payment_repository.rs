@@ -137,9 +137,7 @@ impl PaymentRepository for PostgreSQLPaymentRepository {
     
     async fn find_by_transaction_id(&self, transaction_id: &TransactionId) -> Result<Option<PaymentAggregate>, AppError> {
         let payment_row = sqlx::query!(
-            "SELECT p.* FROM payments p 
-             JOIN transactions t ON p.id = t.payment_id 
-             WHERE t.id = $1",
+            "SELECT * FROM payments WHERE transaction_id = $1",
             transaction_id.value()
         )
         .fetch_optional(&self.pool)
@@ -455,7 +453,7 @@ impl PaymentRepository for PostgreSQLPaymentRepository {
 impl PostgreSQLPaymentRepository {
     async fn load_payment_events(&self, payment_id: &PaymentId) -> Result<Vec<PaymentEvent>, AppError> {
         let rows = sqlx::query!(
-            "SELECT * FROM payment_events WHERE payment_id = $1 ORDER BY occurred_at",
+            "SELECT * FROM payment_events WHERE aggregate_id = $1 AND aggregate_type = 'Payment' ORDER BY occurred_at",
             payment_id.value()
         )
         .fetch_all(&self.pool)
@@ -466,7 +464,7 @@ impl PostgreSQLPaymentRepository {
         for row in rows {
             let event = PaymentEvent::new(
                 row.id,
-                PaymentId::from_uuid(row.payment_id),
+                PaymentId::from_uuid(row.aggregate_id),
                 PaymentEventType::PaymentInitiated, // Simplified
                 serde_json::from_value(row.event_data).unwrap_or(serde_json::Value::Null),
                 row.occurred_at,

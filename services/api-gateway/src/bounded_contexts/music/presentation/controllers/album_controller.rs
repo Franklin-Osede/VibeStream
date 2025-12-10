@@ -9,6 +9,7 @@ use chrono::{DateTime, Utc};
 
 use crate::shared::infrastructure::app_state::MusicAppState;
 use crate::shared::infrastructure::auth::AuthenticatedUser;
+use crate::bounded_contexts::music::domain::repositories::AlbumRepository;
 
 // =============================================================================
 // REQUEST/RESPONSE DTOs

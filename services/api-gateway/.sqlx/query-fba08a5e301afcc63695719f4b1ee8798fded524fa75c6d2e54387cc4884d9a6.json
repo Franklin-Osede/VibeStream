@@ -1,0 +1,136 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, artist_id, title, description, category, tags, risk_level,\n                      expected_return, artist_rating, artist_previous_ventures, artist_success_rate,\n                      funding_goal, current_funding, min_investment, max_investment, status,\n                      start_date, end_date, created_at, updated_at\n               FROM artist_ventures \n               WHERE status = 'Open'\n               ORDER BY created_at DESC\n               LIMIT $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "artist_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "category",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "tags",
+        "type_info": "TextArray"
+      },
+      {
+        "ordinal": 6,
+        "name": "risk_level",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "expected_return",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 8,
+        "name": "artist_rating",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 9,
+        "name": "artist_previous_ventures",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 10,
+        "name": "artist_success_rate",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 11,
+        "name": "funding_goal",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 12,
+        "name": "current_funding",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 13,
+        "name": "min_investment",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 14,
+        "name": "max_investment",
+        "type_info": "Float8"
+      },
+      {
+        "ordinal": 15,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 16,
+        "name": "start_date",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 17,
+        "name": "end_date",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 18,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 19,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "fba08a5e301afcc63695719f4b1ee8798fded524fa75c6d2e54387cc4884d9a6"
+}

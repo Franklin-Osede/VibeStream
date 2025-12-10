@@ -244,7 +244,7 @@ impl PaymentGateway for StripeGateway {
                 gateway_message: "Payment succeeded (test mode)".to_string(),
                 processing_time_ms: processing_time,
                 fees_charged: Amount::new(payment.payment().amount().value() * 0.029, payment.payment().amount().currency().clone())
-                    .map_err(|e| AppError::DomainError(e))?,
+                    .map_err(|e| AppError::DomainError(e.to_string()))?,
                 client_secret: None,
             });
         }
@@ -264,7 +264,7 @@ impl PaymentGateway for StripeGateway {
             metadata: json!({
                 "payment_id": payment.payment().id().value(),
                 "purpose": format!("{:?}", payment.payment().purpose()),
-                "user_id": payment.payment().user_id().value(),
+                "user_id": payment.payment().payer_id(),
             }),
             customer: None, // Would be set if customer exists
             description: Some(format!("VibeStream payment for {:?}", payment.payment().purpose())),
@@ -290,7 +290,7 @@ impl PaymentGateway for StripeGateway {
         // Calculate fees (Stripe charges 2.9% + 30 cents)
         let fee_amount = (response.amount as f64 * 0.029) + 30.0;
         let fees_charged = Amount::new(fee_amount / 100.0, payment.payment().amount().currency().clone())
-            .map_err(|e| AppError::DomainError(e))?;
+            .map_err(|e| AppError::DomainError(e.to_string()))?;
 
         Ok(GatewayResult {
             success,

@@ -2,12 +2,13 @@
 // LISTEN REWARD GATEWAY - GESTIÓN DE RECOMPENSAS POR ESCUCHA INDEPENDIENTE
 // =============================================================================
 
-use axum::{Router, routing::{get, post, put, delete}, response::Json as ResponseJson};
+use axum::{Router, routing::{get, post, put, delete}, response::Json as ResponseJson, extract::{State, Json, Path}};
 use serde_json::json;
 use crate::shared::infrastructure::app_state::AppState;
+use crate::shared::infrastructure::clients::zk_service_client::{ZkProof, VerifyProofResponse};
 
 /// Crear el gateway de listen rewards básico
-pub async fn create_listen_reward_gateway(_app_state: AppState) -> Result<Router, Box<dyn std::error::Error>> {
+pub async fn create_listen_reward_gateway(app_state: AppState) -> Result<Router, Box<dyn std::error::Error>> {
     let router = Router::new()
         .route("/health", get(health_check))
         .route("/info", get(gateway_info))
@@ -51,7 +52,7 @@ pub async fn create_listen_reward_gateway(_app_state: AppState) -> Result<Router
         .route("/admin/sessions", get(get_all_sessions_admin))
         .route("/admin/rewards", get(get_all_rewards_admin));
     
-    Ok(router)
+    Ok(router.with_state(app_state))
 }
 
 async fn health_check() -> ResponseJson<serde_json::Value> {
@@ -136,10 +137,26 @@ async fn get_proof() -> ResponseJson<serde_json::Value> {
     }))
 }
 
-async fn verify_proof() -> ResponseJson<serde_json::Value> {
-    ResponseJson(json!({
-        "message": "Verify proof endpoint - TODO: Implement with real service"
-    }))
+#[derive(serde::Deserialize)]
+pub struct VerifyZkProofRequest {
+    pub proof: ZkProof,
+}
+
+async fn verify_proof(
+    State(state): State<AppState>,
+    Json(request): Json<VerifyZkProofRequest>
+) -> ResponseJson<serde_json::Value> {
+    match state.zk_client.verify_proof(request.proof).await {
+        Ok(valid) => ResponseJson(json!({
+            "success": true,
+            "valid": valid,
+            "message": if valid { "Proof verified successfully" } else { "Proof verification failed" }
+        })),
+        Err(e) => ResponseJson(json!({
+            "success": false,
+            "message": format!("Error verifying proof: {}", e)
+        }))
+    }
 }
 
 // =============================================================================

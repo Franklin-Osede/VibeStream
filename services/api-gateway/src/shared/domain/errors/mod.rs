@@ -60,6 +60,9 @@ impl std::fmt::Display for AppError {
             AppError::Forbidden(msg) => write!(f, "Forbidden: {}", msg),
             AppError::ConcurrencyConflict(msg) => write!(f, "Concurrency conflict: {}", msg),
             AppError::NetworkError(msg) => write!(f, "Network error: {}", msg),
+            AppError::ServiceUnavailable(msg) => write!(f, "Service unavailable: {}", msg),
+            AppError::InsufficientFundsError(msg) => write!(f, "Insufficient funds: {}", msg),
+            AppError::FraudDetected(msg) => write!(f, "Fraud detected: {}", msg),
         }
     }
 }

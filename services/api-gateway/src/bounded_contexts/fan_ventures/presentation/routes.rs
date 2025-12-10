@@ -161,11 +161,11 @@ pub async fn create_routes(
     _service: Arc<ConcreteApplicationService>,
 ) -> Router {
     // TODO: Create proper AppState with database and redis connections
-    let state = AppState {
-        message_queue: MessageQueue::new("redis://localhost").await.unwrap(),
-        database_pool: DatabasePool::new("postgres://localhost").await.unwrap(),
-        event_bus: Arc::new(InMemoryEventBus::new()),
-    };
+    // let state = AppState {
+    //     message_queue: MessageQueue::new("redis://localhost").await.unwrap(),
+    //     database_pool: DatabasePool::new("postgres://localhost").await.unwrap(),
+    //     event_bus: Arc::new(InMemoryEventBus::new()),
+    // };
     
     Router::new()
         // TODO: Implement proper routes with state management
@@ -177,11 +177,11 @@ pub async fn admin_routes(
     _service: Arc<ConcreteApplicationService>,
 ) -> Router {
     // TODO: Create proper AppState with database and redis connections
-    let state = AppState {
-        message_queue: MessageQueue::new("redis://localhost").await.unwrap(),
-        database_pool: DatabasePool::new("postgres://localhost").await.unwrap(),
-        event_bus: Arc::new(InMemoryEventBus::new()),
-    };
+    // let state = AppState {
+    //     message_queue: MessageQueue::new("redis://localhost").await.unwrap(),
+    //     database_pool: DatabasePool::new("postgres://localhost").await.unwrap(),
+    //     event_bus: Arc::new(InMemoryEventBus::new()),
+    // };
     
     Router::new()
         // TODO: Implement proper admin routes
@@ -237,11 +237,11 @@ impl FractionalOwnershipRoutes {
     /// Compose all route groups into a single router
     pub async fn compose_all(service: Arc<ConcreteApplicationService>) -> Router {
         // TODO: Create proper AppState with database and redis connections
-        let state = AppState {
-            message_queue: MessageQueue::new("redis://localhost").await.unwrap(),
-            database_pool: DatabasePool::new("postgres://localhost").await.unwrap(),
-            event_bus: Arc::new(InMemoryEventBus::new()),
-        };
+        // let state = AppState {
+        //     message_queue: MessageQueue::new("redis://localhost").await.unwrap(),
+        //     database_pool: DatabasePool::new("postgres://localhost").await.unwrap(),
+        //     event_bus: Arc::new(InMemoryEventBus::new()),
+        // };
         
         Router::new()
             .nest("/contracts", Self::contracts(state.clone()))

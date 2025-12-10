@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COUNT(*) as count \n               FROM notifications \n               WHERE user_id = $1 AND (read_at IS NULL OR status = 'Unread')",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "663945828a2dd448956c5a256e06b559b918af9414b0d4159ecb222f8a103796"
+}

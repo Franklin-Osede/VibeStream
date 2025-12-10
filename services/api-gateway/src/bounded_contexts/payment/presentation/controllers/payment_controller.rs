@@ -13,7 +13,7 @@ use chrono::{DateTime, Utc};
 
 use crate::bounded_contexts::payment::application::{
     commands::{
-        InitiatePaymentCommand, ProcessPaymentCommand, CompletePaymentCommand, 
+        InitiatePaymentCommand, CompletePaymentCommand, 
         CancelPaymentCommand, InitiateRefundCommand, 
         CreateRoyaltyDistributionCommand, ProcessRoyaltyDistributionCommand,
     },
@@ -29,7 +29,7 @@ use crate::bounded_contexts::payment::application::{
         GetPaymentByTransactionQuery, GetUserPaymentHistoryQuery, GetUserPaymentSummaryQuery,
         GetPaymentStatisticsQuery, GetPaymentAnalyticsQuery, 
         GetRoyaltyDistributionsQuery, GetArtistRevenueSummaryQuery,
-        GetWalletQuery, GetWalletBalanceQuery,
+
     },
     dto::*, 
     dto::{PaymentStatistics, PaymentAnalytics, FraudDetectionStats},
@@ -468,7 +468,7 @@ impl PaymentController {
         }
     }
 
-    async fn get_payment_by_transaction(
+    pub async fn get_payment_by_transaction(
         State(controller): State<Arc<PaymentController>>,
         Path(transaction_id): Path<String>,
     ) -> Result<Json<ApiResponse<PaymentDTO>>, StatusCode> {
@@ -479,7 +479,7 @@ impl PaymentController {
         Err(StatusCode::NOT_FOUND)
     }
 
-    async fn search_payments(
+    pub async fn search_payments(
         State(controller): State<Arc<PaymentController>>,
         Query(params): Query<SearchPaymentsRequest>,
     ) -> Result<Json<ApiResponse<SearchPaymentsResult>>, StatusCode> {
@@ -506,7 +506,7 @@ impl PaymentController {
         Ok(Json(ApiResponse::success(result)))
     }
 
-    async fn get_user_payment_history(
+    pub async fn get_user_payment_history(
         State(_controller): State<Arc<PaymentController>>,
         Path(user_id): Path<Uuid>,
         Extension(current_user_id): Extension<Uuid>,
@@ -526,7 +526,7 @@ impl PaymentController {
         Ok(Json(ApiResponse::success(result)))
     }
 
-    async fn get_user_payment_summary(
+    pub async fn get_user_payment_summary(
         State(_controller): State<Arc<PaymentController>>,
         Path(user_id): Path<Uuid>,
         Extension(current_user_id): Extension<Uuid>,
@@ -543,7 +543,7 @@ impl PaymentController {
     // PAYMENT ANALYTICS
     // =============================================================================
 
-    async fn get_payment_statistics(
+    pub async fn get_payment_statistics(
         State(_controller): State<Arc<PaymentController>>,
         Query(params): Query<std::collections::HashMap<String, String>>,
     ) -> Result<Json<ApiResponse<PaymentStatistics>>, StatusCode> {
@@ -561,7 +561,7 @@ impl PaymentController {
         Ok(Json(ApiResponse::success(stats)))
     }
 
-    async fn get_payment_analytics(
+    pub async fn get_payment_analytics(
         State(_controller): State<Arc<PaymentController>>,
         Query(params): Query<std::collections::HashMap<String, String>>,
     ) -> Result<Json<ApiResponse<PaymentAnalytics>>, StatusCode> {
@@ -585,7 +585,7 @@ impl PaymentController {
     // ROYALTY OPERATIONS
     // =============================================================================
 
-    async fn distribute_royalties(
+    pub async fn distribute_royalties(
         State(controller): State<Arc<PaymentController>>,
         Extension(current_user_id): Extension<Uuid>,
         Json(request): Json<DistributeRoyaltiesRequest>,
@@ -623,7 +623,7 @@ impl PaymentController {
         }
     }
 
-    async fn process_royalty_distribution(
+    pub async fn process_royalty_distribution(
         State(_controller): State<Arc<PaymentController>>,
         Path(distribution_id): Path<Uuid>,
         Extension(current_user_id): Extension<Uuid>,
@@ -632,14 +632,14 @@ impl PaymentController {
         Ok(Json(ApiResponse::success(())))
     }
 
-    async fn get_royalty_distributions(
+    pub async fn get_royalty_distributions(
         State(_controller): State<Arc<PaymentController>>,
         Query(params): Query<std::collections::HashMap<String, String>>,
     ) -> Result<Json<ApiResponse<()>>, StatusCode> {
         Ok(Json(ApiResponse::success(())))
     }
 
-    async fn get_artist_revenue_summary(
+    pub async fn get_artist_revenue_summary(
         State(_controller): State<Arc<PaymentController>>,
         Path(artist_id): Path<Uuid>,
         Query(params): Query<std::collections::HashMap<String, String>>,
@@ -651,7 +651,7 @@ impl PaymentController {
     // WALLET OPERATIONS
     // =============================================================================
 
-    async fn create_wallet(
+    pub async fn create_wallet(
         State(controller): State<Arc<PaymentController>>,
         Extension(current_user_id): Extension<Uuid>,
         Json(request): Json<CreateWalletRequest>,
@@ -686,7 +686,7 @@ impl PaymentController {
         }
     }
 
-    async fn list_wallets(
+    pub async fn list_wallets(
         State(_controller): State<Arc<PaymentController>>,
         Query(params): Query<std::collections::HashMap<String, String>>,
         Extension(current_user_id): Extension<Uuid>,
@@ -695,7 +695,7 @@ impl PaymentController {
         Ok(Json(ApiResponse::success(vec![])))
     }
 
-    async fn get_wallet(
+    pub async fn get_wallet(
         State(_controller): State<Arc<PaymentController>>,
         Path(wallet_id): Path<Uuid>,
         Extension(current_user_id): Extension<Uuid>,
@@ -704,7 +704,7 @@ impl PaymentController {
         Err(StatusCode::NOT_FOUND)
     }
 
-    async fn update_wallet(
+    pub async fn update_wallet(
         State(_controller): State<Arc<PaymentController>>,
         Path(wallet_id): Path<Uuid>,
         Extension(current_user_id): Extension<Uuid>,
@@ -713,7 +713,7 @@ impl PaymentController {
         Err(StatusCode::NOT_FOUND)
     }
 
-    async fn get_wallet_balance(
+    pub async fn get_wallet_balance(
         State(_controller): State<Arc<PaymentController>>,
         Path(wallet_id): Path<Uuid>,
         Extension(current_user_id): Extension<Uuid>,
@@ -734,7 +734,7 @@ impl PaymentController {
     // PAYMENT GATEWAY OPERATIONS
     // =============================================================================
 
-    async fn list_payment_gateways(
+    pub async fn list_payment_gateways(
         State(_controller): State<Arc<PaymentController>>,
     ) -> Result<Json<ApiResponse<Vec<String>>>, StatusCode> {
         let gateways = vec![
@@ -747,7 +747,7 @@ impl PaymentController {
         Ok(Json(ApiResponse::success(gateways)))
     }
 
-    async fn process_gateway_payment(
+    pub async fn process_gateway_payment(
         State(_controller): State<Arc<PaymentController>>,
         Path(gateway_id): Path<String>,
         Extension(current_user_id): Extension<Uuid>,
@@ -760,7 +760,7 @@ impl PaymentController {
     // WEBHOOK HANDLERS
     // =============================================================================
 
-    async fn stripe_webhook(
+    pub async fn stripe_webhook(
         State(controller): State<Arc<PaymentController>>,
         headers: axum::http::HeaderMap,
         body: String,
@@ -800,7 +800,7 @@ impl PaymentController {
         }
     }
 
-    async fn paypal_webhook(
+    pub async fn paypal_webhook(
         State(controller): State<Arc<PaymentController>>,
         headers: axum::http::HeaderMap,
         body: String,
@@ -840,7 +840,7 @@ impl PaymentController {
         }
     }
 
-    async fn coinbase_webhook(
+    pub async fn coinbase_webhook(
         State(controller): State<Arc<PaymentController>>,
         headers: axum::http::HeaderMap,
         body: String,
@@ -881,7 +881,7 @@ impl PaymentController {
 
     /// POST /payments/reconcile/:payment_id
     /// Reconcile payment with webhook events
-    async fn reconcile_payment(
+    pub async fn reconcile_payment(
         State(controller): State<Arc<PaymentController>>,
         Path(payment_id): Path<Uuid>,
     ) -> Result<Json<ApiResponse<ReconciliationResult>>, StatusCode> {
@@ -898,7 +898,7 @@ impl PaymentController {
         }
     }
 
-    async fn generic_webhook(
+    pub async fn generic_webhook(
         State(controller): State<Arc<PaymentController>>,
         Path(gateway): Path<String>,
         headers: axum::http::HeaderMap,

@@ -9,7 +9,7 @@ use crate::bounded_contexts::payment::domain::{
     },
 };
 use crate::bounded_contexts::payment::infrastructure::gateways::{
-    MultiGatewayRouter, GatewayRoutingResult
+    gateway_router::{MultiGatewayRouter, GatewayRoutingResult},
 };
 use crate::shared::domain::errors::AppError;
 use uuid::Uuid;

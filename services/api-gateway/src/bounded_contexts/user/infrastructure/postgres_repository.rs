@@ -625,9 +625,7 @@ impl UserRepository for UserPostgresRepository {
                 username: Username::new(username_str).map_err(|e| AppError::ValidationError(e))?,
                 email: Email::new(email_str).map_err(|e| AppError::ValidationError(e))?,
                 display_name: row.try_get("display_name")?,
-                avatar_url: row.try_get("avatar_url").ok().and_then(|url: Option<String>| {
-                    url.map(|u| ProfileUrl::new(u).ok())
-                }).flatten(),
+                avatar_url: row.try_get("avatar_url").unwrap_or(None),
                 tier: row.try_get("tier")?,
                 role: row.try_get("role")?,
                 is_verified: row.try_get("is_verified")?,
@@ -678,9 +676,7 @@ impl UserRepository for UserPostgresRepository {
                 username: Username::new(username_str).map_err(|e| AppError::ValidationError(e))?,
                 email: Email::new(email_str).map_err(|e| AppError::ValidationError(e))?,
                 display_name: row.try_get("display_name")?,
-                avatar_url: row.try_get("avatar_url").ok().and_then(|url: Option<String>| {
-                    url.map(|u| ProfileUrl::new(u).ok())
-                }).flatten(),
+                avatar_url: row.try_get("avatar_url").unwrap_or(None),
                 tier: row.try_get("tier")?,
                 role: row.try_get("role")?,
                 is_verified: row.try_get("is_verified")?,

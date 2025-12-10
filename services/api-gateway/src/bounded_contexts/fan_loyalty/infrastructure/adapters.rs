@@ -15,6 +15,7 @@ use crate::bounded_contexts::fan_loyalty::{
             NftService, ZkProofService, EventPublisher
         },
         entities::{FanId, WristbandId, WristbandType, NftWristband, FanVerificationResult},
+        events::{FanVerifiedEvent, WristbandCreatedEvent, WristbandActivatedEvent, QrCodeScannedEvent},
     },
     application::dependency_injection::{
         VerifyFanCommand, CreateWristbandCommand, ActivateWristbandCommand,
@@ -674,45 +675,9 @@ pub struct ZkProofStatus {
     pub verified_at: Option<DateTime<Utc>>,
 }
 
-/// Domain events
-#[derive(Debug, Clone)]
-pub struct FanVerifiedEvent {
-    pub fan_id: FanId,
-    pub verification_id: String,
-    pub confidence_score: f32,
-    pub wristband_eligible: bool,
-    pub benefits_unlocked: Vec<String>,
-    pub occurred_at: DateTime<Utc>,
-}
 
-#[derive(Debug, Clone)]
-pub struct WristbandCreatedEvent {
-    pub wristband_id: WristbandId,
-    pub fan_id: FanId,
-    pub concert_id: Uuid,
-    pub artist_id: Uuid,
-    pub wristband_type: WristbandType,
-    pub created_at: DateTime<Utc>,
-}
 
-#[derive(Debug, Clone)]
-pub struct WristbandActivatedEvent {
-    pub wristband_id: WristbandId,
-    pub fan_id: FanId,
-    pub activation_reason: String,
-    pub activated_at: DateTime<Utc>,
-}
 
-#[derive(Debug, Clone)]
-pub struct QrCodeScannedEvent {
-    pub qr_code: String,
-    pub wristband_id: Option<WristbandId>,
-    pub fan_id: Option<FanId>,
-    pub scanner_id: String,
-    pub location: Option<LocationData>,
-    pub access_granted: bool,
-    pub scanned_at: DateTime<Utc>,
-}
 
 #[cfg(test)]
 mod tests {

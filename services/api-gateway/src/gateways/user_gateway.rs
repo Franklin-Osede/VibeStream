@@ -31,7 +31,8 @@ pub async fn create_user_gateway(app_state: AppState) -> Result<Router, Box<dyn 
     
     // Crear UserApplicationService con el repositorio
     let user_service = Arc::new(UserApplicationService::new(
-        user_app_state.user_repository.clone()
+        user_app_state.user_repository.clone(),
+        Some(app_state.facial_client.clone())
     ));
     
     // Configurar rutas reales usando los controllers

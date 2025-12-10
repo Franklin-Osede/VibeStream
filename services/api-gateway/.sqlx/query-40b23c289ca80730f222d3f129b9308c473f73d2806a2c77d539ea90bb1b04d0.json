@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO notifications (\n                id, user_id, title, message, notification_type, priority, status, \n                metadata, read_at, created_at, updated_at\n            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)\n            ON CONFLICT (id) DO UPDATE SET\n                title = EXCLUDED.title,\n                message = EXCLUDED.message,\n                notification_type = EXCLUDED.notification_type,\n                priority = EXCLUDED.priority,\n                status = EXCLUDED.status,\n                metadata = EXCLUDED.metadata,\n                read_at = EXCLUDED.read_at,\n                updated_at = EXCLUDED.updated_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Text",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Jsonb",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "40b23c289ca80730f222d3f129b9308c473f73d2806a2c77d539ea90bb1b04d0"
+}

@@ -1,0 +1,33 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO artist_ventures (\n                id, artist_id, title, description, category, tags, risk_level,\n                expected_return, artist_rating, artist_previous_ventures, artist_success_rate,\n                funding_goal, current_funding, min_investment, max_investment, status,\n                start_date, end_date, created_at, updated_at\n            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)\n            ON CONFLICT (id) DO UPDATE SET\n                title = EXCLUDED.title,\n                description = EXCLUDED.description,\n                category = EXCLUDED.category,\n                tags = EXCLUDED.tags,\n                risk_level = EXCLUDED.risk_level,\n                expected_return = EXCLUDED.expected_return,\n                artist_rating = EXCLUDED.artist_rating,\n                artist_previous_ventures = EXCLUDED.artist_previous_ventures,\n                artist_success_rate = EXCLUDED.artist_success_rate,\n                funding_goal = EXCLUDED.funding_goal,\n                current_funding = EXCLUDED.current_funding,\n                min_investment = EXCLUDED.min_investment,\n                max_investment = EXCLUDED.max_investment,\n                status = EXCLUDED.status,\n                start_date = EXCLUDED.start_date,\n                end_date = EXCLUDED.end_date,\n                updated_at = EXCLUDED.updated_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Text",
+        "Varchar",
+        "TextArray",
+        "Varchar",
+        "Float8",
+        "Float8",
+        "Int4",
+        "Float8",
+        "Float8",
+        "Float8",
+        "Float8",
+        "Float8",
+        "Varchar",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8c2673ad0ae2ed0304594c32a2292ad234db6757f614c13631ed05ac99b1a5a9"
+}
