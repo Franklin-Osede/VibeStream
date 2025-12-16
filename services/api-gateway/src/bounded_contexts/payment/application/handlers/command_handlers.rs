@@ -598,4 +598,35 @@ mod tests {
         
         assert!(command.validate().is_ok());
     }
-} 
+}
+
+// Wallet Command Handler
+pub struct CreateWalletCommandHandler {
+    repository: Arc<dyn WalletRepository>,
+}
+
+impl CreateWalletCommandHandler {
+    pub fn new(repository: Arc<dyn WalletRepository>) -> Self {
+        Self { repository }
+    }
+
+    pub async fn handle(&self, command: CreateWalletCommand) -> Result<CreateWalletResult, AppError> {
+        let wallet = Wallet::create(
+            command.user_id,
+            command.wallet_type,
+            command.currency,
+            command.is_primary,
+        )?;
+
+        self.repository.save(&wallet).await?;
+
+        Ok(CreateWalletResult {
+            wallet_id: wallet.id().value(),
+            address: wallet.address().value().to_string(),
+            wallet_type: wallet.wallet_type().clone(),
+            currency: wallet.currency().clone(),
+            balance: wallet.balance().value(),
+        })
+    }
+}
+ 

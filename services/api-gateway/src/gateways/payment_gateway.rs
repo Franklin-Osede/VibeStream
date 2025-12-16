@@ -10,6 +10,7 @@ use crate::bounded_contexts::payment::infrastructure::repositories::{
     PostgreSQLPaymentRepository as PostgresPaymentRepository,
     PostgresRoyaltyRepository,
     PostgresWalletRepository,
+    mock_repositories::MockPaymentAnalyticsRepository,
 };
 use crate::bounded_contexts::payment::infrastructure::webhooks::WebhookRouter;
 use crate::bounded_contexts::payment::presentation::controllers::payment_controller::{
@@ -87,6 +88,32 @@ pub async fn create_payment_gateway(app_state: AppState) -> Result<Router, Box<d
         notification_service,
         payment_application_service,
     ));
+
+    // 7. Initialize Query Handlers
+    let analytics_repository = Arc::new(MockPaymentAnalyticsRepository);
+    let payment_query_handler = Arc::new(crate::bounded_contexts::payment::application::handlers::query_handlers::GetPaymentQueryHandler::new(
+        payment_repository.clone(),
+    ));
+
+    // 8. Initialize Royalty Command Handler
+    let royalty_service = Arc::new(crate::bounded_contexts::payment::application::services::MockRoyaltyDistributionService);
+    let royalty_app_service = Arc::new(crate::bounded_contexts::payment::application::services::RoyaltyDistributionApplicationService::new(
+        royalty_repository.clone(),
+        payment_repository.clone(),
+        royalty_service,
+        notification_service.clone(),
+    ));
+
+    let royalty_command_handler = Arc::new(crate::bounded_contexts::payment::application::handlers::command_handlers::RoyaltyCommandHandlerImpl::new(
+        royalty_repository.clone(),
+        royalty_app_service, // service
+        payment_repository.clone(),
+    ));
+
+    // 9. Initialize Wallet Command Handler
+    let wallet_command_handler = Arc::new(crate::bounded_contexts::payment::application::handlers::command_handlers::CreateWalletCommandHandler::new(
+        wallet_repository.clone(),
+    ));
     
     // Create controller with injected handler
     let payment_controller = Arc::new(PaymentController::new(
@@ -95,7 +122,10 @@ pub async fn create_payment_gateway(app_state: AppState) -> Result<Router, Box<d
         wallet_repository,
         webhook_router,
         None, // webhook_queue_processor
-        command_handler,
+        payment_command_handler,
+        royalty_command_handler,
+        wallet_command_handler,
+        payment_query_handler,
     ));
     
     // Obtener rutas del controller

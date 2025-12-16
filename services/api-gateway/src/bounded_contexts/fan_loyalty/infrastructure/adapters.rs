@@ -1,4 +1,5 @@
-use async_trait::async_trait;
+// Will update after checking services.rs
+
 use std::sync::Arc;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
@@ -12,9 +13,15 @@ use crate::bounded_contexts::fan_loyalty::{
         },
         services::{
             BiometricVerificationService, WristbandService, QrCodeService,
-            NftService, ZkProofService, EventPublisher
+            NftService, ZkProofService, EventPublisher,
+            ZkWristbandProof, ZkBiometricProof,
+            BehavioralPatterns, DeviceCharacteristics, LocationData
         },
-        entities::{FanId, WristbandId, WristbandType, NftWristband, FanVerificationResult},
+        entities::{
+            FanId, WristbandId, WristbandType, NftWristband, FanVerificationResult,
+            NftMetadata, NftAttribute, BiometricData, BiometricProofData, NftCreationResult, 
+            ZkProof, ZkProofType, ZkProofStatus
+        },
         events::{FanVerifiedEvent, WristbandCreatedEvent, WristbandActivatedEvent, QrCodeScannedEvent},
     },
     application::dependency_injection::{
@@ -570,110 +577,8 @@ impl EventPublisher for ExternalEventAdapter {
 // SUPPORTING TYPES
 // ============================================================================
 
-/// Biometric data
-#[derive(Debug, Clone)]
-pub struct BiometricData {
-    pub audio_sample: Option<String>,
-    pub behavioral_patterns: BehavioralPatterns,
-    pub device_characteristics: DeviceCharacteristics,
-    pub location: Option<LocationData>,
-}
+// Structs moved to domain::entities or domain::services
 
-// Usar los tipos del dominio en lugar de duplicarlos
-use crate::bounded_contexts::fan_loyalty::domain::services::{BehavioralPatterns, DeviceCharacteristics, LocationData};
-
-/// Biometric proof data
-#[derive(Debug, Clone)]
-pub struct BiometricProofData {
-    pub audio_hash: Option<String>,
-    pub behavioral_hash: String,
-    pub device_hash: String,
-    pub location_hash: Option<String>,
-    pub timestamp: DateTime<Utc>,
-}
-
-/// NFT creation result
-#[derive(Debug, Clone)]
-pub struct NftCreationResult {
-    pub wristband_id: WristbandId,
-    pub fan_id: FanId,
-    pub nft_token_id: String,
-    pub transaction_hash: String,
-    pub ipfs_hash: String,
-    pub blockchain_network: String,
-    pub contract_address: String,
-    pub created_at: DateTime<Utc>,
-}
-
-/// NFT metadata
-#[derive(Debug, Clone)]
-pub struct NftMetadata {
-    pub name: String,
-    pub description: String,
-    pub image: String,
-    pub attributes: Vec<NftAttribute>,
-    pub external_url: String,
-    pub background_color: String,
-}
-
-/// NFT attribute
-#[derive(Debug, Clone)]
-pub struct NftAttribute {
-    pub trait_type: String,
-    pub value: String,
-}
-
-/// ZK biometric proof
-#[derive(Debug, Clone)]
-pub struct ZkBiometricProof {
-    pub proof_data: String,
-    pub public_inputs: Vec<String>,
-    pub fan_id: Uuid,
-    pub confidence_score: f32,
-    pub generated_at: DateTime<Utc>,
-}
-
-/// ZK wristband proof
-#[derive(Debug, Clone)]
-pub struct ZkWristbandProof {
-    pub proof_data: String,
-    pub public_inputs: Vec<String>,
-    pub wristband_id: Uuid,
-    pub fan_id: Uuid,
-    pub generated_at: DateTime<Utc>,
-}
-
-/// ZK proof
-#[derive(Debug, Clone)]
-pub struct ZkProof {
-    pub id: Uuid,
-    pub fan_id: FanId,
-    pub proof_type: ZkProofType,
-    pub proof_data: String,
-    pub public_inputs: Vec<String>,
-    pub verification_key: String,
-    pub is_verified: bool,
-    pub confidence_score: Option<f32>,
-    pub created_at: DateTime<Utc>,
-    pub verified_at: Option<DateTime<Utc>>,
-}
-
-/// ZK proof types
-#[derive(Debug, Clone, PartialEq)]
-pub enum ZkProofType {
-    Biometric,
-    Wristband,
-    Ownership,
-}
-
-/// ZK proof status
-#[derive(Debug, Clone)]
-pub struct ZkProofStatus {
-    pub proof_id: Uuid,
-    pub is_verified: bool,
-    pub confidence_score: Option<f32>,
-    pub verified_at: Option<DateTime<Utc>>,
-}
 
 
 

@@ -116,6 +116,16 @@ impl AppState {
             blockchain_client,
             env,
         };
+
+        // Registrar handlers de eventos con sus dependencias
+        // NOTA: Esto es crucial para que los handlers tengan acceso a repositorios y clientes
+        crate::bounded_contexts::orchestrator::EventBusFactory::register_handlers(
+            Arc::clone(&app_state.event_bus),
+            app_state.get_db_pool().clone(),
+            Arc::clone(&app_state.blockchain_client),
+            Arc::clone(&app_state.zk_client)
+        ).await.map_err(|e| format!("Failed to register event handlers: {}", e))?;
+
         
         // Ejecutar migraciones automáticamente si está habilitado
         Self::run_migrations_if_enabled(app_state.get_db_pool()).await?;

@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
-use crate::bounded_contexts::fan_loyalty::domain::entities::{FanId, WristbandId, WristbandType, NftWristband, FanVerificationResult};
+
 
 /// Repository trait for fan verification operations
 #[async_trait]
@@ -125,6 +125,12 @@ pub trait NftRepository: Send + Sync {
 // SUPPORTING TYPES
 // ============================================================================
 
+use crate::bounded_contexts::fan_loyalty::domain::entities::{
+    FanId, WristbandId, WristbandType, NftWristband, FanVerificationResult,
+    ZkProof, ZkProofType, NftMetadata, QrCode
+};
+
+// QrScanLog kept here if not in entities
 /// QR scan log entry
 #[derive(Debug, Clone)]
 pub struct QrScanLog {
@@ -137,42 +143,7 @@ pub struct QrScanLog {
     pub scanned_at: DateTime<Utc>,
 }
 
-/// ZK proof data
-#[derive(Debug, Clone)]
-pub struct ZkProof {
-    pub id: Uuid,
-    pub fan_id: FanId,
-    pub proof_type: ZkProofType,
-    pub proof_data: String,
-    pub public_inputs: Vec<String>,
-    pub verification_key: String,
-    pub is_verified: bool,
-    pub confidence_score: Option<f32>,
-    pub created_at: DateTime<Utc>,
-    pub verified_at: Option<DateTime<Utc>>,
-}
 
-/// ZK proof types
-#[derive(Debug, Clone, PartialEq)]
-pub enum ZkProofType {
-    Biometric,
-    Wristband,
-    Ownership,
-}
-
-/// NFT metadata
-#[derive(Debug, Clone)]
-pub struct NftMetadata {
-    pub id: Uuid,
-    pub wristband_id: WristbandId,
-    pub nft_token_id: String,
-    pub transaction_hash: String,
-    pub ipfs_hash: String,
-    pub blockchain_network: String,
-    pub contract_address: String,
-    pub metadata_json: serde_json::Value,
-    pub created_at: DateTime<Utc>,
-}
 
 #[cfg(test)]
 mod tests {

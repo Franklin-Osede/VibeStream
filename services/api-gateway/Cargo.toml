@@ -50,10 +50,10 @@ vibestream-types = { path = "../../shared/types" }
 jsonwebtoken = "9.0"
 
 # OpenAPI - Versiones compatibles
-utoipa = { version = "4.0", features = ["axum_extras"] }
+utoipa = { version = "4.2", features = ["axum_extras", "uuid", "chrono"] }
 utoipa-axum = "0.1"
-utoipa-swagger-ui = "0.1"
-utoipa-redoc = "0.1"
+utoipa-swagger-ui = { version = "6.0", features = ["axum"] }
+utoipa-redoc = { version = "3.0", features = ["axum"] }
 
 # Config
 config = "0.13"
@@ -79,7 +79,7 @@ lazy_static = "1.4"
 ethers = { version = "2.0", features = ["ws", "rustls", "abigen"] }
 
 # Database
-sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "json", "migrate", "bigdecimal"] }
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "json", "migrate", "bigdecimal", "rust_decimal"] }
 
 # Bytes for file handling
 bytes = "1.0"

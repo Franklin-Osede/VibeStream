@@ -110,6 +110,8 @@ impl WristbandHandler {
         // 4. Publish domain event
         let event = crate::bounded_contexts::fan_loyalty::domain::events::WristbandActivatedEvent {
             wristband_id: wristband.id.clone(),
+            fan_id: wristband.fan_id.clone(),
+            activation_reason: "Manual activation".to_string(),
             activated_at: chrono::Utc::now(),
         };
         self.container.event_publisher.publish_wristband_activated(&event).await?;
@@ -144,9 +146,9 @@ impl QrCodeHandler {
         // TDD GREEN PHASE: Real implementation
         
         // 1. Validate QR code using domain service
-        let wristband_id = self.container.qr_code_service.validate_qr_code(qr_code).await?;
+        let validation_result = self.container.qr_code_service.validate_qr_code(qr_code).await?;
 
-        if let Some(wristband_id) = wristband_id {
+        if let Some(wristband_id) = validation_result.wristband_id {
             // 2. Get wristband details
             let wristband = self.container.wristband_repository.get_wristband(&wristband_id).await?
                 .ok_or_else(|| "Wristband not found".to_string())?;

@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use sqlx::PgPool;
+use sqlx::{PgPool, Row};
 use uuid::Uuid;
 use std::collections::HashMap;
 use chrono::{DateTime, Utc};
@@ -24,6 +24,8 @@ impl PostgreSQLPaymentRepository {
         Self { pool }
     }
 }
+
+pub type PostgresPaymentRepository = PostgreSQLPaymentRepository;
 
 #[async_trait]
 impl PaymentRepository for PostgreSQLPaymentRepository {
@@ -273,10 +275,11 @@ impl PaymentRepository for PostgreSQLPaymentRepository {
         )
         .execute(&self.pool)
         .await
-        .map_err(AppError::DatabaseError)?;
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
         
         Ok(())
     }
+
     async fn find_by_payer_id(&self, payer_id: Uuid, pagination: &Pagination) -> PaymentRepositoryResult<Vec<PaymentAggregate>> {
         // Simple implementation reusing find_by_filter logic or direct query
         // Since find_by_filter exists but is private or helper (line 178), and takes offset/limit.
@@ -284,15 +287,14 @@ impl PaymentRepository for PostgreSQLPaymentRepository {
         let offset = pagination.page * pagination.limit;
         let limit = pagination.limit;
         
-        let rows = sqlx::query!(
-            "SELECT * FROM payments WHERE payer_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
-            payer_id,
-            limit as i64,
-            offset as i64
-        )
+        let rows = sqlx::query(
+            "SELECT * FROM payments WHERE payer_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3")
+            .bind(payer_id)
+            .bind(limit as i64)
+            .bind(offset as i64)
         .fetch_all(&self.pool)
         .await
-        .map_err(AppError::DatabaseError)?;
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
         let mut payment_aggregates = Vec::new();
         for row in rows {
@@ -307,15 +309,14 @@ impl PaymentRepository for PostgreSQLPaymentRepository {
         let offset = pagination.page * pagination.limit;
         let limit = pagination.limit;
         
-        let rows = sqlx::query!(
-            "SELECT * FROM payments WHERE payee_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
-            payee_id,
-            limit as i64,
-            offset as i64
-        )
+        let rows = sqlx::query(
+            "SELECT * FROM payments WHERE payee_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3")
+            .bind(payee_id)
+            .bind(limit as i64)
+            .bind(offset as i64)
         .fetch_all(&self.pool)
         .await
-        .map_err(AppError::DatabaseError)?;
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
         let mut payment_aggregates = Vec::new();
         for row in rows {
@@ -334,15 +335,14 @@ impl PaymentRepository for PostgreSQLPaymentRepository {
         // Note: status stored might be "Pending", "Completed" etc. 
         // We need to match what save() does. save() uses format!("{:?}", status).
         
-        let rows = sqlx::query!(
-            "SELECT * FROM payments WHERE status = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
-            status_str,
-            limit as i64,
-            offset as i64
-        )
+        let rows = sqlx::query(
+            "SELECT * FROM payments WHERE status = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3")
+            .bind(status_str)
+            .bind(limit as i64)
+            .bind(offset as i64)
         .fetch_all(&self.pool)
         .await
-        .map_err(AppError::DatabaseError)?;
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
         
         let mut payment_aggregates = Vec::new();
         for row in rows {
@@ -362,13 +362,15 @@ impl PaymentRepository for PostgreSQLPaymentRepository {
         let offset = pagination.page * pagination.limit;
         let limit = pagination.limit;
         
-        let rows = sqlx::query!(
-            "SELECT * FROM payments WHERE created_at BETWEEN $1 AND $2 ORDER BY created_at DESC LIMIT $3 OFFSET $4",
-            start, end, limit as i64, offset as i64
-        )
+        let rows = sqlx::query(
+            "SELECT * FROM payments WHERE created_at BETWEEN $1 AND $2 ORDER BY created_at DESC LIMIT $3 OFFSET $4")
+            .bind(start)
+            .bind(end)
+            .bind(limit as i64)
+            .bind(offset as i64)
         .fetch_all(&self.pool)
         .await
-        .map_err(AppError::DatabaseError)?;
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
         
         let mut payment_aggregates = Vec::new();
         for row in rows {
@@ -388,13 +390,12 @@ impl PaymentRepository for PostgreSQLPaymentRepository {
     }
 
     async fn find_stale_pending_payments(&self, older_than: DateTime<Utc>) -> PaymentRepositoryResult<Vec<PaymentAggregate>> {
-         let rows = sqlx::query!(
-            "SELECT * FROM payments WHERE status = 'Pending' AND created_at < $1",
-            older_than
-        )
+         let rows = sqlx::query(
+            "SELECT * FROM payments WHERE status = 'Pending' AND created_at < $1")
+            .bind(older_than)
         .fetch_all(&self.pool)
         .await
-        .map_err(AppError::DatabaseError)?;
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
         
         let mut payment_aggregates = Vec::new();
         for row in rows {
@@ -450,6 +451,159 @@ impl PaymentRepository for PostgreSQLPaymentRepository {
     }
 }
 
+#[async_trait]
+#[async_trait]
+impl PaymentAnalyticsRepository for PostgreSQLPaymentRepository {
+    async fn get_payment_statistics(&self, start: DateTime<Utc>, end: DateTime<Utc>, _currency: Option<Currency>, _purpose_type: Option<String>) -> PaymentRepositoryResult<PaymentStatistics> {
+        // Stub implementation
+        Ok(PaymentStatistics {
+            total_payments: 0,
+            successful_payments: 0,
+            failed_payments: 0,
+            cancelled_payments: 0,
+            pending_payments: 0,
+            total_volume: HashMap::new(),
+            total_fees_collected: HashMap::new(),
+            success_rate: 0.0,
+            average_payment_amount: HashMap::new(),
+            period_start: start,
+            period_end: end,
+        })
+    }
+    
+    async fn get_volume_by_currency(&self, _start: DateTime<Utc>, _end: DateTime<Utc>) -> PaymentRepositoryResult<HashMap<Currency, f64>> {
+        Ok(HashMap::new())
+    }
+    
+    async fn get_volume_by_purpose(&self, _start: DateTime<Utc>, _end: DateTime<Utc>) -> PaymentRepositoryResult<HashMap<PaymentCategory, f64>> {
+        Ok(HashMap::new())
+    }
+    
+    async fn get_success_rate(&self, _start: DateTime<Utc>, _end: DateTime<Utc>) -> PaymentRepositoryResult<f64> {
+        Ok(0.0)
+    }
+    
+    async fn get_average_payment_by_purpose(&self, _start: DateTime<Utc>, _end: DateTime<Utc>) -> PaymentRepositoryResult<HashMap<PaymentCategory, f64>> {
+        Ok(HashMap::new())
+    }
+    
+    async fn get_top_payers(&self, _start: DateTime<Utc>, _end: DateTime<Utc>, _limit: u32) -> PaymentRepositoryResult<Vec<UserPaymentSummary>> {
+        Ok(vec![])
+    }
+    
+    async fn get_top_payees(&self, _start: DateTime<Utc>, _end: DateTime<Utc>, _limit: u32) -> PaymentRepositoryResult<Vec<UserPaymentSummary>> {
+        Ok(vec![])
+    }
+    
+    async fn get_payment_trends(&self, _start: DateTime<Utc>, _end: DateTime<Utc>, _granularity: &str) -> PaymentRepositoryResult<Vec<PaymentTrend>> {
+        Ok(vec![])
+    }
+    
+    async fn get_failed_payment_analysis(&self, _start: DateTime<Utc>, _end: DateTime<Utc>) -> PaymentRepositoryResult<FailedPaymentAnalysis> {
+        Ok(FailedPaymentAnalysis {
+            total_failed_payments: 0,
+            failure_reasons: HashMap::new(),
+            failure_rate_by_payment_method: HashMap::new(),
+            failure_rate_by_currency: HashMap::new(),
+            most_common_error_codes: vec![],
+        })
+    }
+    
+    async fn get_fraud_metrics(&self, _start: DateTime<Utc>, _end: DateTime<Utc>) -> PaymentRepositoryResult<FraudMetrics> {
+        Ok(FraudMetrics {
+            total_fraud_alerts: 0,
+            high_risk_transactions: 0,
+            blocked_transactions: 0,
+            fraud_indicators: HashMap::new(),
+            fraud_rate: 0.0,
+        })
+    }
+
+    async fn get_shareholder_portfolio(&self, _shareholder_id: Uuid, _include_pending: bool) -> PaymentRepositoryResult<ShareholderPortfolio> {
+        Ok(ShareholderPortfolio {
+            total_investments: 0.0,
+            current_value: 0.0,
+            total_returns: 0.0,
+            return_rate: 0.0,
+            active_contracts: 0,
+            pending_distributions: 0.0,
+        })
+    }
+
+    async fn get_shareholder_holdings(&self, _shareholder_id: Uuid, _include_historical: bool) -> PaymentRepositoryResult<Vec<ShareholderHolding>> {
+        Ok(vec![])
+    }
+
+    async fn get_payment_breakdown(&self, _start: DateTime<Utc>, _end: DateTime<Utc>) -> PaymentRepositoryResult<HashMap<String, f64>> {
+        Ok(HashMap::new())
+    }
+
+    async fn get_payment_overview(&self, start: DateTime<Utc>, end: DateTime<Utc>) -> PaymentRepositoryResult<PaymentStatistics> {
+        self.get_payment_statistics(start, end, None, None).await
+    }
+
+    async fn get_revenue_breakdown(&self, _start: DateTime<Utc>, _end: DateTime<Utc>) -> PaymentRepositoryResult<HashMap<String, f64>> {
+        Ok(HashMap::new())
+    }
+
+    async fn get_detailed_user_payment_summary(&self, _user_id: Uuid, _start: Option<DateTime<Utc>>, _end: Option<DateTime<Utc>>) -> PaymentRepositoryResult<DetailedUserPaymentSummary> {
+        Ok(DetailedUserPaymentSummary {
+            as_payer: UserRoleSummary {
+                total_volume: HashMap::new(),
+                count: 0,
+                average_amount: HashMap::new(),
+            },
+            as_payee: UserRoleSummary {
+                total_volume: HashMap::new(),
+                count: 0,
+                average_amount: HashMap::new(),
+            },
+            total_summary: UserRoleSummary {
+                total_volume: HashMap::new(),
+                count: 0,
+                average_amount: HashMap::new(),
+            },
+        })
+    }
+
+    async fn get_user_payment_method_usage(&self, _user_id: Uuid, _start: Option<DateTime<Utc>>, _end: Option<DateTime<Utc>>) -> PaymentRepositoryResult<HashMap<String, u64>> {
+        Ok(HashMap::new())
+    }
+
+    async fn get_user_recent_activity(&self, _user_id: Uuid, _limit: u32) -> PaymentRepositoryResult<Vec<PaymentActivity>> {
+        Ok(vec![])
+    }
+
+    async fn get_user_payment_summary(&self, user_id: Uuid, _start: Option<DateTime<Utc>>, _end: Option<DateTime<Utc>>) -> PaymentRepositoryResult<UserPaymentSummary> {
+        Ok(UserPaymentSummary {
+            user_id,
+            total_volume: HashMap::new(),
+            payment_count: 0,
+            average_payment_amount: HashMap::new(),
+            first_payment_date: Utc::now(),
+            last_payment_date: Utc::now(),
+        })
+    }
+
+    async fn get_artist_revenue_summary(&self, _artist_id: Uuid, _start: Option<DateTime<Utc>>, _end: Option<DateTime<Utc>>) -> PaymentRepositoryResult<ArtistRevenueSummary> {
+        Ok(ArtistRevenueSummary {
+            total_revenue: HashMap::new(),
+            platform_fees_paid: HashMap::new(),
+            net_revenue: HashMap::new(),
+            royalty_distributions: 0,
+        })
+    }
+
+    async fn get_artist_song_revenue_breakdown(&self, _artist_id: Uuid, _start: Option<DateTime<Utc>>, _end: Option<DateTime<Utc>>) -> PaymentRepositoryResult<Vec<SongRevenueBreakdown>> {
+        Ok(vec![])
+    }
+
+    async fn get_artist_revenue_trends(&self, _artist_id: Uuid, _start: Option<DateTime<Utc>>, _end: Option<DateTime<Utc>>) -> PaymentRepositoryResult<Vec<RevenueTrend>> {
+        Ok(vec![])
+    }
+}
+
+
 impl PostgreSQLPaymentRepository {
     async fn load_payment_events(&self, payment_id: &PaymentId) -> Result<Vec<PaymentEvent>, AppError> {
         let rows = sqlx::query!(
@@ -491,7 +645,7 @@ impl PostgreSQLPaymentRepository {
             "VIBES" => Currency::VIBES,
             _ => Currency::USD, // Default or error?
         };
-        let amount = Amount::new(amount_value, currency.clone()).map_err(AppError::DomainRuleViolation)?;
+        let amount = Amount::new(amount_value, currency.clone()).map_err(|e| AppError::DomainRuleViolation(e.to_string()))?;
         
         let net_amount_value: f64 = row.try_get("net_amount_value").map_err(AppError::DatabaseError)?;
         let net_amount_currency_str: String = row.try_get("net_amount_currency").map_err(AppError::DatabaseError)?;
@@ -499,7 +653,7 @@ impl PostgreSQLPaymentRepository {
         let net_currency = match net_amount_currency_str.as_str() {
             "USD" => Currency::USD, "ETH" => Currency::ETH, "SOL" => Currency::SOL, "USDC" => Currency::USDC, "VIBES" => Currency::VIBES, _ => Currency::USD,
         };
-        let net_amount = Amount::new(net_amount_value, net_currency).map_err(AppError::DomainRuleViolation)?;
+        let net_amount = Amount::new(net_amount_value, net_currency).map_err(|e| AppError::DomainRuleViolation(e.to_string()))?;
         
         // Platform Fee
         let platform_fee = row.try_get::<Option<f64>, _>("platform_fee_value").map_err(AppError::DatabaseError)?
@@ -507,19 +661,19 @@ impl PostgreSQLPaymentRepository {
                  let fee_currency_str: String = row.try_get("platform_fee_currency").unwrap_or("USD".to_string());
                  // Simplified currency parse
                  let fee_currency = if fee_currency_str == "ETH" { Currency::ETH } else { Currency::USD }; 
-                 Amount::new(fee, fee_currency).map_err(AppError::DomainRuleViolation)
+                 Amount::new(fee, fee_currency).map_err(|e| AppError::DomainRuleViolation(e.to_string()))
             })
             .transpose()?;
         
         // Payment Method - deserialize from details JSON (which contains enum structure)
         let payment_method: PaymentMethod = serde_json::from_value(
             row.try_get("payment_method_details").map_err(AppError::DatabaseError)?
-        ).map_err(AppError::SerializationError)?;
+        ).map_err(|e| AppError::SerializationError(e.to_string()))?;
         
         // Payment Purpose
         let purpose: PaymentPurpose = serde_json::from_value(
             row.try_get("purpose_details").map_err(AppError::DatabaseError)?
-        ).map_err(AppError::SerializationError)?;
+        ).map_err(|e| AppError::SerializationError(e.to_string()))?;
         
         let status_str: String = row.try_get("status").map_err(AppError::DatabaseError)?;
         let status = match status_str.as_str() {
@@ -535,7 +689,7 @@ impl PostgreSQLPaymentRepository {
         };
         
         let blockchain_hash = row.try_get::<Option<String>, _>("blockchain_hash").map_err(AppError::DatabaseError)?
-            .map(|hash| TransactionHash::new(hash).map_err(AppError::DomainRuleViolation))
+            .map(|hash| TransactionHash::new(hash).map_err(|e| AppError::DomainRuleViolation(e.to_string())))
             .transpose()?;
         
         let created_at: DateTime<Utc> = row.try_get("created_at").map_err(AppError::DatabaseError)?;
@@ -548,7 +702,7 @@ impl PostgreSQLPaymentRepository {
         
         let metadata: crate::bounded_contexts::payment::domain::value_objects::PaymentMetadata = serde_json::from_value(
             metadata_val
-        ).map_err(AppError::SerializationError)?;
+        ).map_err(|e| AppError::SerializationError(e.to_string()))?;
         
         Ok(Payment::new(
             payment_id,
@@ -579,7 +733,7 @@ impl PostgreSQLPaymentRepository {
         let currency = match currency_str.as_str() {
             "USD" => Currency::USD, "ETH" => Currency::ETH, "SOL" => Currency::SOL, "USDC" => Currency::USDC, "VIBES" => Currency::VIBES, _ => Currency::USD,
         };
-        let total_amount = Amount::new(total_amount_value, currency).map_err(AppError::DomainRuleViolation)?;
+        let total_amount = Amount::new(total_amount_value, currency).map_err(|e| AppError::DomainRuleViolation(e.to_string()))?;
         
         let payment_count: i32 = row.try_get("payment_count").map_err(AppError::DatabaseError)?;
         let successful_payments: i32 = row.try_get("successful_payments").map_err(AppError::DatabaseError)?;

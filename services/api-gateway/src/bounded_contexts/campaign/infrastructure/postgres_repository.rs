@@ -443,4 +443,57 @@ mod tests {
             assert_eq!(target.value(), 1000.0);
         }
     }
-} 
+}
+
+// ============================================================================
+// CAMPAIGN PARTICIPATION REPOSITORY
+// ============================================================================
+
+use crate::bounded_contexts::campaign::domain::repository::CampaignParticipationRepository;
+
+pub struct PostgresCampaignParticipationRepository {
+    pool: PgPool,
+}
+
+impl PostgresCampaignParticipationRepository {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+}
+
+#[async_trait]
+impl CampaignParticipationRepository for PostgresCampaignParticipationRepository {
+    async fn record_participation(&self, campaign_id: Uuid, user_id: Uuid) -> RepoResult<()> {
+        sqlx::query(
+            r#"
+            INSERT INTO campaign_participants (campaign_id, user_id, joined_at)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (campaign_id, user_id) DO NOTHING
+            "#
+        )
+        .bind(campaign_id)
+        .bind(user_id)
+        .bind(Utc::now())
+        .execute(&self.pool)
+        .await
+        .map_err(|e| crate::shared::domain::errors::AppError::Infrastructure(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn is_participating(&self, campaign_id: Uuid, user_id: Uuid) -> RepoResult<bool> {
+        let count: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COUNT(*) FROM campaign_participants
+            WHERE campaign_id = $1 AND user_id = $2
+            "#
+        )
+        .bind(campaign_id)
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| crate::shared::domain::errors::AppError::Infrastructure(e.to_string()))?;
+
+        Ok(count > 0)
+    }
+}

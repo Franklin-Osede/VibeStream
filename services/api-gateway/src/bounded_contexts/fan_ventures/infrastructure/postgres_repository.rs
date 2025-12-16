@@ -70,6 +70,11 @@ impl PostgresFanVenturesRepository {
         .await
         .map_err(|e| AppError::DatabaseError(e.to_string()))?;
 
+        // Persist benefits if any
+        for benefit in &venture.benefits {
+            self.create_venture_benefit(benefit).await?;
+        }
+
         Ok(())
     }
 
@@ -91,6 +96,13 @@ impl PostgresFanVenturesRepository {
                 let tags: Vec<String> = serde_json::from_value(row.tags)
                     .map_err(|e| AppError::SerializationError(e.to_string()))?;
                 
+                // Load benefits
+                let benefits = self.get_venture_benefits(venture_id).await
+                    .unwrap_or_else(|e| {
+                         tracing::error!("Failed to load benefits for venture {}: {}", venture_id, e);
+                         vec![]
+                    });
+
                 let venture = ArtistVenture {
                     id: row.id,
                     artist_id: row.artist_id,
@@ -112,7 +124,7 @@ impl PostgresFanVenturesRepository {
                     end_date: row.end_date,
                     created_at: row.created_at,
                     updated_at: row.updated_at,
-benefits: vec![], // TODO: Load benefits separately
+                    benefits,
                 };
                 Ok(Some(venture))
             }
@@ -454,29 +466,99 @@ benefits: serde_json::from_value(row.benefits.unwrap_or(serde_json::Value::Null)
     // VENTURE BENEFITS
     // =============================================================================
 
-    pub async fn create_venture_benefit(&self, _benefit: &VentureBenefit) -> Result<(), AppError> {
-        // TODO: Implementar cuando la base de datos esté disponible
+    pub async fn create_venture_benefit(&self, benefit: &VentureBenefit) -> Result<(), AppError> {
+        sqlx::query!(
+            r#"INSERT INTO venture_benefits (
+                id, venture_id, tier_id, title, description, benefit_type,
+                delivery_method, estimated_delivery_date, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"#,
+            benefit.id,
+            benefit.venture_id,
+            benefit.tier_id,
+            benefit.title,
+            benefit.description,
+            benefit.benefit_type.to_string(),
+            benefit.delivery_method.to_string(),
+            benefit.estimated_delivery_date,
+            benefit.created_at,
+            benefit.updated_at
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(format!("Failed to create venture benefit: {}", e)))?;
+
         Ok(())
     }
 
-    pub async fn get_venture_(&self, _venture_id: Uuid) -> Result<Vec<VentureBenefit>, AppError> {
-        // TODO: Implementar cuando la base de datos esté disponible
-        Ok(vec![])
+    pub async fn get_venture_benefits(&self, venture_id: Uuid) -> Result<Vec<VentureBenefit>, AppError> {
+        let rows = sqlx::query!(
+            r#"SELECT id, venture_id, tier_id, title, description, benefit_type,
+                      delivery_method, estimated_delivery_date, created_at, updated_at
+               FROM venture_benefits
+               WHERE venture_id = $1"#,
+            venture_id
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(format!("Failed to get venture benefits: {}", e)))?;
+
+        let benefits = rows.into_iter().map(|row| VentureBenefit {
+            id: row.id,
+            venture_id: row.venture_id,
+            tier_id: row.tier_id,
+            title: row.title,
+            description: row.description,
+            benefit_type: row.benefit_type.parse().unwrap_or_default(),
+            delivery_method: row.delivery_method.unwrap_or_default().parse().unwrap_or_default(),
+            estimated_delivery_date: row.estimated_delivery_date,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        }).collect();
+
+        Ok(benefits)
     }
 
-    pub async fn update_venture_benefit(&self, _benefit: &VentureBenefit) -> Result<(), AppError> {
-        // TODO: Implementar cuando la base de datos esté disponible
+    pub async fn update_venture_benefit(&self, benefit: &VentureBenefit) -> Result<(), AppError> {
+        // TODO: Implement update
         Ok(())
     }
 
-    pub async fn delete_venture_benefit(&self, _benefit_id: Uuid) -> Result<(), AppError> {
-        // TODO: Implementar cuando la base de datos esté disponible
+    pub async fn delete_venture_benefit(&self, benefit_id: Uuid) -> Result<(), AppError> {
+        sqlx::query!("DELETE FROM venture_benefits WHERE id = $1", benefit_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
         Ok(())
     }
 
-    pub async fn get_benefit_by_id(&self, _benefit_id: Uuid) -> Result<Option<VentureBenefit>, AppError> {
-        // TODO: Implementar cuando la base de datos esté disponible
-        Ok(None)
+    pub async fn get_benefit_by_id(&self, benefit_id: Uuid) -> Result<Option<VentureBenefit>, AppError> {
+        let row = sqlx::query!(
+            r#"SELECT id, venture_id, tier_id, title, description, benefit_type,
+                      delivery_method, estimated_delivery_date, created_at, updated_at
+               FROM venture_benefits
+               WHERE id = $1"#,
+            benefit_id
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(format!("Failed to get benefit by ID: {}", e)))?;
+
+        if let Some(row) = row {
+            Ok(Some(VentureBenefit {
+                id: row.id,
+                venture_id: row.venture_id,
+                tier_id: row.tier_id,
+                title: row.title,
+                description: row.description,
+                benefit_type: row.benefit_type.parse().unwrap_or_default(),
+                delivery_method: row.delivery_method.unwrap_or_default().parse().unwrap_or_default(),
+                estimated_delivery_date: row.estimated_delivery_date,
+                created_at: row.created_at,
+                updated_at: row.updated_at,
+            }))
+        } else {
+            Ok(None)
+        }
     }
 
     // =============================================================================

@@ -312,7 +312,7 @@ pub struct ApiResponse<T> {
             ApiError,
             ApiResponse<serde_json::Value>,
             paths::RefreshTokenRequest,
-            paths::RefreshTokenRequest,
+
             paths::RefreshTokenResponse,
             // Payment Schemas
             crate::bounded_contexts::payment::application::dto::PaymentDTO,
@@ -480,6 +480,11 @@ mod tests {
         let json = generate_openapi_json();
         assert!(json.contains("VibeStream API"));
         assert!(json.contains("1.0.0"));
+        
+        // Write to file for client generation
+        use std::io::Write;
+        let mut file = std::fs::File::create("openapi.json").expect("Failed to create openapi.json");
+        file.write_all(json.as_bytes()).expect("Failed to write to openapi.json");
     }
     
     #[test]

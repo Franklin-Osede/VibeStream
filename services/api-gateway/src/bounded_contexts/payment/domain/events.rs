@@ -814,6 +814,61 @@ impl DomainEvent for PlatformFeeCollected {
     fn event_data(&self) -> serde_json::Value { serde_json::to_value(self).unwrap_or_default() }
 }
 
+/// Revenue Share Distributed Event (for individual shareholder)
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RevenueShareDistributed {
+    pub distribution_id: Uuid,
+    pub contract_id: Uuid,
+    pub shareholder_id: Uuid,
+    pub share_amount: Amount,
+    pub total_distributed_to_shareholder: Amount,
+    pub occurred_at: DateTime<Utc>,
+    pub metadata: EventMetadata,
+}
+
+impl RevenueShareDistributed {
+    pub fn new(
+        distribution_id: Uuid,
+        contract_id: Uuid,
+        shareholder_id: Uuid,
+        share_amount: Amount,
+        total_distributed_to_shareholder: Amount,
+    ) -> Self {
+        let metadata = EventMetadata::with_type_and_aggregate(
+            "RevenueShareDistributed",
+            distribution_id,
+            "RevenueSharingDistribution"
+        );
+        Self {
+            distribution_id,
+            contract_id,
+            shareholder_id,
+            share_amount,
+            total_distributed_to_shareholder,
+            occurred_at: Utc::now(),
+            metadata,
+        }
+    }
+}
+
+impl DomainEvent for RevenueShareDistributed {
+    fn metadata(&self) -> &EventMetadata { &self.metadata }
+    fn event_type(&self) -> &str { "RevenueShareDistributed" }
+    fn aggregate_id(&self) -> Uuid { self.distribution_id }
+    fn aggregate_type(&self) -> &str { "RevenueSharingDistribution" }
+    fn occurred_at(&self) -> DateTime<Utc> { self.occurred_at }
+    fn event_data(&self) -> serde_json::Value { serde_json::to_value(self).unwrap_or_default() }
+}
+
+impl DomainEvent for PlatformFeeCollected {
+    fn metadata(&self) -> &EventMetadata { &self.metadata }
+    fn event_type(&self) -> &str { "PlatformFeeCollected" }
+    fn aggregate_id(&self) -> Uuid { self.fee_payment_id.value() }
+    fn aggregate_type(&self) -> &str { "Payment" }
+    fn occurred_at(&self) -> DateTime<Utc> { self.occurred_at }
+    fn event_data(&self) -> serde_json::Value { serde_json::to_value(self).unwrap_or_default() }
+}
+
 /// Payment Batch Created Event
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PaymentBatchCreated {

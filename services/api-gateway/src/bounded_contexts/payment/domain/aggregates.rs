@@ -13,7 +13,7 @@ use super::events::*;
 /// 
 /// This aggregate manages the complete lifecycle of a payment,
 /// including validation, processing, completion, and potential refunds.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PaymentAggregate {
     payment: Payment,
     related_payments: Vec<PaymentId>, // For refunds, fees, etc.
@@ -279,7 +279,7 @@ impl PaymentAggregate {
 /// 
 /// Manages the distribution of royalties from song plays to artists,
 /// including platform fees and multiple payment processing.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RoyaltyDistributionAggregate {
     distribution: RoyaltyDistribution,
     payments: Vec<PaymentAggregate>,
@@ -349,16 +349,16 @@ impl RoyaltyDistributionAggregate {
             reference_id: Some(format!("royalty_dist_{}", self.distribution.id())),
             additional_data: serde_json::json!({
                 "distribution_id": self.distribution.id(),
-                "period_start": self.distribution.period_start,
-                "period_end": self.distribution.period_end,
+                "period_start": self.distribution.period_start(),
+                "period_end": self.distribution.period_end(),
             }),
         };
         
         let artist_payment_purpose = PaymentPurpose::RoyaltyDistribution {
             song_id: self.distribution.song_id(),
             artist_id: self.distribution.artist_id(),
-            period_start: self.distribution.period_start,
-            period_end: self.distribution.period_end,
+            period_start: self.distribution.period_start(),
+            period_end: self.distribution.period_end(),
         };
         
         let artist_payment = PaymentAggregate::create_payment(
@@ -431,7 +431,7 @@ impl RoyaltyDistributionAggregate {
 /// 
 /// Manages the distribution of revenue from songs to multiple shareholders
 /// in fractional ownership contracts.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RevenueSharingAggregate {
     distribution_id: Uuid,
     contract_id: Uuid,
@@ -565,9 +565,6 @@ impl RevenueSharingAggregate {
             )) as Box<dyn DomainEvent>);
         }
         
-        for event in events {
-            self.add_event(event);
-        }
         
         for event in events {
             self.add_event(event);
@@ -640,6 +637,8 @@ impl RevenueSharingAggregate {
     pub fn status(&self) -> &RevenueSharingStatus { &self.status }
     pub fn version(&self) -> u64 { self.version }
     pub fn uncommitted_events(&self) -> &[Box<dyn DomainEvent>] { &self.uncommitted_events }
+    
+    pub fn created_at(&self) -> DateTime<Utc> { self.created_at }
     
     pub fn mark_events_as_committed(&mut self) {
         self.uncommitted_events.clear();

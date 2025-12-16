@@ -470,4 +470,46 @@ mod tests {
         
         assert!(command.validate().is_ok());
     }
-} 
+}
+
+// Wallet Commands
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateWalletCommand {
+    pub user_id: Uuid,
+    pub wallet_type: String,
+    pub currency: Option<String>,
+    pub is_primary: bool,
+    pub created_by: Uuid,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateWalletResult {
+    pub wallet_id: Uuid,
+    pub address: String,
+    pub wallet_type: String,
+    pub currency: String,
+    pub balance: f64,
+    pub is_primary: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DistributeRoyaltiesCommand {
+    pub distribution_id: Uuid,
+    pub processor_id: String,
+}
+
+// Wallet entity (simplified for now)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Wallet {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub wallet_type: String,
+    pub address: String,
+    pub currency: String,
+    pub balance: f64,
+    pub is_primary: bool,
+    pub created_at: DateTime<Utc>,
+}
+ 

@@ -13,7 +13,7 @@ use crate::bounded_contexts::fan_loyalty::{
             BiometricVerificationService, WristbandService, QrCodeService, 
             NftService, ZkProofService, EventPublisher
         },
-        entities::{FanId, WristbandId, WristbandType, NftWristband, FanVerificationResult},
+        entities::{FanId, WristbandId, WristbandType, NftWristband, FanVerificationResult, WristbandActivationResult, ZkProofType},
     },
     infrastructure::{
         database::FanLoyaltyRepository,
@@ -415,7 +415,12 @@ impl WristbandHandler for WristbandHandlerImpl {
         };
         self.event_publisher.publish_wristband_activated(&event).await?;
 
-        Ok(activation_result)
+        Ok(WristbandActivationResult {
+            wristband_id: activation_result.wristband_id,
+            is_active: activation_result.is_active,
+            activated_at: activation_result.activated_at,
+            benefits_activated: activation_result.benefits_activated,
+        })
     }
 }
 
@@ -593,26 +598,10 @@ use crate::bounded_contexts::fan_loyalty::domain::services::{
     WristbandActivatedEvent, QrCodeScannedEvent, QrCodeValidation, QrCodeScanResult
 };
 use crate::bounded_contexts::fan_loyalty::domain::entities::BiometricProofData;
-use crate::bounded_contexts::fan_loyalty::domain::repositories::ZkProof;
+use crate::bounded_contexts::fan_loyalty::domain::entities::ZkProof;
 
-/// Wristband activation result
-#[derive(Debug, Clone)]
-pub struct WristbandActivationResult {
-    pub wristband_id: WristbandId,
-    pub is_active: bool,
-    pub activated_at: DateTime<Utc>,
-    pub benefits_activated: Vec<String>,
-}
+// Types imported from domain/entities.rs
 
-// All domain types are already imported above
-
-/// ZK proof types
-#[derive(Debug, Clone, PartialEq)]
-pub enum ZkProofType {
-    Biometric,
-    Wristband,
-    Ownership,
-}
 
 // Use domain event types directly - no duplicate definitions needed
 

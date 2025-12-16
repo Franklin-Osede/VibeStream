@@ -368,6 +368,7 @@ pub enum FraudAction {
     Review,
     Block,
     RequireAdditionalVerification,
+    Monitor,
 }
 
 #[derive(Debug, Clone)]

@@ -4,7 +4,9 @@ use chrono::{DateTime, Utc, Duration};
 use sha2::{Sha256, Digest};
 use base64::{Engine as _, engine::general_purpose};
 
-use crate::bounded_contexts::fan_loyalty::domain::entities::{WristbandId, FanId};
+use crate::bounded_contexts::fan_loyalty::domain::entities::{
+    WristbandId, FanId, QrCode, QrCodeValidation, QrCodeScanResult, LocationData
+};
 
 /// QR Code service for wristband access control
 #[derive(Debug, Clone)]
@@ -13,6 +15,7 @@ pub struct QrCodeService {
     secret_key: String,
     expiration_hours: i64,
 }
+
 
 impl QrCodeService {
     pub fn new(base_url: String, secret_key: String, expiration_hours: i64) -> Self {
@@ -184,43 +187,8 @@ impl QrCodeService {
     }
 }
 
-/// QR Code data structure
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QrCode {
-    pub code: String,
-    pub url: String,
-    pub wristband_id: WristbandId,
-    pub expires_at: DateTime<Utc>,
-    pub created_at: DateTime<Utc>,
-}
+// Structs moved to domain::entities
 
-/// QR Code validation result
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QrCodeValidation {
-    pub is_valid: bool,
-    pub wristband_id: WristbandId,
-    pub expires_at: Option<DateTime<Utc>>,
-}
-
-/// QR Code scan result
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QrCodeScanResult {
-    pub scan_successful: bool,
-    pub wristband_id: Option<WristbandId>,
-    pub fan_id: Option<FanId>,
-    pub access_granted: bool,
-    pub benefits_available: Vec<String>,
-    pub scan_timestamp: DateTime<Utc>,
-}
-
-/// Location data for scan events
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LocationData {
-    pub latitude: f64,
-    pub longitude: f64,
-    pub accuracy: f32,
-    pub timestamp: DateTime<Utc>,
-}
 
 #[cfg(test)]
 mod tests {

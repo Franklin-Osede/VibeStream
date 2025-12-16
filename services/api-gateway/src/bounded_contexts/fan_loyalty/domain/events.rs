@@ -34,6 +34,8 @@ pub struct WristbandCreatedEvent {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WristbandActivatedEvent {
     pub wristband_id: WristbandId,
+    pub fan_id: FanId,
+    pub activation_reason: String,
     pub activated_at: DateTime<Utc>,
 }
 

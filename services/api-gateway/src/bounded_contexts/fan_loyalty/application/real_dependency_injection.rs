@@ -5,14 +5,7 @@
 use std::sync::Arc;
 use sqlx::PgPool;
 use redis::Client;
-use crate::bounded_contexts::fan_loyalty::domain::repositories::{
-    FanVerificationRepository, WristbandRepository, QrCodeRepository, 
-    ZkProofRepository, NftRepository
-};
-use crate::bounded_contexts::fan_loyalty::domain::services::{
-    BiometricVerificationService, WristbandService, QrCodeService, 
-    NftService, ZkProofService, EventPublisher
-};
+use crate::bounded_contexts::fan_loyalty::application::dependency_injection::FanLoyaltyContainer;
 use crate::bounded_contexts::fan_loyalty::infrastructure::postgres_repositories::{
     PostgresFanVerificationRepository, PostgresWristbandRepository, 
     PostgresQrCodeRepository, PostgresZkProofRepository, PostgresNftRepository
@@ -25,28 +18,11 @@ use crate::bounded_contexts::fan_loyalty::infrastructure::mock_services::{
 use crate::bounded_contexts::fan_loyalty::infrastructure::nft_service::BlockchainNftService;
 use crate::shared::infrastructure::clients::blockchain_client::BlockchainClient;
 
-/// Real Dependency Injection Container for Fan Loyalty System
-#[derive(Clone)]
-pub struct RealFanLoyaltyContainer {
-    // Repositories (Real PostgreSQL implementations)
-    pub fan_verification_repository: Arc<dyn FanVerificationRepository>,
-    pub wristband_repository: Arc<dyn WristbandRepository>,
-    pub qr_code_repository: Arc<dyn QrCodeRepository>,
-    pub zk_proof_repository: Arc<dyn ZkProofRepository>,
-    pub nft_repository: Arc<dyn NftRepository>,
+/// Factory for creating real containers
+pub struct RealFanLoyaltyFactory;
 
-    // Services
-    pub biometric_verification_service: Arc<dyn BiometricVerificationService>,
-    pub wristband_service: Arc<dyn WristbandService>,
-    pub qr_code_service: Arc<dyn QrCodeService>,
-    pub nft_service: Arc<dyn NftService>,
-    pub zk_proof_service: Arc<dyn ZkProofService>,
-    pub event_publisher: Arc<dyn EventPublisher>,
-}
-
-impl RealFanLoyaltyContainer {
-    /// Create new real container with PostgreSQL repositories
-    pub fn new(pool: PgPool, _redis_client: Client, blockchain_client: Arc<BlockchainClient>) -> Self {
+impl RealFanLoyaltyFactory {
+    pub fn create_container(pool: PgPool, _redis_client: Client, blockchain_client: Arc<BlockchainClient>) -> Arc<FanLoyaltyContainer> {
         // Create real PostgreSQL repositories
         let fan_verification_repository = Arc::new(PostgresFanVerificationRepository::new(pool.clone()));
         let wristband_repository = Arc::new(PostgresWristbandRepository::new(pool.clone()));
@@ -68,6 +44,12 @@ impl RealFanLoyaltyContainer {
         );
         let nft_service = Arc::new(nft_service_impl);
         
+        // Circular dependency handling for services matching the container logic:
+        // FanLoyaltyContainer::new handles the service wiring internally mostly, 
+        // but we need to provide the base services.
+        // Wait, MockWristbandService takes repositories.
+        
+        // We will construct the services here before passing to container.
         let wristband_service = Arc::new(MockWristbandService::new(
             wristband_repository.clone(),
             nft_service.clone(),
@@ -84,7 +66,8 @@ impl RealFanLoyaltyContainer {
             event_publisher.clone(),
         ));
 
-        Self {
+        // Use FanLoyaltyContainer::new to wire everything up including handlers
+        let container = FanLoyaltyContainer::new(
             fan_verification_repository,
             wristband_repository,
             qr_code_repository,
@@ -96,15 +79,11 @@ impl RealFanLoyaltyContainer {
             nft_service,
             zk_proof_service,
             event_publisher,
-        }
+        );
+
+        Arc::new(container)
     }
 }
 
-/// Factory for creating real containers
-pub struct RealFanLoyaltyFactory;
-
-impl RealFanLoyaltyFactory {
-    pub fn create_container(pool: PgPool, redis_client: Client, blockchain_client: Arc<BlockchainClient>) -> Arc<RealFanLoyaltyContainer> {
-        Arc::new(RealFanLoyaltyContainer::new(pool, redis_client, blockchain_client))
-    }
-}
+// Type alias for compatibility with existing imports
+pub type RealFanLoyaltyContainer = FanLoyaltyContainer;

@@ -62,7 +62,7 @@ async fn auth_middleware(
 mod tests {
     use super::*;
     use axum::http::StatusCode;
-    use axum::ServiceExt;
+    use tower::ServiceExt;
 
     #[tokio::test]
     async fn test_routes_exist() {

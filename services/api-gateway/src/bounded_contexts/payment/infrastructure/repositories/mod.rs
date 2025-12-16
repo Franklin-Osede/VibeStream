@@ -13,4 +13,7 @@ pub use revenue_sharing_repository::*;
 
 // Re-export type aliases for controller compatibility
 pub use royalty_repository::PostgresRoyaltyRepository;
-pub use revenue_sharing_repository::PostgresWalletRepository; 
+pub use revenue_sharing_repository::PostgresWalletRepository;
+
+pub mod mock_repositories;
+pub use mock_repositories::*; 

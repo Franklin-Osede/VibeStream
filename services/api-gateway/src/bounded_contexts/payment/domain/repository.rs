@@ -157,7 +157,7 @@ pub trait RevenueSharingRepository: Send + Sync {
 #[async_trait]
 pub trait PaymentAnalyticsRepository: Send + Sync {
     /// Get payment statistics for a period
-    async fn get_payment_statistics(&self, start: DateTime<Utc>, end: DateTime<Utc>) -> PaymentRepositoryResult<PaymentStatistics>;
+    async fn get_payment_statistics(&self, start: DateTime<Utc>, end: DateTime<Utc>, currency: Option<Currency>, purpose_type: Option<String>) -> PaymentRepositoryResult<PaymentStatistics>;
     
     /// Get payment volume by currency
     async fn get_volume_by_currency(&self, start: DateTime<Utc>, end: DateTime<Utc>) -> PaymentRepositoryResult<HashMap<Currency, f64>>;
@@ -178,14 +178,33 @@ pub trait PaymentAnalyticsRepository: Send + Sync {
     async fn get_top_payees(&self, start: DateTime<Utc>, end: DateTime<Utc>, limit: u32) -> PaymentRepositoryResult<Vec<UserPaymentSummary>>;
     
     /// Get payment trends (daily, weekly, monthly)
-    async fn get_payment_trends(&self, start: DateTime<Utc>, end: DateTime<Utc>, granularity: TrendGranularity) -> PaymentRepositoryResult<Vec<PaymentTrend>>;
+    async fn get_payment_trends(&self, start: DateTime<Utc>, end: DateTime<Utc>, granularity: &str) -> PaymentRepositoryResult<Vec<PaymentTrend>>;
     
     /// Get failed payment analysis
     async fn get_failed_payment_analysis(&self, start: DateTime<Utc>, end: DateTime<Utc>) -> PaymentRepositoryResult<FailedPaymentAnalysis>;
     
     /// Get fraud detection metrics
     async fn get_fraud_metrics(&self, start: DateTime<Utc>, end: DateTime<Utc>) -> PaymentRepositoryResult<FraudMetrics>;
+    
+    /// Get shareholder portfolio
+    async fn get_shareholder_portfolio(&self, shareholder_id: Uuid, include_pending: bool) -> PaymentRepositoryResult<ShareholderPortfolio>;
+    
+    /// Get shareholder holdings
+    async fn get_shareholder_holdings(&self, shareholder_id: Uuid, include_historical: bool) -> PaymentRepositoryResult<Vec<ShareholderHolding>>;
+
+    // Missing methods required by handlers
+    async fn get_payment_breakdown(&self, start: DateTime<Utc>, end: DateTime<Utc>) -> PaymentRepositoryResult<HashMap<String, f64>>;
+    async fn get_payment_overview(&self, start: DateTime<Utc>, end: DateTime<Utc>) -> PaymentRepositoryResult<PaymentStatistics>;
+    async fn get_revenue_breakdown(&self, start: DateTime<Utc>, end: DateTime<Utc>) -> PaymentRepositoryResult<HashMap<String, f64>>;
+    async fn get_detailed_user_payment_summary(&self, user_id: Uuid, start: Option<DateTime<Utc>>, end: Option<DateTime<Utc>>) -> PaymentRepositoryResult<DetailedUserPaymentSummary>;
+    async fn get_user_payment_method_usage(&self, user_id: Uuid, start: Option<DateTime<Utc>>, end: Option<DateTime<Utc>>) -> PaymentRepositoryResult<HashMap<String, u64>>;
+    async fn get_user_recent_activity(&self, user_id: Uuid, limit: u32) -> PaymentRepositoryResult<Vec<PaymentActivity>>;
+    async fn get_user_payment_summary(&self, user_id: Uuid, start: Option<DateTime<Utc>>, end: Option<DateTime<Utc>>) -> PaymentRepositoryResult<UserPaymentSummary>;
+    async fn get_artist_revenue_summary(&self, artist_id: Uuid, start: Option<DateTime<Utc>>, end: Option<DateTime<Utc>>) -> PaymentRepositoryResult<ArtistRevenueSummary>;
+    async fn get_artist_song_revenue_breakdown(&self, artist_id: Uuid, start: Option<DateTime<Utc>>, end: Option<DateTime<Utc>>) -> PaymentRepositoryResult<Vec<SongRevenueBreakdown>>;
+    async fn get_artist_revenue_trends(&self, artist_id: Uuid, start: Option<DateTime<Utc>>, end: Option<DateTime<Utc>>) -> PaymentRepositoryResult<Vec<RevenueTrend>>;
 }
+
 
 /// Repository for Fraud Detection
 #[async_trait]
@@ -223,6 +242,13 @@ pub trait PaymentEventRepository: Send + Sync {
     
     /// Get events for user
     async fn get_user_events(&self, user_id: Uuid, start: DateTime<Utc>, end: DateTime<Utc>) -> PaymentRepositoryResult<Vec<Box<dyn crate::shared::domain::events::DomainEvent>>>;
+}
+
+/// Repository for Wallet Aggregates
+#[async_trait]
+pub trait WalletRepository: Send + Sync {
+    async fn save(&self, wallet: &Wallet) -> PaymentRepositoryResult<()>;
+    async fn find_by_user_id(&self, user_id: Uuid) -> PaymentRepositoryResult<Option<Wallet>>;
 }
 
 // Supporting data structures for analytics
@@ -284,6 +310,75 @@ pub struct FraudMetrics {
     pub blocked_transactions: u64,
     pub fraud_indicators: HashMap<String, u64>,
     pub fraud_rate: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShareholderPortfolio {
+    pub total_investments: f64,
+    pub current_value: f64,
+    pub total_returns: f64,
+    pub return_rate: f64,
+    pub active_contracts: u32,
+    pub pending_distributions: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShareholderHolding {
+    pub contract_id: Uuid,
+    pub asset_name: String,
+    pub symbol: String,
+    pub shares_owned: f64,
+    pub ownership_percentage: f64,
+    pub initial_investment: f64,
+    pub total_returns: f64,
+    pub purchased_at: DateTime<Utc>,
+    pub last_distribution_at: Option<DateTime<Utc>>,
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DetailedUserPaymentSummary {
+    pub as_payer: UserRoleSummary,
+    pub as_payee: UserRoleSummary,
+    pub total_summary: UserRoleSummary,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserRoleSummary {
+    pub total_volume: HashMap<Currency, f64>,
+    pub count: u64,
+    pub average_amount: HashMap<Currency, f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PaymentActivity {
+    pub payment_id: Uuid,
+    pub amount: f64,
+    pub currency: Currency,
+    pub activity_type: String, // "Sent", "Received"
+    pub date: DateTime<Utc>,
+    pub status: crate::bounded_contexts::payment::domain::value_objects::PaymentStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArtistRevenueSummary {
+    pub total_revenue: HashMap<Currency, f64>,
+    pub platform_fees_paid: HashMap<Currency, f64>,
+    pub net_revenue: HashMap<Currency, f64>,
+    pub royalty_distributions: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SongRevenueBreakdown {
+    pub song_id: Uuid,
+    pub revenue: HashMap<Currency, f64>,
+    pub percentage_of_total: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RevenueTrend {
+    pub period: DateTime<Utc>,
+    pub revenue: HashMap<Currency, f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

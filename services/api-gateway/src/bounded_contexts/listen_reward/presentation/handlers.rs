@@ -307,8 +307,22 @@ pub async fn complete_listen_session(
 ) -> Result<ResponseJson<CompleteListenSessionResponse>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::BAD_REQUEST)?;
     
-    // Verify ZK proof (mock verification)
-    let verification_status = if request.zk_proof.len() > 10 {
+    // Verify ZK proof via ZK Service
+    let proof = crate::shared::infrastructure::clients::zk_service_client::ZkProof {
+         proof_data: request.zk_proof.as_bytes().to_vec(),
+         public_inputs: vec![], // In a real app, we'd extract these from request
+         circuit_id: "listen_proof_circuit".to_string(),
+    };
+    
+    let is_valid = match _state.zk_client.verify_proof(proof).await {
+         Ok(valid) => valid,
+         Err(e) => {
+             tracing::error!("ZK Service verification error: {}", e);
+             false 
+         }
+    };
+
+    let verification_status = if is_valid {
         "verified"
     } else {
         "failed"
@@ -396,27 +410,32 @@ pub async fn get_user_rewards(
         return Err(StatusCode::FORBIDDEN);
     }
 
-    // Mock user data
-    let recent_sessions = vec![
-        SessionSummary {
-            session_id: Uuid::new_v4(),
-            song_title: "Summer Vibes".to_string(),
-            artist_name: "DJ Awesome".to_string(),
-            duration_seconds: 245,
-            reward_earned: 0.045,
-            quality_score: 0.87,
-            completed_at: Utc::now() - chrono::Duration::hours(2),
-        },
-        SessionSummary {
-            session_id: Uuid::new_v4(),
-            song_title: "Deep Beats".to_string(),
-            artist_name: "Bass Master".to_string(),
-            duration_seconds: 189,
-            reward_earned: 0.032,
-            quality_score: 0.73,
-            completed_at: Utc::now() - chrono::Duration::hours(5),
-        },
-    ];
+    // Fetch real data from repository
+    use crate::bounded_contexts::listen_reward::infrastructure::repositories::{
+        PostgresRewardAnalyticsRepository, Pagination
+    };
+    use crate::bounded_contexts::listen_reward::infrastructure::repositories::repository_traits::RewardAnalyticsRepository;
+
+    let analytics_repo = PostgresRewardAnalyticsRepository::new(_state.get_db_pool().clone());
+    
+    // Pagination defaults
+    let pagination = Pagination { offset: 0, limit: 10 };
+    
+    let history = analytics_repo.get_user_reward_history(user_id, &pagination).await
+        .map_err(|e| {
+             tracing::error!("Failed to fetch user rewards: {}", e);
+             StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    let recent_sessions: Vec<SessionSummary> = history.into_iter().map(|h| SessionSummary {
+        session_id: h.session_id,
+        song_title: "Unknown Song".to_string(), // TODO: Join with songs table
+        artist_name: "Unknown Artist".to_string(), // TODO: Join with artists table
+        duration_seconds: h.listen_duration.unwrap_or(0),
+        reward_earned: h.reward_amount,
+        quality_score: h.quality_score.unwrap_or(0.0),
+        completed_at: h.earned_at,
+    }).collect();
 
     let achievements = vec![
         Achievement {

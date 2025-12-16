@@ -38,7 +38,6 @@ pub async fn create_fan_loyalty_gateway(app_state: AppState) -> Result<Router, B
         .route("/", get(health_check))
         .route("/health", get(health_check))
         .route("/info", get(info))
-        .nest("/api/v1", api_router)
         .nest("/api/v1", api_router);
 
     Ok(router)

@@ -261,3 +261,95 @@ impl NftCreationResult {
         }
     }
 }
+
+
+// ============================================================================
+// ZK PROOF ENTITIES (Consolidated)
+// ============================================================================
+
+/// ZK proof types
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum ZkProofType {
+    Biometric,
+    Wristband,
+    Ownership,
+}
+
+/// ZK proof status
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ZkProofStatus {
+    pub proof_id: Uuid,
+    pub is_verified: bool,
+    pub confidence_score: Option<f32>,
+    pub verified_at: Option<DateTime<Utc>>,
+}
+
+/// ZK proof
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ZkProof {
+    pub id: Uuid,
+    pub fan_id: FanId,
+    pub proof_type: ZkProofType,
+    pub proof_data: String,
+    pub public_inputs: Vec<String>,
+    pub verification_key: String,
+    pub is_verified: bool,
+    pub confidence_score: Option<f32>,
+    pub created_at: DateTime<Utc>,
+    pub verified_at: Option<DateTime<Utc>>,
+}
+
+// ============================================================================
+// NFT METADATA
+// ============================================================================
+
+/// NFT metadata
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NftMetadata {
+    pub name: String,
+    pub description: String,
+    pub image: String,
+    pub attributes: Vec<NftAttribute>,
+    pub external_url: String,
+    pub background_color: String,
+}
+
+/// NFT attribute
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NftAttribute {
+    pub trait_type: String,
+    pub value: String,
+}
+
+
+// ============================================================================
+// QR CODE RESULTS
+// ============================================================================
+
+/// QR Code validation result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QrCodeValidation {
+    pub is_valid: bool,
+    pub wristband_id: WristbandId,
+    pub expires_at: Option<DateTime<Utc>>,
+}
+
+/// QR Code scan result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QrCodeScanResult {
+    pub scan_successful: bool,
+    pub wristband_id: Option<WristbandId>,
+    pub fan_id: Option<FanId>,
+    pub access_granted: bool,
+    pub benefits_available: Vec<String>,
+    pub scan_timestamp: DateTime<Utc>,
+}
+
+/// Wristband activation result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WristbandActivationResult {
+    pub wristband_id: WristbandId,
+    pub is_active: bool,
+    pub activated_at: DateTime<Utc>,
+    pub benefits_activated: Vec<String>,
+}

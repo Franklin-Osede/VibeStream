@@ -23,7 +23,7 @@ pub fn create_openapi_router() -> Router {
         )
         // Redoc - Alternative documentation interface  
         .merge(
-            Redoc::new("/redoc", ApiDoc::openapi())
+            Redoc::new("/redoc")
         )
         // Endpoint to get OpenAPI JSON
         .route("/api-docs/openapi.json", get(openapi_spec_handler))

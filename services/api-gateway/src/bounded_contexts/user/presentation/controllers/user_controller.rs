@@ -9,6 +9,7 @@ use axum::{
     Router,
 };
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
@@ -31,7 +32,7 @@ use crate::shared::infrastructure::clients::facial_recognition_client::VerifyFac
 type UserAppService = UserApplicationService<PostgresUserRepository>;
 
 // Request/Response DTOs
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct RegisterUserRequest {
     pub email: String,
     pub username: String,
@@ -43,7 +44,7 @@ pub struct RegisterUserRequest {
     pub marketing_emails_consent: Option<bool>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct RegisterUserResponse {
     pub user_id: Uuid,
     pub username: String,
@@ -53,26 +54,26 @@ pub struct RegisterUserResponse {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct LoginRequest {
     pub credential: String, // email or username
     pub password: String,
     pub remember_me: Option<bool>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct RefreshTokenRequest {
     pub refresh_token: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct RefreshTokenResponse {
     pub access_token: String,
     pub refresh_token: String,
     pub expires_in: u64,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct LoginResponse {
     pub user_id: Uuid,
     pub username: String,
@@ -85,7 +86,7 @@ pub struct LoginResponse {
     pub tier: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdateUserRequest {
     pub display_name: Option<String>,
     pub bio: Option<String>,
@@ -96,7 +97,7 @@ pub struct UpdateUserRequest {
     pub is_public: Option<bool>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserProfileResponse {
     pub id: Uuid,
     pub username: String,
@@ -119,7 +120,7 @@ pub struct UserProfileResponse {
     pub last_login_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserStatsResponse {
     pub user_id: Uuid,
     pub total_listening_time_minutes: u64,
@@ -138,32 +139,32 @@ pub struct UserStatsResponse {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct FollowUserRequest {
     pub follow: bool, // true = follow, false = unfollow
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct ChangePasswordRequest {
     pub current_password: String,
     pub new_password: String,
     pub confirm_new_password: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct LinkWalletRequest {
     pub wallet_address: String,
     pub signature: Option<String>,
     pub message: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct VerifyBiometricsRequest {
     pub image: String, // base64
 }
 
 // Use the query parameters directly without defining a new struct
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct UserSearchQuery {
     pub q: Option<String>,
     pub tier: Option<String>,
@@ -176,13 +177,13 @@ pub struct UserSearchQuery {
     pub sort_order: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserListResponse {
     pub users: Vec<UserSummaryResponse>,
     pub pagination: PaginationResponse,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserSummaryResponse {
     pub id: Uuid,
     pub username: String,
@@ -197,7 +198,7 @@ pub struct UserSummaryResponse {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct PaginationResponse {
     pub page: u32,
     pub page_size: u32,
@@ -207,7 +208,7 @@ pub struct PaginationResponse {
     pub has_previous_page: bool,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct ApiResponse<T> {
     pub success: bool,
     pub data: Option<T>,

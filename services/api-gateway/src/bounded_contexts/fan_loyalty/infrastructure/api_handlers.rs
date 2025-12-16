@@ -12,7 +12,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
-use crate::bounded_contexts::fan_loyalty::application::real_dependency_injection::RealFanLoyaltyContainer;
+use crate::bounded_contexts::fan_loyalty::application::dependency_injection::FanLoyaltyContainer;
 use crate::bounded_contexts::fan_loyalty::domain::entities::{FanId, WristbandId, WristbandType, BiometricData, BehavioralPatterns, DeviceCharacteristics};
 use crate::bounded_contexts::fan_loyalty::application::commands::{VerifyFanCommand, CreateWristbandCommand, ActivateWristbandCommand, GenerateQrCodeCommand, ValidateQrCodeCommand};
 use crate::bounded_contexts::fan_loyalty::application::handlers::{FanVerificationHandler, WristbandHandler};
@@ -21,21 +21,21 @@ use crate::bounded_contexts::fan_loyalty::application::handlers::{FanVerificatio
 // REQUEST/RESPONSE DTOs
 // ============================================================================
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, utoipa::ToSchema)]
 pub struct VerifyFanRequest {
     pub fan_id: String,
     pub biometric_data: BiometricDataRequest,
     pub device_id: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, utoipa::ToSchema)]
 pub struct BiometricDataRequest {
     pub audio_sample: Option<String>,
     pub behavioral_patterns: BehavioralPatternsRequest,
     pub device_characteristics: DeviceCharacteristicsRequest,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, utoipa::ToSchema)]
 pub struct BehavioralPatternsRequest {
     pub listening_duration: u64,
     pub skip_frequency: f64,
@@ -43,7 +43,7 @@ pub struct BehavioralPatternsRequest {
     pub time_of_day_patterns: Vec<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, utoipa::ToSchema)]
 pub struct DeviceCharacteristicsRequest {
     pub device_type: String,
     pub os_version: String,
@@ -51,7 +51,7 @@ pub struct DeviceCharacteristicsRequest {
     pub hardware_fingerprint: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct VerifyFanResponse {
     pub is_verified: bool,
     pub confidence_score: f64,
@@ -60,7 +60,7 @@ pub struct VerifyFanResponse {
     pub benefits_unlocked: Vec<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, utoipa::ToSchema)]
 pub struct CreateWristbandRequest {
     pub fan_id: String,
     pub concert_id: String,
@@ -69,7 +69,7 @@ pub struct CreateWristbandRequest {
     pub fan_wallet_address: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct CreateWristbandResponse {
     pub wristband_id: String,
     pub fan_id: String,
@@ -80,14 +80,14 @@ pub struct CreateWristbandResponse {
     pub created_at: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ActivateWristbandResponse {
     pub success: bool,
     pub wristband_id: String,
     pub message: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct GetWristbandResponse {
     pub wristband_id: String,
     pub fan_id: String,
@@ -98,19 +98,19 @@ pub struct GetWristbandResponse {
     pub created_at: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct GenerateQrCodeResponse {
     pub qr_code: String,
     pub wristband_id: String,
     pub expires_at: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, utoipa::ToSchema)]
 pub struct ValidateQrCodeRequest {
     pub qr_code: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ValidateQrCodeResponse {
     pub is_valid: bool,
     pub wristband_id: String,
@@ -121,7 +121,7 @@ pub struct ValidateQrCodeResponse {
     pub benefits: Vec<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct GetFanVerificationResponse {
     pub is_verified: bool,
     pub confidence_score: f64,
@@ -130,7 +130,7 @@ pub struct GetFanVerificationResponse {
     pub benefits_unlocked: Vec<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct HealthCheckResponse {
     pub status: String,
     pub service: String,
@@ -154,7 +154,7 @@ pub struct HealthCheckResponse {
     tag = "fan-loyalty"
 )]
 pub async fn verify_fan_handler(
-    State(container): State<Arc<RealFanLoyaltyContainer>>,
+    State(container): State<Arc<FanLoyaltyContainer>>,
     Json(request): Json<VerifyFanRequest>,
 ) -> Result<Json<VerifyFanResponse>, StatusCode> {
     let fan_id = FanId::new(request.fan_id);
@@ -208,7 +208,7 @@ pub async fn verify_fan_handler(
     tag = "fan-loyalty"
 )]
 pub async fn create_wristband_handler(
-    State(container): State<Arc<RealFanLoyaltyContainer>>,
+    State(container): State<Arc<FanLoyaltyContainer>>,
     Json(request): Json<CreateWristbandRequest>,
 ) -> Result<Json<CreateWristbandResponse>, StatusCode> {
     let fan_id = FanId::new(request.fan_id.clone());
@@ -258,7 +258,7 @@ pub async fn create_wristband_handler(
     tag = "fan-loyalty"
 )]
 pub async fn activate_wristband_handler(
-    State(container): State<Arc<RealFanLoyaltyContainer>>,
+    State(container): State<Arc<FanLoyaltyContainer>>,
     Path(wristband_id): Path<String>,
 ) -> Result<Json<ActivateWristbandResponse>, StatusCode> {
     let wristband_id = match Uuid::parse_str(&wristband_id) {
@@ -295,7 +295,7 @@ pub async fn activate_wristband_handler(
     tag = "fan-loyalty"
 )]
 pub async fn get_wristband_handler(
-    State(container): State<Arc<RealFanLoyaltyContainer>>,
+    State(container): State<Arc<FanLoyaltyContainer>>,
     Path(wristband_id): Path<String>,
 ) -> Result<Json<GetWristbandResponse>, StatusCode> {
     let wristband_id = match Uuid::parse_str(&wristband_id) {
@@ -333,7 +333,7 @@ pub async fn get_wristband_handler(
     tag = "fan-loyalty"
 )]
 pub async fn generate_qr_code_handler(
-    State(container): State<Arc<RealFanLoyaltyContainer>>,
+    State(container): State<Arc<FanLoyaltyContainer>>,
     Path(wristband_id): Path<String>,
 ) -> Result<Json<GenerateQrCodeResponse>, StatusCode> {
     let wristband_id = match Uuid::parse_str(&wristband_id) {
@@ -366,10 +366,10 @@ pub async fn generate_qr_code_handler(
     tag = "fan-loyalty"
 )]
 pub async fn validate_qr_code_handler(
-    State(container): State<Arc<RealFanLoyaltyContainer>>,
+    State(container): State<Arc<FanLoyaltyContainer>>,
     Json(request): Json<ValidateQrCodeRequest>,
 ) -> Result<Json<ValidateQrCodeResponse>, StatusCode> {
-    let command = ValidateQrCodeCommand::new(request.qr_code);
+    let command = ValidateQrCodeCommand::new(request.qr_code, None);
     let handler = WristbandHandler::new(container.clone());
     
     match handler.handle_validate_qr_code(&command).await {
@@ -424,7 +424,7 @@ pub async fn validate_qr_code_handler(
     tag = "fan-loyalty"
 )]
 pub async fn get_fan_verification_handler(
-    State(container): State<Arc<RealFanLoyaltyContainer>>,
+    State(container): State<Arc<FanLoyaltyContainer>>,
     Path(fan_id): Path<String>,
 ) -> Result<Json<GetFanVerificationResponse>, StatusCode> {
     let fan_id = FanId::new(fan_id);
@@ -457,7 +457,7 @@ pub async fn health_check_handler() -> Json<HealthCheckResponse> {
 // ============================================================================
 
 /// Create Fan Loyalty API router
-pub fn create_fan_loyalty_router(container: Arc<RealFanLoyaltyContainer>) -> Router {
+pub fn create_fan_loyalty_router(container: Arc<FanLoyaltyContainer>) -> Router {
     Router::new()
         .route("/verify", post(verify_fan_handler))
         .route("/wristbands", post(create_wristband_handler))

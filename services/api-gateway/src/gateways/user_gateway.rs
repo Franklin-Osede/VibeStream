@@ -27,11 +27,13 @@ use crate::bounded_contexts::user::presentation::routes::configure_user_routes;
 /// Crear el gateway de usuario con todas las rutas y middleware
 pub async fn create_user_gateway(app_state: AppState) -> Result<Router, Box<dyn std::error::Error>> {
     // Crear UserAppState desde AppState usando el factory
-    let user_app_state = AppStateFactory::create_user_state(app_state).await?;
+    let user_state = AppStateFactory::create_user_state(app_state)
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
     
     // Crear UserApplicationService con el repositorio
     let user_service = Arc::new(UserApplicationService::new(
-        user_app_state.user_repository.clone(),
+        user_state.user_repository.clone(),
         Some(app_state.facial_client.clone())
     ));
     

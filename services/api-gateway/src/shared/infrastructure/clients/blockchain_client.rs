@@ -51,18 +51,9 @@ impl BlockchainClient {
         Ok(block.as_u64())
     }
 
-    /// Convert to Middleware (SignerMiddleware if wallet present, else Provider)
-    /// This allows us to use the client with ethers Contract implementations
-    pub fn get_middleware(&self) -> Arc<dyn Middleware<Provider<Http>>> {
-        // Note: In a real standardized client, we might want to return a specific type or 
-        // handle this differently. For now, we'll just expose the provider. 
-        // If we need signing, we should construct a SignerMiddleware.
-        
-        // This is a simplified approach. Ideally we'd return Arc<M> where M: Middleware
+    /// Convert to Provider (read-only middleware)
+    pub fn get_middleware(&self) -> Arc<Provider<Http>> {
         self.provider.clone()
-        // If we needed to return SignerMiddleware, the return type gets complex because it's generic.
-        // For simple "get_middleware" we usually just return the provider and handle signing separately 
-        // or wrap everything in an Arc<Box<dyn Middleware>> (which has object safety issues).
     }
 
     /// Get a client capable of signing transactions (if wallet is configured)

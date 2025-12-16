@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use std::sync::Arc;
+use std::collections::HashMap;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
@@ -106,7 +107,7 @@ impl PaymentApplicationService {
         Ok(ProcessPaymentResult {
             payment_id: *payment_aggregate.payment().id().value(),
             status: format!("{:?}", payment_aggregate.payment().status()),
-            transaction_id: Some(*transaction_id.value()),
+            transaction_id: Some(transaction_id.value()),
             blockchain_hash: processing_result.blockchain_hash.map(|h| h.value().to_string()),
             processing_time_ms,
         })
@@ -125,7 +126,7 @@ impl PaymentApplicationService {
         let fraud_result = self.fraud_detection_service.analyze_payment(&payment_aggregate).await?;
         
         // 3. Take action based on risk score
-        match fraud_result.action_required {
+        match fraud_result.recommendation {
             FraudAction::Block => {
                 // Block the payment
                 let mut payment_aggregate = payment_aggregate;
@@ -136,7 +137,7 @@ impl PaymentApplicationService {
                 self.payment_repository.save(&payment_aggregate).await?;
                 
                 // Send notification
-                self.notification_service.send_payment_blocked_notification(&payment_aggregate).await?;
+                self.notification_service.send_payment_blocked_notification(&payment_aggregate, "Payment blocked by fraud detection").await?;
             }
             FraudAction::RequireAdditionalVerification => {
                 // Put payment on hold
@@ -230,7 +231,7 @@ impl PaymentApplicationService {
         self.payment_repository.save(&original_payment).await?;
         
         // 5. Process refund through payment gateway
-        let refund_result = self.payment_processing_service.process_refund(&original_payment, &refund_amount).await.map_err(|e| AppError::PaymentGatewayError(e.to_string()))?;
+        let refund_result = self.payment_processing_service.process_refund(&mut original_payment, refund_amount.clone(), refund_command.reason.clone().unwrap_or_default()).await.map_err(|e| AppError::PaymentGatewayError(e.to_string()))?;
         
         // 6. Update refund status
         if refund_result.success {
@@ -461,8 +462,8 @@ impl RevenueSharingApplicationService {
             distribution_id: distribution_aggregate.distribution_id(),
             total_shareholders: distribution_aggregate.shareholders().len() as u32,
             total_distributed: distribution_aggregate.total_distributed().value(),
-            status: format!("{:?}", distribution_aggregate.distribution().status()),
-            created_at: distribution_aggregate.distribution().created_at(),
+            status: format!("{:?}", distribution_aggregate.status()),
+            created_at: distribution_aggregate.created_at(),
         })
     }
     
@@ -476,22 +477,22 @@ impl RevenueSharingApplicationService {
         
         let payment_aggregate = PaymentAggregate::create_payment(
             Uuid::new_v4(), // Platform as payer
-            shareholder.shareholder_id(),
-            shareholder.distribution_amount().clone(),
+            shareholder.shareholder_id,
+            shareholder.distribution_amount.clone(),
             PaymentMethod::PlatformBalance,
             PaymentPurpose::RevenueDistribution {
-                contract_id: distribution_aggregate.distribution().contract_id(),
-                distribution_id: distribution_aggregate.distribution().id(),
+                contract_id: distribution_aggregate.contract_id(),
+                distribution_id: distribution_aggregate.distribution_id(),
             },
             platform_fee_percentage,
             PaymentMetadata {
                 user_ip: None,
                 user_agent: None,
                 platform_version: "1.0.0".to_string(),
-                reference_id: Some(format!("revenue_share_{}", distribution_aggregate.distribution().id())),
+                reference_id: Some(format!("revenue_share_{}", distribution_aggregate.distribution_id())),
                 additional_data: serde_json::json!({
-                    "shareholder_id": shareholder.shareholder_id(),
-                    "ownership_percentage": shareholder.ownership_percentage()
+                    "shareholder_id": shareholder.shareholder_id,
+                    "ownership_percentage": shareholder.ownership_percentage
                 }),
             },
         )?;
@@ -510,11 +511,13 @@ impl PaymentProcessingService for MockPaymentProcessingService {
             success: true,
             transaction_id: Some(TransactionId::new()),
             blockchain_hash: None,
-            error_message: None,
+            gateway_response: Some("Mock Gateway Success".to_string()),
+            processing_time_ms: 50,
+            fees_charged: Amount::new(0.0, _payment.amount().currency().clone())?,
         })
     }
     
-    async fn process_refund(&self, _original_payment: &PaymentAggregate, _refund_amount: &Amount) -> Result<RefundProcessingResult, AppError> {
+    async fn process_refund(&self, _original_payment: &mut PaymentAggregate, _refund_amount: Amount, _reason: String) -> Result<RefundProcessingResult, AppError> {
         Ok(RefundProcessingResult {
             success: true,
             refund_id: Some(Uuid::new_v4()),
@@ -529,9 +532,11 @@ struct MockFraudDetectionService;
 impl FraudDetectionService for MockFraudDetectionService {
     async fn analyze_payment(&self, _payment: &PaymentAggregate) -> Result<FraudDetectionResult, AppError> {
         Ok(FraudDetectionResult {
-            risk_score: 0.1,
-            fraud_indicators: vec![],
-            action_required: FraudAction::Allow,
+            overall_risk_score: 0.1,
+            individual_scores: std::collections::HashMap::new(),
+            triggered_rules: vec![],
+            recommendation: FraudAction::Allow,
+            analysis_timestamp: Utc::now(),
         })
     }
     

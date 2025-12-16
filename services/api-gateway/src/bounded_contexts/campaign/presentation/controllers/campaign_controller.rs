@@ -695,16 +695,16 @@ impl CampaignController {
             .unwrap_or(20);
 
         let query = GetTrendingCampaignsQuery {
-            limit: Some(limit),
-            campaign_type: params.get("campaign_type").cloned(),
-            time_range: params.get("time_range").cloned(),
+            limit: limit,
+            // campaign_type: params.get("campaign_type").cloned(),
+            // time_range: params.get("time_range").cloned(),
         };
 
         // Handler would be implemented
         let result = SearchCampaignsResult {
             campaigns: vec![],
-            total_count: 0,
-            has_more: false,
+            total: 0,
+            // has_more: false,
         };
 
         Ok(Json(ApiResponse::success(result)))
@@ -716,8 +716,8 @@ impl CampaignController {
     ) -> Result<Json<ApiResponse<SearchCampaignsResult>>, StatusCode> {
         let result = SearchCampaignsResult {
             campaigns: vec![],
-            total_count: 0,
-            has_more: false,
+            total: 0,
+            // has_more: false,
         };
 
         Ok(Json(ApiResponse::success(result)))
@@ -730,17 +730,17 @@ impl CampaignController {
     ) -> Result<Json<ApiResponse<SearchCampaignsResult>>, StatusCode> {
         let query = GetUserCampaignsQuery {
             user_id,
-            campaign_type: params.get("campaign_type").cloned(),
-            status: params.get("status").cloned(),
-            limit: params.get("limit").and_then(|s| s.parse().ok()),
-            offset: params.get("offset").and_then(|s| s.parse().ok()),
+            // campaign_type: params.get("campaign_type").cloned(),
+            // status: params.get("status").cloned(),
+            // limit: params.get("limit").and_then(|s| s.parse().ok()),
+            // offset: params.get("offset").and_then(|s| s.parse().ok()),
         };
 
         // Handler would be implemented
         let result = SearchCampaignsResult {
             campaigns: vec![],
-            total_count: 0,
-            has_more: false,
+            total: 0,
+            // has_more: false,
         };
 
         Ok(Json(ApiResponse::success(result)))

@@ -42,6 +42,8 @@ impl AmountDTO {
             Currency::ETH => format!("{:.6} ETH", value),
             Currency::SOL => format!("{:.6} SOL", value),
             Currency::USDC => format!("{:.2} USDC", value),
+            Currency::GBP => format!("£{:.2}", value),
+            Currency::VIBES => format!("{:.2} VIBES", value),
         };
         
         Self {

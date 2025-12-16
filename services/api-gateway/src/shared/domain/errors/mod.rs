@@ -28,7 +28,7 @@ pub enum AppError {
     NetworkError(String),
     ServiceUnavailable(String),
     InsufficientFundsError(String),
-    FraudDetected(String),
+    PaymentGatewayError(String),
 }
 
 impl std::error::Error for AppError {}
@@ -63,6 +63,7 @@ impl std::fmt::Display for AppError {
             AppError::ServiceUnavailable(msg) => write!(f, "Service unavailable: {}", msg),
             AppError::InsufficientFundsError(msg) => write!(f, "Insufficient funds: {}", msg),
             AppError::FraudDetected(msg) => write!(f, "Fraud detected: {}", msg),
+            AppError::PaymentGatewayError(msg) => write!(f, "Payment gateway error: {}", msg),
         }
     }
 }
@@ -137,6 +138,7 @@ impl From<AppError> for StatusCode {
             AppError::ServiceUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             AppError::InsufficientFundsError(_) => StatusCode::PAYMENT_REQUIRED,
             AppError::FraudDetected(_) => StatusCode::FORBIDDEN,
+            AppError::PaymentGatewayError(_) => StatusCode::BAD_GATEWAY,
         }
     }
 }

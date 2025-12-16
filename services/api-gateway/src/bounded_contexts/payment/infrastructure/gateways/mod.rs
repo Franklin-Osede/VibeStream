@@ -6,7 +6,7 @@ pub mod gateway_router;
 pub use stripe_gateway::StripeGateway;
 pub use coinbase_gateway::CoinbaseGateway;
 pub use paypal_gateway::PayPalGateway;
-pub use gateway_router::{PaymentGatewayRouter, GatewayRoutingResult};
+pub use gateway_router::{PaymentGatewayRouter, GatewayRoutingResult, MultiGatewayRouter};
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};

@@ -431,8 +431,13 @@ impl PaymentStatus {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct PaymentFilter {
     pub user_id: Option<Uuid>,
+    pub role: Option<String>,
     pub status: Option<PaymentStatus>,
+    pub purpose_type: Option<String>,
+    pub start_date: Option<DateTime<Utc>>,
+    pub end_date: Option<DateTime<Utc>>,
 }
+
 
 /// Revenue Sharing Status
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
