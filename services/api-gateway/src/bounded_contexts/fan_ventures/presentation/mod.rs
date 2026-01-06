@@ -2,6 +2,7 @@ pub mod controllers;
 pub mod routes;
 pub mod handlers;
 pub mod ownership_routes;
+pub mod venture_handlers;
 
 use crate::bounded_contexts::fan_ventures::application::services::MockFanVenturesApplicationService;
 

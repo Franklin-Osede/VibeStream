@@ -286,7 +286,16 @@ pub struct ApiResponse<T> {
         crate::bounded_contexts::listen_reward::presentation::handlers::complete_listen_session,
         crate::bounded_contexts::listen_reward::presentation::handlers::get_user_rewards,
         crate::bounded_contexts::listen_reward::presentation::handlers::distribute_rewards,
-        crate::bounded_contexts::listen_reward::presentation::handlers::get_listen_analytics
+        crate::bounded_contexts::listen_reward::presentation::handlers::get_listen_analytics,
+        // Fan Ventures endpoints
+        crate::bounded_contexts::fan_ventures::presentation::venture_handlers::create_venture,
+        crate::bounded_contexts::fan_ventures::presentation::venture_handlers::list_ventures,
+        crate::bounded_contexts::fan_ventures::presentation::venture_handlers::get_venture_details,
+        crate::bounded_contexts::fan_ventures::presentation::venture_handlers::update_venture,
+        crate::bounded_contexts::fan_ventures::presentation::venture_handlers::delete_venture,
+        crate::bounded_contexts::fan_ventures::presentation::venture_handlers::invest_in_venture,
+        crate::bounded_contexts::fan_ventures::presentation::venture_handlers::get_user_portfolio,
+        crate::bounded_contexts::fan_ventures::presentation::venture_handlers::get_artist_ventures
     ),
     components(
         schemas(
@@ -332,6 +341,17 @@ pub struct ApiResponse<T> {
             crate::bounded_contexts::listen_reward::presentation::handlers::DistributeRewardsResponse,
             crate::bounded_contexts::listen_reward::presentation::handlers::AnalyticsResponse,
             crate::bounded_contexts::listen_reward::presentation::handlers::DeviceInfo,
+            // Fan Ventures Schemas
+            crate::bounded_contexts::fan_ventures::presentation::venture_handlers::CreateVentureRequest,
+            crate::bounded_contexts::fan_ventures::presentation::venture_handlers::CreateVentureResponse,
+            crate::bounded_contexts::fan_ventures::presentation::venture_handlers::UpdateVentureRequest,
+            crate::bounded_contexts::fan_ventures::presentation::venture_handlers::InvestInVentureRequest,
+            crate::bounded_contexts::fan_ventures::presentation::venture_handlers::InvestInVentureResponse,
+            crate::bounded_contexts::fan_ventures::presentation::venture_handlers::VentureDetailsResponse,
+            crate::bounded_contexts::fan_ventures::presentation::venture_handlers::ListVenturesResponse,
+            crate::bounded_contexts::fan_ventures::presentation::venture_handlers::VentureSummary,
+            crate::bounded_contexts::fan_ventures::presentation::venture_handlers::UserPortfolioResponse,
+            crate::bounded_contexts::fan_ventures::presentation::venture_handlers::PortfolioInvestment,
             crate::bounded_contexts::listen_reward::presentation::handlers::Location,
             crate::bounded_contexts::listen_reward::presentation::handlers::EngagementMetrics,
             crate::bounded_contexts::listen_reward::presentation::handlers::RewardBreakdown,

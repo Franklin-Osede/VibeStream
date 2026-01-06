@@ -40,6 +40,10 @@ pub mod integration_tests;
 pub mod payment_gateways_integration_tests;
 pub mod fractional_ownership_integration_tests;
 
+// Fan Ventures tests
+pub mod fan_ventures_integration_test;
+pub mod fan_ventures_handlers_tests;
+
 use helpers::TestClient;
 use serde_json::{json, Value};
 use uuid::Uuid;

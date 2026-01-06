@@ -490,6 +490,30 @@ impl EventBusFactory {
         event_bus.subscribe("InvestmentMade", Arc::clone(&fan_ventures_handlers) as Arc<dyn EventHandler>).await?;
         event_bus.subscribe("BenefitDelivered", Arc::clone(&fan_ventures_handlers) as Arc<dyn EventHandler>).await?;
 
+        // Fan Ventures Payment Integration Handlers
+        // These handlers update venture funding when payments are confirmed
+        use crate::bounded_contexts::fan_ventures::infrastructure::{
+            postgres_repository::PostgresFanVenturesRepository,
+            payment_integration::FanVenturesPaymentIntegration,
+            payment_helper::create_payment_command_handler,
+            payment_event_listener::FanVenturesPaymentEventListener,
+        };
+        
+        let payment_handler = create_payment_command_handler(db_pool.clone());
+        let venture_repo = Arc::new(PostgresFanVenturesRepository::new(db_pool.clone()));
+        let payment_integration = Arc::new(FanVenturesPaymentIntegration::new(
+            payment_handler,
+            venture_repo.clone(),
+        ));
+        let fan_ventures_payment_listener = Arc::new(FanVenturesPaymentEventListener::new(
+            payment_integration.clone()
+        ));
+        
+        // Register payment event listeners
+        event_bus.subscribe("PaymentCompleted", Arc::clone(&fan_ventures_payment_listener) as Arc<dyn EventHandler>).await?;
+        event_bus.subscribe("PaymentFailed", Arc::clone(&fan_ventures_payment_listener) as Arc<dyn EventHandler>).await?;
+        event_bus.subscribe("SharePurchasePaymentCompleted", Arc::clone(&fan_ventures_payment_listener) as Arc<dyn EventHandler>).await?;
+
         tracing::info!("✅ Registered event handlers WITH DEPENDENCIES for all bounded contexts");
         
         Ok(())
