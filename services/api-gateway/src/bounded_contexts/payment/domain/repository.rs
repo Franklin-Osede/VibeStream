@@ -9,6 +9,7 @@ use super::aggregates::*;
 use super::entities::*;
 use super::value_objects::*;
 use super::events::*;
+use crate::bounded_contexts::payment::application::commands::Wallet;
 
 pub type PaymentRepositoryResult<T> = Result<T, AppError>;
 

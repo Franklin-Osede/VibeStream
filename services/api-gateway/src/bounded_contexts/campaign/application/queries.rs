@@ -112,3 +112,24 @@ impl<R: CampaignRepository + Send + Sync> QueryHandler<GetCampaignAnalyticsQuery
         Ok(serde_json::json!({}))
     }
 }
+
+// =========================================================================
+// Submodule compatibility exports
+// =========================================================================
+// These allow use_cases to import via `queries::get_campaign::CampaignDetailDTO`
+
+pub mod get_campaign {
+    pub use super::CampaignDetailDTO;
+}
+
+pub mod get_campaign_analytics {
+    pub use super::GetCampaignAnalyticsQuery;
+}
+
+pub mod get_trending_campaigns {
+    pub use super::GetTrendingCampaignsQuery;
+}
+
+pub mod get_user_campaigns {
+    pub use super::GetUserCampaignsQuery;
+}

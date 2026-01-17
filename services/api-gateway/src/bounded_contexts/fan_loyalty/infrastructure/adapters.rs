@@ -4,6 +4,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 use serde::{Serialize, Deserialize};
+use async_trait::async_trait;
 
 use crate::bounded_contexts::fan_loyalty::{
     domain::{
@@ -15,12 +16,12 @@ use crate::bounded_contexts::fan_loyalty::{
             BiometricVerificationService, WristbandService, QrCodeService,
             NftService, ZkProofService, EventPublisher,
             ZkWristbandProof, ZkBiometricProof,
-            BehavioralPatterns, DeviceCharacteristics, LocationData
         },
         entities::{
             FanId, WristbandId, WristbandType, NftWristband, FanVerificationResult,
             NftMetadata, NftAttribute, BiometricData, BiometricProofData, NftCreationResult, 
-            ZkProof, ZkProofType, ZkProofStatus
+            ZkProof, ZkProofType, ZkProofStatus,
+            BehavioralPatterns, DeviceCharacteristics, LocationData
         },
         events::{FanVerifiedEvent, WristbandCreatedEvent, WristbandActivatedEvent, QrCodeScannedEvent},
     },
@@ -63,6 +64,10 @@ impl ExternalBiometricAdapter {
 
 #[async_trait]
 impl BiometricVerificationService for ExternalBiometricAdapter {
+    async fn verify_fan_biometrics(&self, fan_id: &FanId, biometric_data: &BiometricData) -> Result<FanVerificationResult, String> {
+        self.verify_fan(fan_id, biometric_data).await
+    }
+
     async fn verify_fan(&self, fan_id: &FanId, biometric_data: &BiometricData) -> Result<FanVerificationResult, String> {
         // Prepare payload for external service
         let payload = serde_json::json!({
@@ -354,6 +359,12 @@ impl NftService for ExternalNftAdapter {
             background_color: "#f39c12".to_string(),
         }))
     }
+
+    async fn mint_nft_wristband(&self, wristband: &NftWristband, fan_wallet_address: &str) -> Result<String, String> {
+        // Reuse create_nft logic or call specific endpoint
+         let result = self.create_nft(wristband, fan_wallet_address).await?;
+         Ok(result.transaction_hash)
+    }
 }
 
 /// Adapter for external ZK service
@@ -492,6 +503,11 @@ impl ZkProofService for ExternalZkAdapter {
             verified_at,
         }))
     }
+
+    async fn generate_zk_proof(&self, data: &[u8]) -> Result<Uuid, String> {
+         // Stub
+         Ok(Uuid::new_v4())
+    }
 }
 
 /// Adapter for external event publishing service
@@ -570,6 +586,10 @@ impl EventPublisher for ExternalEventAdapter {
         });
 
         self.publish_event("qr_code_scanned", &event_data).await
+    }
+
+    async fn publish(&self, event: &str) -> Result<(), String> {
+        self.publish_event(event, &serde_json::json!({})).await
     }
 }
 

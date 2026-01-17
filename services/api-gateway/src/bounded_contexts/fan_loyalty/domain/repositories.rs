@@ -12,29 +12,29 @@ pub trait FanVerificationRepository: Send + Sync {
         &self,
         fan_id: &FanId,
         result: &FanVerificationResult,
-    ) -> Result<(), String>;
+    ) -> Result<(), AppError>;
 
     /// Get fan verification result
-    async fn get_verification_result(&self, fan_id: &FanId) -> Result<Option<FanVerificationResult>, String>;
+    async fn get_verification_result(&self, fan_id: &FanId) -> Result<Option<FanVerificationResult>, AppError>;
 
     /// Check if fan is eligible for wristband
-    async fn is_fan_eligible_for_wristband(&self, fan_id: &FanId) -> Result<bool, String>;
+    async fn is_fan_eligible_for_wristband(&self, fan_id: &FanId) -> Result<bool, AppError>;
 
     /// Get fan verification history
-    async fn get_verification_history(&self, fan_id: &FanId) -> Result<Vec<FanVerificationResult>, String>;
+    async fn get_verification_history(&self, fan_id: &FanId) -> Result<Vec<FanVerificationResult>, AppError>;
 }
 
 /// Repository trait for wristband operations
 #[async_trait]
 pub trait WristbandRepository: Send + Sync {
     /// Save wristband
-    async fn save_wristband(&self, wristband: &NftWristband) -> Result<(), String>;
+    async fn save_wristband(&self, wristband: &NftWristband) -> Result<(), AppError>;
 
     /// Get wristband by ID
-    async fn get_wristband(&self, wristband_id: &WristbandId) -> Result<Option<NftWristband>, String>;
+    async fn get_wristband(&self, wristband_id: &WristbandId) -> Result<Option<NftWristband>, AppError>;
 
     /// Get wristbands by fan ID
-    async fn get_wristbands_by_fan(&self, fan_id: &FanId) -> Result<Vec<NftWristband>, String>;
+    async fn get_wristbands_by_fan(&self, fan_id: &FanId) -> Result<Vec<NftWristband>, AppError>;
 
     /// Update wristband status
     async fn update_wristband_status(
@@ -42,13 +42,13 @@ pub trait WristbandRepository: Send + Sync {
         wristband_id: &WristbandId,
         is_active: bool,
         activated_at: Option<DateTime<Utc>>,
-    ) -> Result<(), String>;
+    ) -> Result<(), AppError>;
 
     /// Get wristbands by concert ID
-    async fn get_wristbands_by_concert(&self, concert_id: &Uuid) -> Result<Vec<NftWristband>, String>;
+    async fn get_wristbands_by_concert(&self, concert_id: &Uuid) -> Result<Vec<NftWristband>, AppError>;
 
     /// Get wristbands by artist ID
-    async fn get_wristbands_by_artist(&self, artist_id: &Uuid) -> Result<Vec<NftWristband>, String>;
+    async fn get_wristbands_by_artist(&self, artist_id: &Uuid) -> Result<Vec<NftWristband>, AppError>;
 }
 
 /// Repository trait for QR code operations
@@ -60,13 +60,13 @@ pub trait QrCodeRepository: Send + Sync {
         wristband_id: &WristbandId,
         qr_code: &str,
         expires_at: DateTime<Utc>,
-    ) -> Result<(), String>;
+    ) -> Result<(), AppError>;
 
     /// Get QR code by wristband ID
-    async fn get_qr_code(&self, wristband_id: &WristbandId) -> Result<Option<String>, String>;
+    async fn get_qr_code(&self, wristband_id: &WristbandId) -> Result<Option<String>, AppError>;
 
     /// Validate QR code
-    async fn validate_qr_code(&self, qr_code: &str) -> Result<bool, String>;
+    async fn validate_qr_code(&self, qr_code: &str) -> Result<bool, AppError>;
 
     /// Log QR code scan
     async fn log_qr_scan(
@@ -74,51 +74,51 @@ pub trait QrCodeRepository: Send + Sync {
         qr_code: &str,
         scanner_id: &str,
         location: Option<(f64, f64, f32)>,
-    ) -> Result<(), String>;
+    ) -> Result<(), AppError>;
 
     /// Get QR code scan history
-    async fn get_qr_scan_history(&self, qr_code: &str) -> Result<Vec<QrScanLog>, String>;
+    async fn get_qr_scan_history(&self, qr_code: &str) -> Result<Vec<QrScanLog>, AppError>;
 
     /// Invalidate QR code
-    async fn invalidate_qr_code(&self, code: &str) -> Result<(), String>;
+    async fn invalidate_qr_code(&self, code: &str) -> Result<(), AppError>;
 }
 
 /// Repository trait for ZK proof operations
 #[async_trait]
 pub trait ZkProofRepository: Send + Sync {
     /// Save ZK proof
-    async fn save_zk_proof(&self, proof: &ZkProof) -> Result<(), String>;
+    async fn save_zk_proof(&self, proof: &ZkProof) -> Result<(), AppError>;
 
     /// Get ZK proof by ID
-    async fn get_zk_proof(&self, proof_id: &Uuid) -> Result<Option<ZkProof>, String>;
+    async fn get_zk_proof(&self, proof_id: &Uuid) -> Result<Option<ZkProof>, AppError>;
 
     /// Verify ZK proof
-    async fn verify_zk_proof(&self, proof: &ZkProof) -> Result<bool, String>;
+    async fn verify_zk_proof(&self, proof: &ZkProof) -> Result<bool, AppError>;
 
     /// Get proofs by fan ID
-    async fn get_proofs_by_fan(&self, fan_id: &FanId) -> Result<Vec<ZkProof>, String>;
+    async fn get_proofs_by_fan(&self, fan_id: &FanId) -> Result<Vec<ZkProof>, AppError>;
 }
 
 /// Repository trait for NFT operations
 #[async_trait]
 pub trait NftRepository: Send + Sync {
     /// Save NFT metadata
-    async fn save_nft_metadata(&self, metadata: &NftMetadata) -> Result<(), String>;
+    async fn save_nft_metadata(&self, metadata: &NftMetadata) -> Result<(), AppError>;
 
     /// Get NFT metadata by token ID
-    async fn get_nft_metadata(&self, token_id: &str) -> Result<Option<NftMetadata>, String>;
+    async fn get_nft_metadata(&self, token_id: &str) -> Result<Option<NftMetadata>, AppError>;
 
     /// Get NFTs by fan ID
-    async fn get_nfts_by_fan(&self, fan_id: &FanId) -> Result<Vec<NftMetadata>, String>;
+    async fn get_nfts_by_fan(&self, fan_id: &FanId) -> Result<Vec<NftMetadata>, AppError>;
 
     /// Update NFT status
-    async fn update_nft_status(&self, token_id: &str, is_active: bool) -> Result<(), String>;
+    async fn update_nft_status(&self, token_id: &str, is_active: bool) -> Result<(), AppError>;
 
     /// Mint NFT for wristband
-    async fn mint_nft(&self, wristband_id: &WristbandId, fan_wallet_address: &str) -> Result<String, String>;
+    async fn mint_nft(&self, wristband_id: &WristbandId, fan_wallet_address: &str) -> Result<String, AppError>;
 
     /// Verify NFT ownership
-    async fn verify_nft_ownership(&self, wristband_id: &WristbandId, fan_wallet_address: &str) -> Result<bool, String>;
+    async fn verify_nft_ownership(&self, wristband_id: &WristbandId, fan_wallet_address: &str) -> Result<bool, AppError>;
 }
 
 // ============================================================================
@@ -127,8 +127,9 @@ pub trait NftRepository: Send + Sync {
 
 use crate::bounded_contexts::fan_loyalty::domain::entities::{
     FanId, WristbandId, WristbandType, NftWristband, FanVerificationResult,
-    ZkProof, ZkProofType, NftMetadata, QrCode
+    ZkProof, NftMetadata, QrCode, ZkProofType
 };
+use crate::shared::domain::errors::AppError;
 
 // QrScanLog kept here if not in entities
 /// QR scan log entry

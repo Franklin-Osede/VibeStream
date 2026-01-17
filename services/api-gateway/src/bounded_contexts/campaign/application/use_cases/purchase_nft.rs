@@ -7,8 +7,8 @@ use crate::bounded_contexts::user::domain::value_objects::UserId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MintCampaignNFTCommand { // Renamed from PurchaseNFTCommand
-    pub campaign_id: String,
-    pub user_id: String,
+    pub campaign_id: Uuid,
+    pub user_id: Uuid,
     pub payment_method: String,
     pub payment_token: String,
     pub wallet_address: String,
@@ -55,11 +55,10 @@ impl MintCampaignNFTCommandHandler {
         self.validate_command(&command)?;
 
         // Parse IDs
-        let campaign_id = CampaignId::from_string(&command.campaign_id)
-            .map_err(|e| format!("Invalid campaign ID: {}", e))?;
+        // Parse IDs
+        let campaign_id = CampaignId::new(command.campaign_id);
         
-        let user_id = UserId::from_string(&command.user_id)
-            .map_err(|e| format!("Invalid user ID: {}", e))?;
+        let user_id = UserId::new(command.user_id);
 
         // Business validation
         self.validate_purchase_rules(&command)?;
@@ -77,8 +76,8 @@ impl MintCampaignNFTCommandHandler {
         let total_amount = unit_price * command.quantity as f64;
 
         let purchase_details = PurchaseDetails {
-            campaign_id: command.campaign_id.clone(),
-            user_id: command.user_id.clone(),
+            campaign_id: command.campaign_id.to_string(),
+            user_id: command.user_id.to_string(),
             quantity_purchased: command.quantity,
             total_amount,
             unit_price,
@@ -99,6 +98,7 @@ impl MintCampaignNFTCommandHandler {
     }
 
     fn validate_command(&self, command: &MintCampaignNFTCommand) -> Result<(), String> {
+        /*
         if command.campaign_id.trim().is_empty() {
             return Err("Campaign ID is required".to_string());
         }
@@ -106,6 +106,7 @@ impl MintCampaignNFTCommandHandler {
         if command.user_id.trim().is_empty() {
             return Err("User ID is required".to_string());
         }
+        */
 
         if command.wallet_address.trim().is_empty() {
             return Err("Wallet address is required".to_string());
@@ -163,6 +164,14 @@ impl MintCampaignNFTCommandHandler {
             "bank_transfer" => "1-3 business days".to_string(),
             _ => "Processing time varies".to_string(),
         }
+    }
+
+    pub async fn handle(&self, command: MintCampaignNFTCommand) -> Result<MintCampaignNFTResponse, crate::shared::domain::errors::AppError> {
+        // Since execute is not async, we can wrap it or just reuse logic
+        // For now, we stub it or wrap it.
+        // But execute returns Result<MintCampaignNFTResponse, String>, handle returns Result<..., AppError>
+        
+        self.execute(command).map_err(|e| crate::shared::domain::errors::AppError::PaymentGatewayError(e))
     }
 }
 

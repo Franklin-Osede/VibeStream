@@ -11,21 +11,22 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 
 use crate::bounded_contexts::campaign::application::{
-    // Commands
-    CreateCampaignCommand, CreateCampaignCommandHandler, CreateCampaignResult,
-    ActivateCampaignCommand, ActivateCampaignCommandHandler,
-    UpdateCampaignCommand, UpdateCampaignCommandHandler,
-    ParticipateCampaignCommand, ParticipateCampaignCommandHandler,
-    BoostCampaignCommand, BoostCampaignCommandHandler,
-    MintCampaignNFTCommand, MintCampaignNFTCommandHandler,
+    // Commands - using explicit paths to avoid ambiguity
+    use_cases::create_campaign::{CreateCampaignCommand, CreateCampaignCommandHandler},
+    use_cases::activate_campaign::{ActivateCampaignCommand, ActivateCampaignCommandHandler},
+    use_cases::update_campaign::{UpdateCampaignCommand, UpdateCampaignCommandHandler},
+    use_cases::participate_campaign::{ParticipateCampaignCommand, ParticipateCampaignCommandHandler},
+    use_cases::boost_campaign::{BoostCampaignCommand, BoostCampaignCommandHandler},
+    use_cases::purchase_nft::{MintCampaignNFTCommand, MintCampaignNFTCommandHandler},
     // Queries
-    GetCampaignQuery, GetCampaignQueryHandler, CampaignDetailDTO,
-    SearchCampaignsQuery, SearchCampaignsQueryHandler, SearchCampaignsResult,
-    GetCampaignAnalyticsQuery, GetCampaignAnalyticsQueryHandler,
-    GetTrendingCampaignsQuery, GetUserCampaignsQuery,
+    queries::get_campaign::{GetCampaignQuery, GetCampaignQueryHandler, CampaignDetailDTO},
+    queries::search_campaigns::{SearchCampaignsQuery, SearchCampaignsQueryHandler, SearchCampaignsResult},
+    queries::get_campaign_analytics::{GetCampaignAnalyticsQuery, GetCampaignAnalyticsQueryHandler},
+    queries::get_trending_campaigns::GetTrendingCampaignsQuery,
+    queries::get_user_campaigns::GetUserCampaignsQuery,
 };
 
-use crate::bounded_contexts::campaign::infrastructure::repositories::{
+use crate::bounded_contexts::campaign::infrastructure::{
     PostgresCampaignRepository, PostgresCampaignParticipationRepository,
 };
 
@@ -530,7 +531,10 @@ impl CampaignController {
             proof_of_action: request.proof_of_action,
         };
 
-        let handler = ParticipateCampaignCommandHandler::new(controller.participation_repository.clone());
+        let handler = ParticipateCampaignCommandHandler::new(
+            controller.campaign_repository.clone(),
+            controller.participation_repository.clone()
+        );
 
         match handler.handle(command).await {
             Ok(result) => {

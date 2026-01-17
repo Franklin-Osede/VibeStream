@@ -126,6 +126,7 @@ use crate::bounded_contexts::fan_loyalty::domain::entities::{
     FanId, WristbandId, WristbandType, NftWristband, FanVerificationResult, BiometricProofData,
     ZkProof, ZkProofType, ZkProofStatus, BiometricData, BehavioralPatterns, DeviceCharacteristics, LocationData,
     QrCode, QrCodeValidation, QrCodeScanResult, NftCreationResult, NftMetadata, NftAttribute,
+    WristbandActivationResult,
 };
 
 // ZK Biometric Proof and Wristband Proof kept here as they seem service-specific, but checking...

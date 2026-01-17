@@ -21,7 +21,7 @@ struct VerifyProofRequest {
 }
 
 #[derive(Debug, Deserialize)]
-struct VerifyProofResponse {
+pub struct VerifyProofResponse {
     valid: bool,
     #[allow(dead_code)]
     circuit_id: String,

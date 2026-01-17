@@ -54,6 +54,14 @@ impl FanVerificationRepository for MockFanVerificationRepository {
         println!("Mock: Getting verification result for fan: {:?}", fan_id);
         Ok(None)
     }
+
+    async fn is_fan_eligible_for_wristband(&self, _fan_id: &FanId) -> Result<bool, AppError> {
+        Ok(true)
+    }
+
+    async fn get_verification_history(&self, _fan_id: &FanId) -> Result<Vec<FanVerificationResult>, AppError> {
+        Ok(vec![])
+    }
 }
 
 pub struct MockWristbandRepository {
@@ -80,9 +88,21 @@ impl WristbandRepository for MockWristbandRepository {
         Ok(None)
     }
 
-    async fn update_wristband_status(&self, wristband_id: &WristbandId, status: &str) -> Result<(), AppError> {
-        println!("Mock: Updating wristband status: {:?} to {}", wristband_id, status);
+    async fn update_wristband_status(&self, wristband_id: &WristbandId, is_active: bool, activated_at: Option<chrono::DateTime<chrono::Utc>>) -> Result<(), AppError> {
+        println!("Mock: Updating wristband status: {:?} to active={}", wristband_id, is_active);
         Ok(())
+    }
+
+    async fn get_wristbands_by_fan(&self, _fan_id: &FanId) -> Result<Vec<NftWristband>, AppError> {
+        Ok(vec![])
+    }
+
+    async fn get_wristbands_by_concert(&self, _concert_id: &uuid::Uuid) -> Result<Vec<NftWristband>, AppError> {
+        Ok(vec![])
+    }
+
+    async fn get_wristbands_by_artist(&self, _artist_id: &uuid::Uuid) -> Result<Vec<NftWristband>, AppError> {
+        Ok(vec![])
     }
 }
 
@@ -100,19 +120,31 @@ impl MockQrCodeRepository {
 
 #[async_trait]
 impl QrCodeRepository for MockQrCodeRepository {
-    async fn save_qr_code(&self, qr_code: &QrCode) -> Result<(), AppError> {
-        println!("Mock: Saving QR code: {}", qr_code.code);
+    async fn save_qr_code(&self, wristband_id: &WristbandId, qr_code: &str, expires_at: chrono::DateTime<chrono::Utc>) -> Result<(), AppError> {
+        println!("Mock: Saving QR code: {}", qr_code);
         Ok(())
     }
 
-    async fn get_qr_code(&self, code: &str) -> Result<Option<QrCode>, AppError> {
-        println!("Mock: Getting QR code: {}", code);
+    async fn get_qr_code(&self, wristband_id: &WristbandId) -> Result<Option<String>, AppError> {
+        println!("Mock: Getting QR code for wristband: {:?}", wristband_id);
         Ok(None)
     }
 
     async fn invalidate_qr_code(&self, code: &str) -> Result<(), AppError> {
         println!("Mock: Invalidating QR code: {}", code);
         Ok(())
+    }
+
+    async fn validate_qr_code(&self, _qr_code: &str) -> Result<bool, AppError> {
+        Ok(false)
+    }
+
+    async fn log_qr_scan(&self, _qr_code: &str, _scanner_id: &str, _location: Option<(f64, f64, f32)>) -> Result<(), AppError> {
+        Ok(())
+    }
+
+    async fn get_qr_scan_history(&self, _qr_code: &str) -> Result<Vec<crate::bounded_contexts::fan_loyalty::domain::repositories::QrScanLog>, AppError> {
+        Ok(vec![])
     }
 }
 
@@ -130,14 +162,22 @@ impl MockZkProofRepository {
 
 #[async_trait]
 impl ZkProofRepository for MockZkProofRepository {
-    async fn save_zk_proof(&self, proof_id: uuid::Uuid, proof_data: String) -> Result<(), AppError> {
-        println!("Mock: Saving ZK proof: {}", proof_id);
+    async fn save_zk_proof(&self, proof: &ZkProof) -> Result<(), AppError> {
+        println!("Mock: Saving ZK proof: {}", proof.id);
         Ok(())
     }
 
-    async fn get_zk_proof(&self, proof_id: uuid::Uuid) -> Result<Option<String>, AppError> {
+    async fn get_zk_proof(&self, proof_id: &uuid::Uuid) -> Result<Option<ZkProof>, AppError> {
         println!("Mock: Getting ZK proof: {}", proof_id);
         Ok(None)
+    }
+
+    async fn verify_zk_proof(&self, _proof: &ZkProof) -> Result<bool, AppError> {
+        Ok(true)
+    }
+
+    async fn get_proofs_by_fan(&self, _fan_id: &FanId) -> Result<Vec<ZkProof>, AppError> {
+        Ok(vec![])
     }
 }
 
@@ -164,6 +204,22 @@ impl NftRepository for MockNftRepository {
         println!("Mock: Verifying NFT ownership for wristband: {:?} by wallet: {}", wristband_id, fan_wallet_address);
         Ok(true)
     }
+
+    async fn save_nft_metadata(&self, _metadata: &crate::bounded_contexts::fan_loyalty::domain::entities::NftMetadata) -> Result<(), AppError> {
+        Ok(())
+    }
+
+    async fn get_nft_metadata(&self, _token_id: &str) -> Result<Option<crate::bounded_contexts::fan_loyalty::domain::entities::NftMetadata>, AppError> {
+        Ok(None)
+    }
+
+    async fn get_nfts_by_fan(&self, _fan_id: &FanId) -> Result<Vec<crate::bounded_contexts::fan_loyalty::domain::entities::NftMetadata>, AppError> {
+        Ok(vec![])
+    }
+
+    async fn update_nft_status(&self, _token_id: &str, _is_active: bool) -> Result<(), AppError> {
+        Ok(())
+    }
 }
 
 // ============================================================================
@@ -174,11 +230,14 @@ pub struct MockBiometricVerificationService;
 
 #[async_trait]
 impl BiometricVerificationService for MockBiometricVerificationService {
-    async fn verify_fan_biometrics(&self, fan_id: &FanId, biometric_data: &BiometricData) -> Result<FanVerificationResult, AppError> {
+    async fn verify_fan(&self, fan_id: &FanId, biometric_data: &BiometricData) -> Result<FanVerificationResult, String> {
+        self.verify_fan_biometrics(fan_id, biometric_data).await
+    }
+
+    async fn verify_fan_biometrics(&self, fan_id: &FanId, biometric_data: &BiometricData) -> Result<FanVerificationResult, String> {
         println!("Mock: Verifying fan biometrics for: {:?}", fan_id);
         
-        // Mock verification logic
-        let is_verified = true; // Always verify for TDD
+        let is_verified = true; 
         let confidence_score = 0.95;
         let wristband_eligible = is_verified;
         
@@ -189,6 +248,22 @@ impl BiometricVerificationService for MockBiometricVerificationService {
             wristband_eligible,
             benefits_unlocked: vec!["Verified Fan Status".to_string()],
         })
+    }
+
+    async fn calculate_confidence_score(&self, _biometric_data: &BiometricData) -> Result<f32, String> {
+        Ok(0.95)
+    }
+
+    async fn analyze_behavioral_patterns(&self, _patterns: &crate::bounded_contexts::fan_loyalty::domain::entities::BehavioralPatterns) -> Result<f32, String> {
+        Ok(0.9)
+    }
+
+    async fn analyze_device_characteristics(&self, _characteristics: &crate::bounded_contexts::fan_loyalty::domain::entities::DeviceCharacteristics) -> Result<f32, String> {
+        Ok(0.9)
+    }
+
+    async fn analyze_location_consistency(&self, _location: &crate::bounded_contexts::fan_loyalty::domain::entities::LocationData) -> Result<f32, String> {
+        Ok(0.9)
     }
 }
 
@@ -214,7 +289,18 @@ impl MockWristbandService {
 
 #[async_trait]
 impl WristbandService for MockWristbandService {
-    async fn create_nft_wristband(&self, fan_id: &FanId, wristband_type: crate::bounded_contexts::fan_loyalty::domain::WristbandType) -> Result<NftWristband, AppError> {
+    async fn create_wristband(&self, fan_id: &FanId, concert_id: &uuid::Uuid, artist_id: &uuid::Uuid, wristband_type: &crate::bounded_contexts::fan_loyalty::domain::WristbandType) -> Result<NftWristband, String> {
+         let wristband = NftWristband::new(
+            fan_id.clone(),
+            concert_id.to_string(),
+            artist_id.to_string(),
+            wristband_type.clone(),
+        );
+        self.wristband_repository.save_wristband(&wristband).await.map_err(|e| e.to_string())?;
+        Ok(wristband)
+    }
+
+    async fn create_nft_wristband(&self, fan_id: &FanId, wristband_type: crate::bounded_contexts::fan_loyalty::domain::WristbandType) -> Result<NftWristband, String> {
         println!("Mock: Creating NFT wristband for fan: {:?}", fan_id);
         
         let wristband = NftWristband::new(
@@ -224,18 +310,31 @@ impl WristbandService for MockWristbandService {
             wristband_type,
         );
         
-        self.wristband_repository.save_wristband(&wristband).await?;
+        self.wristband_repository.save_wristband(&wristband).await.map_err(|e| e.to_string())?;
         Ok(wristband)
     }
 
-    async fn activate_wristband(&self, wristband_id: &WristbandId) -> Result<(), AppError> {
+    async fn activate_wristband(&self, wristband_id: &WristbandId, fan_id: &FanId, reason: &str) -> Result<crate::bounded_contexts::fan_loyalty::domain::services::WristbandActivationResult, String> {
         println!("Mock: Activating wristband: {:?}", wristband_id);
-        Ok(())
+        Ok(crate::bounded_contexts::fan_loyalty::domain::services::WristbandActivationResult {
+            wristband_id: wristband_id.clone(),
+            is_active: true,
+            activated_at: Utc::now(),
+            benefits_activated: vec![],
+        })
     }
 
-    async fn get_wristband_details(&self, wristband_id: &WristbandId) -> Result<Option<NftWristband>, AppError> {
+    async fn get_wristband_details(&self, wristband_id: &WristbandId) -> Result<Option<NftWristband>, String> {
         println!("Mock: Getting wristband details: {:?}", wristband_id);
         Ok(None)
+    }
+
+    async fn validate_wristband_eligibility(&self, fan_id: &FanId, concert_id: &uuid::Uuid) -> Result<bool, String> {
+        Ok(true)
+    }
+
+    async fn get_wristband_benefits(&self, wristband_type: &crate::bounded_contexts::fan_loyalty::domain::WristbandType) -> Result<Vec<String>, String> {
+        Ok(vec![])
     }
 }
 
@@ -258,24 +357,36 @@ impl MockQrCodeService {
 
 #[async_trait]
 impl QrCodeService for MockQrCodeService {
-    async fn generate_qr_code(&self, wristband_id: &WristbandId) -> Result<QrCode, AppError> {
+    async fn generate_qr_code(&self, wristband_id: &WristbandId) -> Result<QrCode, String> {
         println!("Mock: Generating QR code for wristband: {:?}", wristband_id);
         
         let qr_code = QrCode::new(wristband_id.clone());
-        self.qr_code_repository.save_qr_code(wristband_id, &qr_code.code, qr_code.expires_at.unwrap_or_else(|| Utc::now() + chrono::Duration::hours(24))).await?;
+        self.qr_code_repository.save_qr_code(wristband_id, &qr_code.code, qr_code.expires_at.unwrap_or_else(|| Utc::now() + chrono::Duration::hours(24))).await.map_err(|e| e.to_string())?;
         Ok(qr_code)
     }
 
-    async fn validate_qr_code(&self, code: &str) -> Result<Option<WristbandId>, AppError> {
+    async fn validate_qr_code(&self, code: &str) -> Result<crate::bounded_contexts::fan_loyalty::domain::entities::QrCodeValidation, String> {
         println!("Mock: Validating QR code: {}", code);
-        
-        if code.starts_with("QR_") {
-            let id_part = &code[3..];
-            if let Ok(wristband_id) = WristbandId::from_string(id_part) {
-                return Ok(Some(wristband_id));
-            }
-        }
-        Ok(None)
+        Ok(crate::bounded_contexts::fan_loyalty::domain::entities::QrCodeValidation {
+            is_valid: false,
+            wristband_id: None,
+            expires_at: None,
+        })
+    }
+
+    async fn scan_qr_code(&self, qr_code: &str, scanner_id: &str, location: Option<crate::bounded_contexts::fan_loyalty::domain::entities::LocationData>) -> Result<crate::bounded_contexts::fan_loyalty::domain::entities::QrCodeScanResult, String> {
+        Ok(crate::bounded_contexts::fan_loyalty::domain::entities::QrCodeScanResult {
+            scan_successful: false,
+            wristband_id: None,
+            fan_id: None,
+            access_granted: false,
+            benefits_available: vec![],
+            scan_timestamp: Utc::now(),
+        })
+    }
+
+    async fn is_qr_code_expired(&self, qr_code: &str) -> Result<bool, String> {
+        Ok(false)
     }
 }
 
@@ -298,18 +409,36 @@ impl MockNftService {
 
 #[async_trait]
 impl NftService for MockNftService {
-    async fn mint_nft_wristband(&self, wristband: &NftWristband, fan_wallet_address: &str) -> Result<String, AppError> {
+    async fn create_nft(&self, wristband: &NftWristband, fan_wallet_address: &str) -> Result<NftCreationResult, String> {
+         Ok(NftCreationResult {
+            wristband_id: wristband.id.clone(),
+            fan_id: wristband.fan_id.clone(),
+            nft_token_id: "token".to_string(),
+            transaction_hash: "hash".to_string(),
+            ipfs_hash: "ipfs".to_string(),
+            blockchain_network: "ethereum".to_string(),
+            contract_address: "0x".to_string(),
+            created_at: Utc::now(),
+        })
+    }
+
+    async fn mint_nft_wristband(&self, wristband: &NftWristband, fan_wallet_address: &str) -> Result<String, String> {
         println!("Mock: Minting NFT wristband: {:?}", wristband.id);
         
         let transaction_hash = format!("mock_transaction_hash_{}", wristband.id.to_string());
         Ok(transaction_hash)
     }
 
-    async fn verify_nft_ownership(&self, wristband_id: &WristbandId, fan_wallet_address: &str) -> Result<bool, AppError> {
-        println!("Mock: Verifying NFT ownership: {:?}", wristband_id);
-        
-        let is_owner = self.nft_repository.verify_nft_ownership(wristband_id, fan_wallet_address).await?;
-        Ok(is_owner)
+    async fn verify_nft_ownership(&self, fan_wallet_address: &str, token_id: &str) -> Result<bool, String> {
+        Ok(true)
+    }
+
+    async fn transfer_nft(&self, from_address: &str, to_address: &str, token_id: &str) -> Result<String, String> {
+        Ok("hash".to_string())
+    }
+
+    async fn get_nft_metadata(&self, token_id: &str) -> Result<Option<crate::bounded_contexts::fan_loyalty::domain::entities::NftMetadata>, String> {
+        Ok(None)
     }
 }
 
@@ -332,31 +461,38 @@ impl MockZkProofService {
 
 #[async_trait]
 impl ZkProofService for MockZkProofService {
-    async fn generate_zk_proof(&self, data: &[u8]) -> Result<uuid::Uuid, AppError> {
+    async fn generate_zk_proof(&self, data: &[u8]) -> Result<uuid::Uuid, String> {
         println!("Mock: Generating ZK proof for data length: {}", data.len());
-        
-        let proof_id = uuid::Uuid::new_v4();
-        let proof_data = format!("mock_proof_{}", proof_id);
-        let fan_id = FanId::new(); // Create a mock fan ID
-        let zk_proof = ZkProof {
-            id: proof_id,
-            fan_id: fan_id.clone(),
-            proof_type: ZkProofType::Biometric,
-            proof_data,
-            public_inputs: vec![],
-            verification_key: "mock_key".to_string(),
-            is_verified: false,
-            confidence_score: None,
-            created_at: Utc::now(),
-            verified_at: None,
-        };
-        self.zk_proof_repository.save_zk_proof(&zk_proof).await?;
-        Ok(proof_id)
+        Ok(uuid::Uuid::new_v4())
     }
 
-    async fn verify_zk_proof(&self, proof_id: uuid::Uuid) -> Result<bool, AppError> {
-        println!("Mock: Verifying ZK proof: {}", proof_id);
+    async fn verify_zk_proof(&self, proof: &ZkProof) -> Result<bool, String> {
+        println!("Mock: Verifying ZK proof: {}", proof.id);
         Ok(true)
+    }
+
+    async fn generate_biometric_proof(&self, fan_id: &FanId, biometric_data: &crate::bounded_contexts::fan_loyalty::domain::entities::BiometricProofData) -> Result<crate::bounded_contexts::fan_loyalty::domain::services::ZkBiometricProof, String> {
+        Ok(crate::bounded_contexts::fan_loyalty::domain::services::ZkBiometricProof {
+            proof_data: "mock_proof".to_string(),
+            public_inputs: vec![],
+            fan_id: fan_id.0,
+            confidence_score: 1.0,
+            generated_at: Utc::now(),
+        })
+    }
+
+    async fn generate_wristband_proof(&self, wristband_id: &WristbandId, fan_id: &FanId) -> Result<crate::bounded_contexts::fan_loyalty::domain::services::ZkWristbandProof, String> {
+        Ok(crate::bounded_contexts::fan_loyalty::domain::services::ZkWristbandProof {
+            proof_data: "mock_proof".to_string(),
+            public_inputs: vec![],
+            wristband_id: wristband_id.0,
+            fan_id: fan_id.0,
+            generated_at: Utc::now(),
+        })
+    }
+
+    async fn get_proof_status(&self, proof_id: &uuid::Uuid) -> Result<Option<crate::bounded_contexts::fan_loyalty::domain::entities::ZkProofStatus>, String> {
+        Ok(None)
     }
 }
 

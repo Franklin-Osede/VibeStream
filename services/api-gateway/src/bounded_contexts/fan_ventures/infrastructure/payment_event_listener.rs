@@ -7,9 +7,9 @@ use async_trait::async_trait;
 use uuid::Uuid;
 use tracing::{info, warn, error};
 
-use crate::shared::domain::errors::AppError;
+use crate::shared::domain::{errors::AppError, events::DomainEvent};
 use crate::bounded_contexts::{
-    orchestrator::{EventHandler, DomainEvent},
+    orchestrator::EventHandler,
     payment::domain::events::{PaymentCompleted, PaymentFailed},
     fan_ventures::infrastructure::{
         postgres_repository::PostgresFanVenturesRepository,

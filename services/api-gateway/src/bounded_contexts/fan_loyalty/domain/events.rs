@@ -72,7 +72,7 @@ pub struct QrCodeScannedEvent {
     pub fan_id: Option<FanId>,
     #[serde(default)]
     pub scanner_id: String,
-    pub location: Option<crate::bounded_contexts::fan_loyalty::domain::services::LocationData>,
+    pub location: Option<crate::bounded_contexts::fan_loyalty::domain::entities::LocationData>,
     pub access_granted: bool,
     pub scanned_at: DateTime<Utc>,
 }

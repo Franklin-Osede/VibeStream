@@ -63,6 +63,31 @@ pub enum InvestmentStatus {
     Cancelled,  // Cancelada
 }
 
+impl fmt::Display for InvestmentStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            InvestmentStatus::Pending => write!(f, "Pending"),
+            InvestmentStatus::Active => write!(f, "Active"),
+            InvestmentStatus::Completed => write!(f, "Completed"),
+            InvestmentStatus::Cancelled => write!(f, "Cancelled"),
+        }
+    }
+}
+
+impl std::str::FromStr for InvestmentStatus {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Pending" | "pending" => Ok(InvestmentStatus::Pending),
+            "Active" | "active" => Ok(InvestmentStatus::Active),
+            "Completed" | "completed" => Ok(InvestmentStatus::Completed),
+            "Cancelled" | "cancelled" => Ok(InvestmentStatus::Cancelled),
+            _ => Err(format!("Invalid InvestmentStatus: {}", s)),
+        }
+    }
+}
+
 /// Venture creado por un artista para sus fans
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArtistVenture {
@@ -105,6 +130,20 @@ impl fmt::Display for VentureStatus {
             VentureStatus::Open => write!(f, "Open"),
             VentureStatus::Closed => write!(f, "Closed"),
             VentureStatus::Cancelled => write!(f, "Cancelled"),
+        }
+    }
+}
+
+impl std::str::FromStr for VentureStatus {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Draft" | "draft" => Ok(VentureStatus::Draft),
+            "Open" | "open" => Ok(VentureStatus::Open),
+            "Closed" | "closed" => Ok(VentureStatus::Closed),
+            "Cancelled" | "cancelled" => Ok(VentureStatus::Cancelled),
+            _ => Err(format!("Invalid VentureStatus: {}", s)),
         }
     }
 }
@@ -525,6 +564,27 @@ impl fmt::Display for VentureCategory {
     }
 }
 
+impl std::str::FromStr for VentureCategory {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Music" | "music" => Ok(VentureCategory::Music),
+            "Visual Arts" | "visual arts" | "VisualArts" => Ok(VentureCategory::VisualArts),
+            "Film" | "film" => Ok(VentureCategory::Film),
+            "Gaming" | "gaming" => Ok(VentureCategory::Gaming),
+            "Technology" | "technology" => Ok(VentureCategory::Technology),
+            "Fashion" | "fashion" => Ok(VentureCategory::Fashion),
+            "Food" | "food" => Ok(VentureCategory::Food),
+            "Travel" | "travel" => Ok(VentureCategory::Travel),
+            "Education" | "education" => Ok(VentureCategory::Education),
+            "Health" | "health" => Ok(VentureCategory::Health),
+            "Other" | "other" => Ok(VentureCategory::Other),
+            _ => Err(format!("Invalid VentureCategory: {}", s)),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RiskLevel {
     Low,
@@ -540,6 +600,20 @@ impl fmt::Display for RiskLevel {
             RiskLevel::Medium => write!(f, "Medium"),
             RiskLevel::High => write!(f, "High"),
             RiskLevel::VeryHigh => write!(f, "Very High"),
+        }
+    }
+}
+
+impl std::str::FromStr for RiskLevel {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Low" | "low" => Ok(RiskLevel::Low),
+            "Medium" | "medium" => Ok(RiskLevel::Medium),
+            "High" | "high" => Ok(RiskLevel::High),
+            "Very High" | "very high" | "VeryHigh" => Ok(RiskLevel::VeryHigh),
+            _ => Err(format!("Invalid RiskLevel: {}", s)),
         }
     }
 }

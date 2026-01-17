@@ -109,7 +109,6 @@ impl PostgresFanVenturesRepository {
                 current_funding = EXCLUDED.current_funding,
                 min_investment = EXCLUDED.min_investment,
                 max_investment = EXCLUDED.max_investment,
-                status = EXCLUDED.status,
                 start_date = EXCLUDED.start_date,
                 end_date = EXCLUDED.end_date,
                 updated_at = EXCLUDED.updated_at,

@@ -23,12 +23,17 @@ pub enum AppError {
     InvalidInput(String),
     RateLimitError(String),
     Unauthorized(String),
+    UnauthorizedError(String),  // Added for campaign controller
     Forbidden(String),
     ConcurrencyConflict(String),
     NetworkError(String),
     ServiceUnavailable(String),
     InsufficientFundsError(String),
+    FraudDetected(String),  // Added for payment fraud detection
     PaymentGatewayError(String),
+    NotFoundError(String),  // Added for campaign/resource not found
+    ConflictError(String),  // Added for campaign conflicts
+    BlockchainError(String),  // Added for blockchain operations
 }
 
 impl std::error::Error for AppError {}
@@ -57,6 +62,7 @@ impl std::fmt::Display for AppError {
             AppError::InvalidInput(msg) => write!(f, "Invalid input: {}", msg),
             AppError::RateLimitError(msg) => write!(f, "Rate limit error: {}", msg),
             AppError::Unauthorized(msg) => write!(f, "Unauthorized: {}", msg),
+            AppError::UnauthorizedError(msg) => write!(f, "Unauthorized error: {}", msg),
             AppError::Forbidden(msg) => write!(f, "Forbidden: {}", msg),
             AppError::ConcurrencyConflict(msg) => write!(f, "Concurrency conflict: {}", msg),
             AppError::NetworkError(msg) => write!(f, "Network error: {}", msg),
@@ -64,6 +70,9 @@ impl std::fmt::Display for AppError {
             AppError::InsufficientFundsError(msg) => write!(f, "Insufficient funds: {}", msg),
             AppError::FraudDetected(msg) => write!(f, "Fraud detected: {}", msg),
             AppError::PaymentGatewayError(msg) => write!(f, "Payment gateway error: {}", msg),
+            AppError::NotFoundError(msg) => write!(f, "Not found: {}", msg),
+            AppError::ConflictError(msg) => write!(f, "Conflict: {}", msg),
+            AppError::BlockchainError(msg) => write!(f, "Blockchain error: {}", msg),
         }
     }
 }
@@ -123,6 +132,7 @@ impl From<AppError> for StatusCode {
             AppError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::RateLimitError(_) => StatusCode::TOO_MANY_REQUESTS,
             AppError::Unauthorized(_) => StatusCode::UNAUTHORIZED,
+            AppError::UnauthorizedError(_) => StatusCode::UNAUTHORIZED,
             AppError::Forbidden(_) => StatusCode::FORBIDDEN,
             AppError::ConcurrencyConflict(_) => StatusCode::CONFLICT,
             AppError::SerializationError(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -139,6 +149,9 @@ impl From<AppError> for StatusCode {
             AppError::InsufficientFundsError(_) => StatusCode::PAYMENT_REQUIRED,
             AppError::FraudDetected(_) => StatusCode::FORBIDDEN,
             AppError::PaymentGatewayError(_) => StatusCode::BAD_GATEWAY,
+            AppError::NotFoundError(_) => StatusCode::NOT_FOUND,
+            AppError::ConflictError(_) => StatusCode::CONFLICT,
+            AppError::BlockchainError(_) => StatusCode::BAD_GATEWAY,
         }
     }
 }

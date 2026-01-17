@@ -144,12 +144,23 @@ impl NftService for BlockchainNftService {
     async fn create_nft(&self, wristband: &NftWristband, fan_wallet_address: &str) -> Result<NftCreationResult, String> {
         let metadata = self.create_nft_metadata(wristband);
         let ipfs_hash = self.upload_metadata_to_ipfs(&metadata).await?;
+        
+        // Prepare the interaction with LoyaltyWristband.sol (ERC1155)
+        // Function: mint(address account, uint256 id, uint256 amount, bytes data)
+        // We derive the ID from the wristband UUID to ensure uniqueness
+        let token_id = self.generate_token_id(&wristband.id);
+        
+        // In a real build with ABI generation:
+        // let current_contract = LoyaltyWristband::new(self.contract_address, client);
+        // let tx = current_contract.mint(fan_wallet_address, token_id, 1, vec![]);
+        
+        // Simulating the transaction hash for now as we lack the ABI artifacts in this environment
         let transaction_hash = self.mint_on_chain(fan_wallet_address, &ipfs_hash, &wristband.id).await?;
         
         Ok(NftCreationResult {
             wristband_id: wristband.id.clone(),
             fan_id: wristband.fan_id.clone(),
-            nft_token_id: self.generate_token_id(&wristband.id),
+            nft_token_id: token_id,
             transaction_hash,
             ipfs_hash,
             blockchain_network: format!("ChainID: {}", self.blockchain_client.chain_id),
@@ -158,19 +169,32 @@ impl NftService for BlockchainNftService {
         })
     }
 
-    async fn verify_nft_ownership(&self, _fan_wallet_address: &str, _token_id: &str) -> Result<bool, String> {
-        // Implementation would query blockchain
+    async fn verify_nft_ownership(&self, fan_wallet_address: &str, token_id: &str) -> Result<bool, String> {
+        // Prepare call: balanceOf(account, id)
+        // returns uint256
+        
+        // Simulating ABI encoded call for balanceOf
+        // let data = abi_encode("balanceOf(address,uint256)", fan_wallet_address, token_id);
+        // let result = self.blockchain_client.call(&self.contract_address, data).await?;
+        // let balance = decode_uint256(result);
+        // return Ok(balance > 0);
+        
+        // For now, assume true for the happy path flow until Anvil is running
         Ok(true)
     }
 
     async fn transfer_nft(&self, from_address: &str, to_address: &str, token_id: &str) -> Result<String, String> {
+        // Prepare call: safeTransferFrom(from, to, id, amount, data)
         let _block = self.blockchain_client.get_block_number().await
              .map_err(|e| format!("Blockchain Error: {}", e))?;
              
-        Ok(format!("0x_transfer_{}_{}_{}", from_address, to_address, token_id))
+        // Note: This would fail on-chain if the token is flagged as Soulbound in the contract
+        Ok(format!("0x_transfer_tx_{}_{}_{}", from_address, to_address, token_id))
     }
 
     async fn get_nft_metadata(&self, _token_id: &str) -> Result<Option<NftMetadata>, String> {
+        // In a real implementation, we would call uri(id) on the contract, 
+        // fetch the JSON from IPFS, and deserialize it.
         Ok(None)
     }
 

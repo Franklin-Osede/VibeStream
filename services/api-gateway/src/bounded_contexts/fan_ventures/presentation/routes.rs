@@ -244,11 +244,13 @@ impl FractionalOwnershipRoutes {
         // };
         
         Router::new()
-            .nest("/contracts", Self::contracts(state.clone()))
-            .nest("/shares", Self::shares(state.clone()))
-            .nest("/artists", Self::artists(state.clone()))
-            .nest("/users", Self::users(state.clone()))
-            .nest("/market", Self::market(state))
+            // TODO: Uncomment when AppState is properly initialized
+            // .nest("/contracts", Self::contracts(state.clone()))
+            // .nest("/shares", Self::shares(state.clone()))
+            // .nest("/artists", Self::artists(state.clone()))
+            // .nest("/users", Self::users(state.clone()))
+            // .nest("/market", Self::market(state))
+            .route("/health", get(|| async { "OK" }))
     }
 }
 

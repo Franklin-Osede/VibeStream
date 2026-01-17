@@ -9,40 +9,35 @@ use crate::bounded_contexts::campaign::domain::aggregates::CampaignAggregate;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateCampaignCommand {
-    pub song_id: String,
-    pub artist_id: String,
     pub name: String,
     pub description: String,
+    pub campaign_type: String,
+    pub song_id: String,
+    pub artist_id: String,
+    pub target_audience: Option<String>,
+    pub budget: Option<f64>,
+    pub currency: Option<String>,
     pub start_date: DateTime<Utc>,
     pub end_date: DateTime<Utc>,
     pub boost_multiplier: f64,
     pub nft_price: f64,
     pub max_nfts: u32,
     pub target_revenue: Option<f64>,
+    pub campaign_parameters: Option<serde_json::Value>,
+    pub metadata: Option<serde_json::Value>,
+    pub created_by: Uuid,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateCampaignResponse {
-    pub campaign_id: String,
-    pub success: bool,
-    pub message: String,
-    pub campaign_details: CampaignDetails,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CampaignDetails {
-    pub id: String,
+    pub campaign_id: Uuid,
     pub name: String,
-    pub song_id: String,
-    pub artist_id: String,
+    pub campaign_type: String,
     pub status: String,
+    pub budget: f64,
+    pub estimated_reach: u32,
     pub start_date: DateTime<Utc>,
     pub end_date: DateTime<Utc>,
-    pub boost_multiplier: f64,
-    pub nft_price: f64,
-    pub max_nfts: u32,
-    pub nfts_sold: u32,
-    pub target_revenue: Option<f64>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -118,28 +113,25 @@ impl CreateCampaignCommandHandler {
         // 3. Send notifications
 
         let campaign = campaign_aggregate.campaign();
-        let campaign_details = CampaignDetails {
-            id: campaign.id().to_string(),
-            name: campaign.name().to_string(),
-            song_id: campaign.song_id().to_string(),
-            artist_id: campaign.artist_id().to_string(),
-            status: format!("{:?}", campaign.status()),
-            start_date: campaign.date_range().start(),
-            end_date: campaign.date_range().end(),
-            boost_multiplier: campaign.boost_multiplier().value(),
-            nft_price: campaign.nft_price().value(),
-            max_nfts: campaign.nft_supply().max_supply(),
-            nfts_sold: campaign.nft_supply().current_sold(),
-            target_revenue: campaign.target().map(|t| t.target_value()),
-            created_at: campaign.created_at(),
-        };
+        
+        // Calculate estimated reach based on budget and campaign parameters
+        let estimated_reach = command.budget.unwrap_or(0.0) as u32 * 100; // Simple estimation
 
         Ok(CreateCampaignResponse {
-            campaign_id: campaign.id().to_string(),
-            success: true,
-            message: "Campaign created successfully".to_string(),
-            campaign_details,
+            campaign_id: Uuid::parse_str(&campaign.id().to_string()).unwrap_or_else(|_| Uuid::new_v4()),
+            name: campaign.name().to_string(),
+            campaign_type: command.campaign_type.clone(),
+            status: format!("{:?}", campaign.status()),
+            budget: command.budget.unwrap_or(0.0),
+            estimated_reach,
+            start_date: campaign.date_range().start(),
+            end_date: campaign.date_range().end(),
+            created_at: campaign.created_at(),
         })
+    }
+
+    pub async fn handle(&self, command: CreateCampaignCommand) -> Result<CreateCampaignResponse, crate::shared::domain::errors::AppError> {
+        self.execute(command).map_err(|e| crate::shared::domain::errors::AppError::ValidationError(e))
     }
 
     fn validate_command(&self, command: &CreateCampaignCommand) -> Result<(), String> {

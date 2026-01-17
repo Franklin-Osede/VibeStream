@@ -9,8 +9,8 @@ use chrono::{DateTime, Utc};
 use std::sync::Arc;
 
 use crate::shared::domain::errors::AppError;
-use crate::bounded_contexts::payment::domain::repository::{
-    PaymentRepository, 
+use crate::bounded_contexts::payment::domain::repository::PaymentRepository;
+use crate::bounded_contexts::payment::domain::entities::{
     PaymentBatch, 
     BatchType,
     BatchStatus

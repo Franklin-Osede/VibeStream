@@ -860,14 +860,8 @@ impl DomainEvent for RevenueShareDistributed {
     fn event_data(&self) -> serde_json::Value { serde_json::to_value(self).unwrap_or_default() }
 }
 
-impl DomainEvent for PlatformFeeCollected {
-    fn metadata(&self) -> &EventMetadata { &self.metadata }
-    fn event_type(&self) -> &str { "PlatformFeeCollected" }
-    fn aggregate_id(&self) -> Uuid { self.fee_payment_id.value() }
-    fn aggregate_type(&self) -> &str { "Payment" }
-    fn occurred_at(&self) -> DateTime<Utc> { self.occurred_at }
-    fn event_data(&self) -> serde_json::Value { serde_json::to_value(self).unwrap_or_default() }
-}
+// Duplicate removed
+
 
 /// Payment Batch Created Event
 #[derive(Clone, Debug, Serialize, Deserialize)]

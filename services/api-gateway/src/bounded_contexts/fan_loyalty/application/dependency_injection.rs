@@ -593,12 +593,14 @@ pub struct VerifyZkProofCommand {
 // Use domain types directly - no duplicate definitions needed
 
 // Use domain types directly
-use crate::bounded_contexts::fan_loyalty::domain::services::{
-    LocationData, BiometricData, FanVerifiedEvent, WristbandCreatedEvent, 
-    WristbandActivatedEvent, QrCodeScannedEvent, QrCodeValidation, QrCodeScanResult
+use crate::bounded_contexts::fan_loyalty::domain::entities::{
+    LocationData, BiometricData, BiometricProofData, ZkProof,
+    QrCodeValidation, QrCodeScanResult, BehavioralPatterns, DeviceCharacteristics
 };
-use crate::bounded_contexts::fan_loyalty::domain::entities::BiometricProofData;
-use crate::bounded_contexts::fan_loyalty::domain::entities::ZkProof;
+use crate::bounded_contexts::fan_loyalty::domain::events::{
+    FanVerifiedEvent, WristbandCreatedEvent, 
+    WristbandActivatedEvent, QrCodeScannedEvent
+};
 
 // Types imported from domain/entities.rs
 

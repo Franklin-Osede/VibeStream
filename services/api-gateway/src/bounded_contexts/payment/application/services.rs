@@ -502,7 +502,7 @@ impl RevenueSharingApplicationService {
 }
 
 // Mock services for testing/demonstration
-struct MockPaymentProcessingService;
+pub struct MockPaymentProcessingService;
 
 #[async_trait]
 impl PaymentProcessingService for MockPaymentProcessingService {
@@ -524,9 +524,35 @@ impl PaymentProcessingService for MockPaymentProcessingService {
             error_message: None,
         })
     }
+
+    async fn validate_payment(&self, _payment: &PaymentAggregate) -> Result<ValidationResult, AppError> {
+        Ok(ValidationResult {
+            is_valid: true,
+            validation_errors: vec![],
+            risk_score: 0.0,
+            requires_audit: false,
+        })
+    }
+
+    async fn check_fraud_indicators(&self, _payment: &PaymentAggregate) -> Result<FraudCheckResult, AppError> {
+        Ok(FraudCheckResult {
+            risk_score: 0.1,
+            fraud_indicators: vec![],
+            action_required: FraudAction::Allow,
+            confidence_level: 0.9,
+        })
+    }
+
+    async fn cancel_payment(&self, _payment_aggregate: &mut PaymentAggregate, _reason: String) -> Result<(), AppError> {
+        Ok(())
+    }
+
+    async fn calculate_processing_fee(&self, amount: &Amount, _payment_method: &PaymentMethod) -> Result<Amount, AppError> {
+        Ok(Amount::new(amount.value() * 0.02, amount.currency().clone())?)
+    }
 }
 
-struct MockFraudDetectionService;
+pub struct MockFraudDetectionService;
 
 #[async_trait]
 impl FraudDetectionService for MockFraudDetectionService {
@@ -540,7 +566,46 @@ impl FraudDetectionService for MockFraudDetectionService {
         })
     }
     
+    async fn check_user_patterns(&self, _user_id: Uuid, _payment: &PaymentAggregate) -> Result<PatternAnalysisResult, AppError> {
+        Ok(PatternAnalysisResult {
+            is_unusual: false,
+            pattern_deviations: vec![],
+            historical_comparison: PatternComparison {
+                average_amount: 0.0,
+                payment_frequency: 0.0,
+                typical_times: vec![],
+                common_payment_methods: vec![],
+            },
+            recommendations: vec![],
+        })
+    }
 
+    async fn validate_payment_method(&self, _payment_method: &PaymentMethod, _user_id: Uuid) -> Result<PaymentMethodValidationResult, AppError> {
+        Ok(PaymentMethodValidationResult {
+            is_valid: true,
+            validation_errors: vec![],
+            risk_factors: vec![],
+            requires_verification: false,
+        })
+    }
+
+    async fn check_velocity_limits(&self, _user_id: Uuid, _amount: &Amount, _time_window: chrono::Duration) -> Result<VelocityCheckResult, AppError> {
+        Ok(VelocityCheckResult {
+            is_within_limits: true,
+            current_velocity: 0.0,
+            limit_threshold: 1000.0,
+            time_until_reset: chrono::Duration::hours(24),
+        })
+    }
+
+    async fn get_user_risk_score(&self, _user_id: Uuid) -> Result<RiskScore, AppError> {
+        Ok(RiskScore {
+            score: 0.0,
+            factors: HashMap::new(),
+            classification: RiskClassification::Low,
+            last_updated: Utc::now(),
+        })
+    }
 }
 
 #[cfg(test)]
@@ -570,7 +635,7 @@ mod tests {
 
 // Additional mock implementations for testing
 struct MockPaymentRepository;
-struct MockNotificationService;
+pub struct MockNotificationService;
 
 #[async_trait]
 impl PaymentRepository for MockPaymentRepository {
@@ -589,6 +654,23 @@ impl PaymentRepository for MockPaymentRepository {
     async fn find_by_idempotency_key(&self, _key: &str) -> Result<Option<PaymentAggregate>, AppError> {
         Ok(None)
     }
+
+    async fn find_by_payer_id(&self, _payer_id: Uuid, _pagination: &Pagination) -> Result<Vec<PaymentAggregate>, AppError> {
+        Ok(vec![])
+    }
+
+    async fn find_by_payee_id(&self, _payee_id: Uuid, _pagination: &Pagination) -> Result<Vec<PaymentAggregate>, AppError> {
+        Ok(vec![])
+    }
+
+    async fn find_by_status(&self, _status: &PaymentStatus, _pagination: &Pagination) -> Result<Vec<PaymentAggregate>, AppError> {
+        Ok(vec![])
+    }
+
+    async fn find_by_purpose_category(&self, _category: &PaymentCategory, _pagination: &Pagination) -> Result<Vec<PaymentAggregate>, AppError> {
+        Ok(vec![])
+    }
+
     
     async fn find_by_filter(&self, _filter: PaymentFilter, _offset: u64, _limit: u64) -> Result<Vec<PaymentAggregate>, AppError> {
         Ok(vec![])
@@ -606,11 +688,48 @@ impl PaymentRepository for MockPaymentRepository {
         Ok(None)
     }
     
+    async fn find_by_date_range(&self, _start: DateTime<Utc>, _end: DateTime<Utc>, _pagination: &Pagination) -> Result<Vec<PaymentAggregate>, AppError> {
+        Ok(vec![])
+    }
+
+    async fn find_by_amount_range(&self, _min_amount: &Amount, _max_amount: &Amount, _pagination: &Pagination) -> Result<Vec<PaymentAggregate>, AppError> {
+        Ok(vec![])
+    }
+
+    async fn find_refundable_payments(&self, _pagination: &Pagination) -> Result<Vec<PaymentAggregate>, AppError> {
+        Ok(vec![])
+    }
+
+    async fn find_stale_pending_payments(&self, _older_than: DateTime<Utc>) -> Result<Vec<PaymentAggregate>, AppError> {
+        Ok(vec![])
+    }
+    
+    async fn update(&self, _aggregate: &PaymentAggregate) -> Result<(), AppError> {
+        Ok(())
+    }
+    
+    async fn delete(&self, _id: &PaymentId) -> Result<(), AppError> {
+        Ok(())
+    }
+    
+    async fn exists(&self, _id: &PaymentId) -> Result<bool, AppError> {
+        Ok(false)
+    }
+
     async fn save_batch(&self, _batch: &PaymentBatch) -> Result<(), AppError> {
         Ok(())
     }
+    
+    async fn count_by_status(&self, _status: &PaymentStatus) -> Result<u64, AppError> {
+        Ok(0)
+    }
+
+    async fn get_total_volume(&self, _start: DateTime<Utc>, _end: DateTime<Utc>) -> Result<HashMap<Currency, f64>, AppError> {
+        Ok(HashMap::new())
+    }
 }
 
+#[async_trait]
 #[async_trait]
 impl PaymentNotificationService for MockNotificationService {
     async fn send_payment_completed_notification(&self, _payment: &PaymentAggregate) -> Result<(), AppError> {
@@ -621,7 +740,7 @@ impl PaymentNotificationService for MockNotificationService {
         Ok(())
     }
     
-    async fn send_payment_blocked_notification(&self, _payment: &PaymentAggregate) -> Result<(), AppError> {
+    async fn send_payment_blocked_notification(&self, _payment: &PaymentAggregate, _reason: &str) -> Result<(), AppError> {
         Ok(())
     }
     
@@ -637,7 +756,21 @@ impl PaymentNotificationService for MockNotificationService {
         Ok(())
     }
     
-    async fn send_refund_failed_notification(&self, _payment: &PaymentAggregate, _amount: &Amount) -> Result<(), AppError> {
+    async fn send_refund_failed_notification(&self, _payment: &PaymentAggregate, _reason: &str) -> Result<(), AppError> {
+        Ok(())
+    }
+    
+    async fn send_fraud_alert_notification(&self, _payment: &PaymentAggregate, _fraud_indicators: &[String]) -> Result<(), AppError> {
+        Ok(())
+    }
+
+    async fn send_royalty_distribution_notification(
+        &self,
+        _artist_id: Uuid,
+        _amount: &Amount,
+        _period_start: DateTime<Utc>,
+        _period_end: DateTime<Utc>,
+    ) -> Result<(), AppError> {
         Ok(())
     }
     

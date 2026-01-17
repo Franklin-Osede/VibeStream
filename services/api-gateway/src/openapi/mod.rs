@@ -235,6 +235,27 @@ pub struct ApiResponse<T> {
     pub errors: Option<Vec<String>>,
 }
 
+impl<T> ApiResponse<T> {
+    pub fn success(data: T) -> Self {
+        Self {
+            success: true,
+            data: Some(data),
+            message: "Success".to_string(),
+            errors: None,
+        }
+    }
+
+    pub fn error(message: String, errors: Option<Vec<String>>) -> Self {
+        Self {
+            success: false,
+            data: None,
+            message,
+            errors,
+        }
+    }
+}
+
+
 // =============================================================================
 // OPENAPI DOCUMENTATION
 // =============================================================================
