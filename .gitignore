@@ -96,4 +96,7 @@ yarn-error.log*
 **/*.so
 **/*.dylib
 **/*.dll
-**/*.rlib 
+**/*.rlib
+
+# PID files
+.pid 
