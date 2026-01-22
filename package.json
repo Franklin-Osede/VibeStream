@@ -1,6 +1,8 @@
 {
-  "devDependencies": {
-    "@types/react-navigation": "^3.0.8"
+  "scripts": {
+    "dev:backend": "./scripts/dev-start.sh",
+    "dev:frontend": "cd apps/frontend && npm run dev",
+    "stop": "./scripts/dev-stop.sh"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.4.0"

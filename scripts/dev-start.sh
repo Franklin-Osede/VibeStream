@@ -12,11 +12,11 @@ NC='\033[0m' # No Color
 
 PROJECT_ROOT="/Users/domoblock/Documents/Proycts-dev/Vibestream"
 PID_FILE="$PROJECT_ROOT/.pid"
-PORT=3000
+PORT=3007
 
 cd "$PROJECT_ROOT" || exit 1
 
-echo -e "${BLUE}🚀 Iniciando Vibestream...${NC}"
+echo -e "${BLUE}🚀 Iniciando Vibestream Backend...${NC}"
 
 # Verificar si el servidor ya está corriendo
 if [ -f "$PID_FILE" ]; then
@@ -31,40 +31,43 @@ if [ -f "$PID_FILE" ]; then
     fi
 fi
 
-# Verificar si node_modules existe
-if [ ! -d "node_modules" ]; then
-    echo -e "${YELLOW}📦 Instalando dependencias...${NC}"
-    npm install
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}❌ Error instalando dependencias${NC}"
-        exit 1
-    fi
-    echo -e "${GREEN}✅ Dependencias instaladas${NC}"
+# Iniciar backend (api-gateway)
+# Verificar si cargo está instalado, si no, intentar usar docker-compose o avisar
+if command -v cargo >/dev/null 2>&1; then
+    echo -e "${BLUE}📦 Ejecutando con Cargo...${NC}"
+    cd services/api-gateway || exit 1
+    # Asegurar que se usen las variables de entorno correctas o el .env
+    SERVER_PORT=3007 cargo run --bin api-gateway-unified > /dev/null 2>&1 &
+    SERVER_PID=$!
+    cd ../..
 else
-    echo -e "${GREEN}✅ Dependencias ya instaladas${NC}"
+     echo -e "${YELLOW}⚠️ Cargo no encontrado. Intentando Docker Compose...${NC}"
+     docker-compose up -d api-gateway
+     # Nota: Esto no nos da el PID fácilmente para el archivo .pid, pero es un fallback.
+     # Por simplicidad en este script, asumiremos entorno de desarrollo con Rust instalado.
+     echo -e "${RED}❌ Rust/Cargo no encontrado. Por favor instala Rust o usa docker-compose manualmente.${NC}"
+     exit 1
 fi
-
-# Iniciar servidor
-echo -e "${BLUE}🔄 Iniciando servidor en puerto $PORT...${NC}"
-npm run dev > /dev/null 2>&1 &
-SERVER_PID=$!
 
 # Guardar PID
 echo $SERVER_PID > "$PID_FILE"
 
 # Esperar un momento para verificar que el servidor inició
-sleep 2
+sleep 5
 
 # Verificar que el proceso sigue corriendo
 if kill -0 "$SERVER_PID" 2>/dev/null; then
-    echo -e "${GREEN}✅ Servidor iniciado correctamente${NC}"
+    echo -e "${GREEN}✅ Backend iniciado correctamente${NC}"
     echo -e "${GREEN}   PID: $SERVER_PID${NC}"
     echo -e "${GREEN}   Puerto: $PORT${NC}"
-    echo -e "${BLUE}   URL: http://localhost:$PORT${NC}"
+    echo -e "${BLUE}   API URL: http://localhost:$PORT${NC}"
     echo ""
-    echo -e "${YELLOW}💡 Para detener: ./scripts/dev-stop.sh${NC}"
+    echo -e "${BLUE}🚀 Para iniciar el Frontend:${NC}"
+    echo -e "   cd apps/frontend && npm run dev"
+    echo ""
+    echo -e "${YELLOW}💡 Para detener el backend: ./scripts/dev-stop.sh${NC}"
 else
-    echo -e "${RED}❌ Error iniciando el servidor${NC}"
+    echo -e "${RED}❌ Error iniciando el servidor (Revisa logs/ o salida de cargo)${NC}"
     rm -f "$PID_FILE"
     exit 1
 fi
