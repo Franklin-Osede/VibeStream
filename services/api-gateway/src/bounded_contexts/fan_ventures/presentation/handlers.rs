@@ -6,100 +6,62 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
+use std::sync::Arc;
 
 use crate::auth::Claims;
+use crate::bounded_contexts::fan_ventures::infrastructure::postgres_repository::PostgresFanVenturesRepository;
+use crate::bounded_contexts::fan_ventures::domain::entities::{
+    ArtistVenture, FanInvestment, VentureStatus, RevenueDistribution, 
+    InvestmentType, VentureCategory, RiskLevel,
+    CreateVentureRequest, BenefitDelivery, DeliveryStatus, DeliveryMethod
+};
 
 // ====== REQUEST/RESPONSE TYPES ======
+// Re-using domain entities where possible or specific DTOs
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct CreateContractRequest {
-    pub song_id: Uuid,
-    pub total_shares: u32,
-    pub price_per_share: f64,
-    pub artist_retained_percentage: f64,
-    pub minimum_investment: Option<f64>,
-    pub vesting_period_months: Option<u32>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CreateContractResponse {
-    pub contract_id: Uuid,
-    pub song_id: Uuid,
-    pub total_shares: u32,
-    pub shares_available: u32,
-    pub price_per_share: f64,
-    pub market_cap: f64,
+pub struct CreateVentureResponse {
+    pub venture_id: Uuid,
     pub status: String,
     pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct PurchaseSharesRequest {
-    pub investor_id: Uuid,
-    pub shares_to_purchase: u32,
-    pub investment_amount: f64,
-    pub payment_method: String,
+pub struct InvestRequest {
+    pub amount: f64,
+    pub investment_type: InvestmentType,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct PurchaseSharesResponse {
-    pub transaction_id: Uuid,
-    pub shares_purchased: u32,
-    pub total_cost: f64,
-    pub ownership_percentage: f64,
-    pub estimated_returns: f64,
-    pub blockchain_tx_hash: Option<String>,
+pub struct InvestResponse {
+    pub investment_id: Uuid,
+    pub status: String,
+    pub transactions_hash: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct UserPortfolioResponse {
-    pub user_id: Uuid,
-    pub total_invested: f64,
-    pub current_value: f64,
-    pub total_returns: f64,
-    pub roi_percentage: f64,
-    pub active_contracts: u32,
-    pub positions: Vec<PortfolioPosition>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PortfolioPosition {
-    pub contract_id: Uuid,
-    pub song_title: String,
-    pub artist_name: String,
-    pub shares_owned: u32,
-    pub ownership_percentage: f64,
-    pub initial_investment: f64,
-    pub current_value: f64,
-    pub revenue_earned: f64,
-    pub purchase_date: DateTime<Utc>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ContractDetailsResponse {
-    pub contract_id: Uuid,
-    pub song_id: Uuid,
-    pub song_title: String,
-    pub artist_name: String,
-    pub total_shares: u32,
-    pub shares_sold: u32,
-    pub shares_available: u32,
-    pub price_per_share: f64,
-    pub total_invested: f64,
-    pub investor_count: u32,
-    pub monthly_revenue: f64,
+#[derive(Debug, Deserialize)]
+pub struct DistributeRevenueRequest {
     pub total_revenue: f64,
-    pub status: String,
-    pub created_at: DateTime<Utc>,
-    pub performance_metrics: PerformanceMetrics,
+    pub period_start: DateTime<Utc>,
+    pub period_end: DateTime<Utc>,
+    pub artist_share: f64,
+    pub fan_share: f64,
+    pub platform_fee: f64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PerformanceMetrics {
-    pub roi_percentage: f64,
-    pub monthly_growth: f64,
-    pub revenue_per_share: f64,
-    pub risk_score: f64,
+#[derive(Debug, Serialize)]
+pub struct DistributeRevenueResponse {
+    pub success: bool,
+    pub distribution_id: Uuid,
+    pub distributed_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateDeliveryRequest {
+    pub status: DeliveryStatus,
+    pub tracking_number: Option<String>,
+    pub carrier: Option<String>,
+    pub notes: Option<String>,
 }
 
 // ====== STATE TYPE ======
@@ -108,230 +70,190 @@ pub type AppState = crate::shared::infrastructure::app_state::AppState;
 
 // ====== HANDLERS ======
 
-/// POST /api/v1/ownership/contracts - Create new ownership contract
-pub async fn create_ownership_contract(
-    State(_state): State<AppState>,
+/// POST /api/v1/ventures - Create new venture
+pub async fn create_venture_handler(
+    State(state): State<AppState>,
     claims: Claims,
-    Json(request): Json<CreateContractRequest>,
-) -> Result<ResponseJson<CreateContractResponse>, StatusCode> {
-    // Verify user is artist or admin
+    Json(request): Json<CreateVentureRequest>,
+) -> Result<ResponseJson<CreateVentureResponse>, StatusCode> {
+    // Only artists can create ventures
     if claims.role != "artist" && claims.role != "admin" {
         return Err(StatusCode::FORBIDDEN);
     }
 
-    // Mock response for now - replace with real application service call
-    let contract_id = Uuid::new_v4();
-    let shares_available = ((100.0 - request.artist_retained_percentage) / 100.0 * request.total_shares as f64) as u32;
-    let market_cap = request.total_shares as f64 * request.price_per_share;
+    let repo = PostgresFanVenturesRepository::new(state.get_db_pool());
+    
+    let venture_id = Uuid::new_v4();
+    let artist_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::BAD_REQUEST)?;
 
-    let response = CreateContractResponse {
-        contract_id,
-        song_id: request.song_id,
-        total_shares: request.total_shares,
-        shares_available,
-        price_per_share: request.price_per_share,
-        market_cap,
-        status: "active".to_string(),
+    let venture = ArtistVenture {
+        id: venture_id,
+        artist_id,
+        title: request.title,
+        description: Some(request.description),
+        category: VentureCategory::Music, // Default, should come from request
+        tags: vec![],
+        risk_level: RiskLevel::Medium,
+        expected_return: 0.0,
+        artist_rating: 0.0,
+        artist_previous_ventures: 0,
+        artist_success_rate: 0.0,
+        funding_goal: request.funding_goal,
+        current_funding: 0.0,
+        min_investment: request.min_investment,
+        max_investment: Some(request.max_investment),
+        status: VentureStatus::Draft,
+        start_date: None,
+        end_date: request.expires_at,
         created_at: Utc::now(),
+        updated_at: Utc::now(),
+        benefits: vec![],
     };
 
-    tracing::info!("✅ Created ownership contract {} for song {}", contract_id, request.song_id);
-    Ok(ResponseJson(response))
-}
+    repo.create_venture(&venture).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-/// POST /api/v1/ownership/contracts/{id}/purchase - Purchase shares
-pub async fn purchase_shares(
-    State(_state): State<AppState>,
-    Path(contract_id): Path<Uuid>,
-    claims: Claims,
-    Json(request): Json<PurchaseSharesRequest>,
-) -> Result<ResponseJson<PurchaseSharesResponse>, StatusCode> {
-    let transaction_id = Uuid::new_v4();
-    let ownership_percentage = (request.shares_to_purchase as f64 / 1000.0) * 100.0; // Assuming 1000 total shares
-    let estimated_returns = request.investment_amount * 0.12; // 12% estimated annual return
-
-    let response = PurchaseSharesResponse {
-        transaction_id,
-        shares_purchased: request.shares_to_purchase,
-        total_cost: request.investment_amount,
-        ownership_percentage,
-        estimated_returns,
-        blockchain_tx_hash: Some(format!("0x{:x}", transaction_id.as_u128())),
-    };
-
-    tracing::info!("✅ User {} purchased {} shares of contract {}", claims.sub, request.shares_to_purchase, contract_id);
-    Ok(ResponseJson(response))
-}
-
-/// GET /api/v1/ownership/contracts/{id} - Get contract details
-pub async fn get_contract_details(
-    State(_state): State<AppState>,
-    Path(contract_id): Path<Uuid>,
-    _claims: Claims,
-) -> Result<ResponseJson<ContractDetailsResponse>, StatusCode> {
-    // Mock response - replace with real data fetching
-    let response = ContractDetailsResponse {
-        contract_id,
-        song_id: Uuid::new_v4(),
-        song_title: "Sample Song".to_string(),
-        artist_name: "Sample Artist".to_string(),
-        total_shares: 1000,
-        shares_sold: 750,
-        shares_available: 250,
-        price_per_share: 10.0,
-        total_invested: 7500.0,
-        investor_count: 15,
-        monthly_revenue: 450.0,
-        total_revenue: 5400.0,
-        status: "active".to_string(),
+    Ok(ResponseJson(CreateVentureResponse {
+        venture_id,
+        status: "draft".to_string(),
         created_at: Utc::now(),
-        performance_metrics: PerformanceMetrics {
-            roi_percentage: 12.5,
-            monthly_growth: 2.1,
-            revenue_per_share: 7.2,
-            risk_score: 3.5,
-        },
-    };
-
-    tracing::info!("📊 Contract details requested for {}", contract_id);
-    Ok(ResponseJson(response))
+    }))
 }
 
-/// GET /api/v1/ownership/users/{id}/portfolio - Get user portfolio
-pub async fn get_user_portfolio(
-    State(_state): State<AppState>,
-    Path(user_id): Path<Uuid>,
+/// POST /api/v1/ventures/{id}/invest - Invest in venture
+pub async fn invest_in_venture_handler(
+    State(state): State<AppState>,
+    Path(venture_id): Path<Uuid>,
     claims: Claims,
-) -> Result<ResponseJson<UserPortfolioResponse>, StatusCode> {
-    // Verify user can access this portfolio
-    if claims.sub != user_id.to_string() && claims.role != "admin" {
-        return Err(StatusCode::FORBIDDEN);
+    Json(request): Json<InvestRequest>,
+) -> Result<ResponseJson<InvestResponse>, StatusCode> {
+    let repo = PostgresFanVenturesRepository::new(state.get_db_pool());
+    let fan_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    // 1. Check if venture exists and is open
+    let venture = repo.get_venture(venture_id).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    if venture.status != VentureStatus::Open {
+        return Err(StatusCode::BAD_REQUEST);
     }
 
-    // Mock portfolio data
-    let positions = vec![
-        PortfolioPosition {
-            contract_id: Uuid::new_v4(),
-            song_title: "Hit Song #1".to_string(),
-            artist_name: "Popular Artist".to_string(),
-            shares_owned: 50,
-            ownership_percentage: 5.0,
-            initial_investment: 500.0,
-            current_value: 625.0,
-            revenue_earned: 75.0,
-            purchase_date: Utc::now() - chrono::Duration::days(90),
-        },
-        PortfolioPosition {
-            contract_id: Uuid::new_v4(),
-            song_title: "Indie Gem".to_string(),
-            artist_name: "Rising Star".to_string(),
-            shares_owned: 25,
-            ownership_percentage: 2.5,
-            initial_investment: 250.0,
-            current_value: 280.0,
-            revenue_earned: 18.0,
-            purchase_date: Utc::now() - chrono::Duration::days(45),
-        },
-    ];
+    // 2. Create Investment Record
+    let investment_id = Uuid::new_v4();
+    let investment = FanInvestment::new(
+        investment_id,
+        fan_id,
+        venture_id,
+        request.amount,
+        request.investment_type,
+        crate::bounded_contexts::fan_ventures::domain::entities::InvestmentStatus::Pending, // Pending payment confirmation
+    );
 
-    let total_invested = positions.iter().map(|p| p.initial_investment).sum();
-    let current_value = positions.iter().map(|p| p.current_value).sum();
-    let total_returns = positions.iter().map(|p| p.revenue_earned).sum();
-    let roi_percentage = if total_invested > 0.0 { 
-        ((current_value - total_invested) / total_invested) * 100.0 
-    } else { 0.0 };
+    repo.create_fan_investment(&investment).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let response = UserPortfolioResponse {
-        user_id,
-        total_invested,
-        current_value,
-        total_returns,
-        roi_percentage,
-        active_contracts: positions.len() as u32,
-        positions,
-    };
+    // TODO: Trigger Payment Intent via Payment Service here (or return necessary info for frontend to do it)
 
-    tracing::info!("📈 Portfolio requested for user {}", user_id);
-    Ok(ResponseJson(response))
+    Ok(ResponseJson(InvestResponse {
+        investment_id,
+        status: "pending".to_string(),
+        transactions_hash: None,
+    }))
 }
 
-#[derive(Debug, Deserialize)]
-pub struct ListContractsQuery {
-    pub page: Option<u32>,
-    pub limit: Option<u32>,
-    pub artist_id: Option<Uuid>,
-    pub min_roi: Option<f64>,
-    pub max_risk: Option<String>,
-    pub sort_by: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct ContractSummary {
-    pub contract_id: Uuid,
-    pub song_title: String,
-    pub artist_name: String,
-    pub total_shares: u32,
-    pub shares_available: u32,
-    pub price_per_share: f64,
-    pub roi_percentage: f64,
-    pub risk_level: String,
-    pub monthly_revenue: f64,
-    pub created_at: DateTime<Utc>,
-}
-
-/// POST /api/v1/ownership/contracts/{id}/distribute - Distribute revenue
-pub async fn distribute_revenue(
-    State(_state): State<AppState>,
-    Path(contract_id): Path<Uuid>,
+/// POST /api/v1/ventures/{id}/revenue - Distribute Revenue
+pub async fn distribute_revenue_handler(
+    State(state): State<AppState>,
+    Path(venture_id): Path<Uuid>,
     claims: Claims,
     Json(request): Json<DistributeRevenueRequest>,
 ) -> Result<ResponseJson<DistributeRevenueResponse>, StatusCode> {
-    // Only admins and artists can distribute revenue
+    // Only admin or artist
     if claims.role != "admin" && claims.role != "artist" {
         return Err(StatusCode::FORBIDDEN);
     }
 
-    let distribution_id = Uuid::new_v4();
-    let platform_fee = request.total_revenue * 0.1; // 10% platform fee
-    let artist_share = request.total_revenue * 0.5; // 50% to artist
-    let investor_share = request.total_revenue - platform_fee - artist_share; // 40% to investors
+    let repo = PostgresFanVenturesRepository::new(state.get_db_pool());
 
-    let response = DistributeRevenueResponse {
-        distribution_id,
-        contract_id,
+    let distribution_id = Uuid::new_v4();
+    let distribution = RevenueDistribution {
+        id: distribution_id,
+        venture_id,
         total_revenue: request.total_revenue,
-        platform_fee,
-        artist_share,
-        investor_share,
-        investors_paid: 12, // Mock number
-        transaction_hashes: vec![
-            format!("0x{:x}", Uuid::new_v4().as_u128()),
-            format!("0x{:x}", Uuid::new_v4().as_u128()),
-        ],
+        artist_share: request.artist_share,
+        fan_share: request.fan_share,
+        platform_fee: request.platform_fee,
         distributed_at: Utc::now(),
+        period_start: request.period_start,
+        period_end: request.period_end,
     };
 
-    tracing::info!("💰 Revenue distributed for contract {}: ${}", contract_id, request.total_revenue);
-    Ok(ResponseJson(response))
+    repo.create_revenue_distribution(&distribution).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    // TODO: Trigger Async Job to actually transfer funds/tokens to all investors
+    
+    Ok(ResponseJson(DistributeRevenueResponse {
+        success: true,
+        distribution_id,
+        distributed_at: Utc::now(),
+    }))
 }
 
-#[derive(Debug, Deserialize)]
-pub struct DistributeRevenueRequest {
-    pub total_revenue: f64,
-    pub period_start: DateTime<Utc>,
-    pub period_end: DateTime<Utc>,
-    pub source: String, // "streaming", "sales", "licensing", etc.
+/// GET /api/v1/ventures/{id}/deliveries - Get deliveries for a venture (Artist view)
+pub async fn get_venture_deliveries_handler(
+    State(state): State<AppState>,
+    Path(venture_id): Path<Uuid>,
+    claims: Claims,
+) -> Result<ResponseJson<Vec<BenefitDelivery>>, StatusCode> {
+    let repo = PostgresFanVenturesRepository::new(state.get_db_pool());
+    
+    let deliveries = repo.get_venture_deliveries(venture_id).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        
+    Ok(ResponseJson(deliveries))
 }
 
-#[derive(Debug, Serialize)]
-pub struct DistributeRevenueResponse {
-    pub distribution_id: Uuid,
-    pub contract_id: Uuid,
-    pub total_revenue: f64,
-    pub platform_fee: f64,
-    pub artist_share: f64,
-    pub investor_share: f64,
-    pub investors_paid: u32,
-    pub transaction_hashes: Vec<String>,
-    pub distributed_at: DateTime<Utc>,
-} 
+/// PUT /api/v1/deliveries/{id} - Update delivery status
+pub async fn update_delivery_handler(
+    State(state): State<AppState>,
+    Path(delivery_id): Path<Uuid>,
+    claims: Claims,
+    Json(request): Json<UpdateDeliveryRequest>,
+) -> Result<StatusCode, StatusCode> {
+    let repo = PostgresFanVenturesRepository::new(state.get_db_pool());
+
+    // Fetch existing
+    let mut delivery = repo.get_benefit_delivery(delivery_id).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    // Update fields
+    delivery.delivery_status = request.status;
+    if let Some(notes) = request.notes {
+        delivery.notes = Some(notes);
+    }
+    
+    // Update tracking info if provided
+    if request.tracking_number.is_some() || request.carrier.is_some() {
+        let mut tracking = delivery.tracking_info.unwrap_or(crate::bounded_contexts::fan_ventures::domain::entities::TrackingInfo {
+            tracking_number: None,
+            carrier: None,
+            estimated_delivery: None,
+            actual_delivery: None,
+            delivery_notes: None,
+        });
+        
+        if let Some(tn) = request.tracking_number { tracking.tracking_number = Some(tn); }
+        if let Some(c) = request.carrier { tracking.carrier = Some(c); }
+        
+        delivery.tracking_info = Some(tracking);
+    }
+
+    repo.update_benefit_delivery(delivery_id, &delivery).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(StatusCode::OK)
+}
+ 

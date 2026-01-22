@@ -31,7 +31,8 @@ pub fn create_payment_command_handler(pool: PgPool) -> Arc<dyn PaymentCommandHan
     
     // Create payment processing service
     let payment_processing_service = Arc::new(PaymentProcessingServiceImpl::new(
-        gateway_router.clone()
+        gateway_router.clone(),
+        pool.clone()
     ));
     
     // Use mocks for auxiliary services

@@ -189,67 +189,40 @@ pub async fn admin_routes(
 }
 
 /// Route groups organized by functionality
-pub struct FractionalOwnershipRoutes;
+pub struct FanVenturesRoutes;
 
-impl FractionalOwnershipRoutes {
-    /// Contract-related routes
-    pub fn contracts(state: AppState) -> Router {
+impl FanVenturesRoutes {
+    /// Venture-related routes
+    pub fn ventures(state: AppState) -> Router {
         Router::new()
-            .route("/", post(create_contract_handler))
-            .route("/:contract_id", get(get_contract_handler))
-            .route("/:contract_id/activate", post(activate_contract_handler))
-            .route("/:contract_id/terminate", delete(terminate_contract_handler))
-            .route("/:contract_id/purchase", post(purchase_shares_handler))
-            .route("/:contract_id/distribute-revenue", post(distribute_revenue_handler))
-            .route("/:contract_id/analytics", get(get_contract_analytics_handler))
-            .route("/search", get(search_contracts_handler))
+            .route("/", post(crate::bounded_contexts::fan_ventures::presentation::handlers::create_venture_handler))
+            .route("/:id/invest", post(crate::bounded_contexts::fan_ventures::presentation::handlers::invest_in_venture_handler))
+            .route("/:id/revenue", post(crate::bounded_contexts::fan_ventures::presentation::handlers::distribute_revenue_handler))
+            .route("/:id/deliveries", get(crate::bounded_contexts::fan_ventures::presentation::handlers::get_venture_deliveries_handler))
             .with_state(state)
     }
 
-    /// Share trading routes
-    pub fn shares(state: AppState) -> Router {
+    /// Benefit Delivery routes
+    pub fn deliveries(state: AppState) -> Router {
         Router::new()
-            .route("/:share_id/trade", post(trade_shares_handler))
-            .with_state(state)
-    }
-
-    /// Artist-specific routes
-    pub fn artists(state: AppState) -> Router {
-        Router::new()
-            .route("/:artist_id/contracts", get(get_contracts_by_artist_handler))
-            .with_state(state)
-    }
-
-    /// User portfolio routes
-    pub fn users(state: AppState) -> Router {
-        Router::new()
-            .route("/:user_id/portfolio", get(get_user_portfolio_handler))
-            .with_state(state)
-    }
-
-    /// Market statistics routes
-    pub fn market(state: AppState) -> Router {
-        Router::new()
-            .route("/statistics", get(get_market_statistics_handler))
+            .route("/:id", axum::routing::put(crate::bounded_contexts::fan_ventures::presentation::handlers::update_delivery_handler))
             .with_state(state)
     }
 
     /// Compose all route groups into a single router
     pub async fn compose_all(service: Arc<ConcreteApplicationService>) -> Router {
-        // TODO: Create proper AppState with database and redis connections
-        // let state = AppState {
-        //     message_queue: MessageQueue::new("redis://localhost").await.unwrap(),
-        //     database_pool: DatabasePool::new("postgres://localhost").await.unwrap(),
-        //     event_bus: Arc::new(InMemoryEventBus::new()),
-        // };
+        // Temporary State construction until proper DI
+        // In real app this comes from DI container
+        let pool = sqlx::PgPool::connect(&std::env::var("DATABASE_URL").unwrap_or_default()).await.unwrap_or_else(|_| panic!("DB URL not set"));
+        
+        let state = AppState::new(
+             pool,
+             redis::Client::open("redis://127.0.0.1/").unwrap(),
+        );
         
         Router::new()
-            // TODO: Uncomment when AppState is properly initialized
-            // .nest("/contracts", Self::contracts(state.clone()))
-            // .nest("/shares", Self::shares(state.clone()))
-            // .nest("/artists", Self::artists(state.clone()))
-            // .nest("/users", Self::users(state.clone()))
-            // .nest("/market", Self::market(state))
+            .nest("/ventures", Self::ventures(state.clone()))
+            .nest("/deliveries", Self::deliveries(state.clone()))
             .route("/health", get(|| async { "OK" }))
     }
 }

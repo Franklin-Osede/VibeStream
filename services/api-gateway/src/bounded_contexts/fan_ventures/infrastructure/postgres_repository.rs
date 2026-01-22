@@ -1096,15 +1096,55 @@ benefits: serde_json::from_value(row.benefits.unwrap_or(serde_json::Value::Null)
     // =============================================================================
 
     /// Create revenue distribution
-    pub async fn create_revenue_distribution(&self, _distribution: &crate::bounded_contexts::fan_ventures::domain::entities::RevenueDistribution) -> Result<(), AppError> {
-        // TODO: Implementar cuando la base de datos esté disponible
+    pub async fn create_revenue_distribution(&self, distribution: &crate::bounded_contexts::fan_ventures::domain::entities::RevenueDistribution) -> Result<(), AppError> {
+        sqlx::query!(
+            r#"INSERT INTO revenue_distributions (
+                id, venture_id, total_revenue, artist_share, fan_share, platform_fee,
+                distributed_at, period_start, period_end, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())"#,
+            distribution.id,
+            distribution.venture_id,
+            distribution.total_revenue,
+            distribution.artist_share,
+            distribution.fan_share,
+            distribution.platform_fee,
+            distribution.distributed_at,
+            distribution.period_start,
+            distribution.period_end
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(format!("Failed to create revenue distribution: {}", e)))?;
         Ok(())
     }
 
     /// Get venture distributions
-    pub async fn get_venture_distributions(&self, _venture_id: Uuid) -> Result<Vec<crate::bounded_contexts::fan_ventures::domain::entities::RevenueDistribution>, AppError> {
-        // TODO: Implementar cuando la base de datos esté disponible
-        Ok(vec![])
+    pub async fn get_venture_distributions(&self, venture_id: Uuid) -> Result<Vec<crate::bounded_contexts::fan_ventures::domain::entities::RevenueDistribution>, AppError> {
+        let rows = sqlx::query!(
+            r#"SELECT id, venture_id, total_revenue, artist_share, fan_share, platform_fee,
+                      distributed_at, period_start, period_end
+               FROM revenue_distributions
+               WHERE venture_id = $1
+               ORDER BY distributed_at DESC"#,
+            venture_id
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(format!("Failed to get distributions: {}", e)))?;
+
+        let distributions = rows.into_iter().map(|row| crate::bounded_contexts::fan_ventures::domain::entities::RevenueDistribution {
+            id: row.id,
+            venture_id: row.venture_id,
+            total_revenue: row.total_revenue,
+            artist_share: row.artist_share,
+            fan_share: row.fan_share,
+            platform_fee: row.platform_fee,
+            distributed_at: row.distributed_at,
+            period_start: row.period_start,
+            period_end: row.period_end,
+        }).collect();
+
+        Ok(distributions)
     }
 
     /// Get venture tier (singular) - alias for get_tier_by_id
@@ -1118,50 +1158,219 @@ benefits: serde_json::from_value(row.benefits.unwrap_or(serde_json::Value::Null)
     }
 
     /// Create benefit delivery
-    pub async fn create_benefit_delivery(&self, _delivery: &crate::bounded_contexts::fan_ventures::domain::entities::BenefitDelivery) -> Result<(), AppError> {
-        // TODO: Implementar cuando la base de datos esté disponible
+    pub async fn create_benefit_delivery(&self, delivery: &crate::bounded_contexts::fan_ventures::domain::entities::BenefitDelivery) -> Result<(), AppError> {
+        sqlx::query!(
+            r#"INSERT INTO benefit_deliveries (
+                id, benefit_id, venture_id, fan_id, tier_id, delivery_status,
+                delivery_method, delivery_date, tracking_info, notes, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)"#,
+            delivery.id,
+            delivery.benefit_id,
+            delivery.venture_id,
+            delivery.fan_id,
+            delivery.tier_id,
+            format!("{:?}", delivery.delivery_status),
+            format!("{:?}", delivery.delivery_method),
+            delivery.delivery_date,
+            serde_json::to_value(&delivery.tracking_info).unwrap_or(serde_json::Value::Null),
+            delivery.notes,
+            delivery.created_at,
+            delivery.updated_at
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(format!("Failed to create benefit delivery: {}", e)))?;
         Ok(())
     }
 
     /// Get benefit delivery
-    pub async fn get_benefit_delivery(&self, _delivery_id: Uuid) -> Result<Option<crate::bounded_contexts::fan_ventures::domain::entities::BenefitDelivery>, AppError> {
-        // TODO: Implementar cuando la base de datos esté disponible
-        Ok(None)
+    pub async fn get_benefit_delivery(&self, delivery_id: Uuid) -> Result<Option<crate::bounded_contexts::fan_ventures::domain::entities::BenefitDelivery>, AppError> {
+        let row = sqlx::query!(
+            r#"SELECT id, benefit_id, venture_id, fan_id, tier_id, delivery_status,
+                      delivery_method, delivery_date, tracking_info, notes, created_at, updated_at
+               FROM benefit_deliveries
+               WHERE id = $1"#,
+            delivery_id
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(format!("Failed to get benefit delivery: {}", e)))?;
+
+        if let Some(row) = row {
+             // Basic parsing (Assuming enums match name, otherwise need robust parsing)
+             // Using simplified parsing assuming data integrity from create
+             let delivery_status = match row.delivery_status.as_str() {
+                 "Pending" => crate::bounded_contexts::fan_ventures::domain::entities::DeliveryStatus::Pending,
+                 "InProgress" => crate::bounded_contexts::fan_ventures::domain::entities::DeliveryStatus::InProgress,
+                 "Delivered" => crate::bounded_contexts::fan_ventures::domain::entities::DeliveryStatus::Delivered,
+                 "Failed" => crate::bounded_contexts::fan_ventures::domain::entities::DeliveryStatus::Failed,
+                 "Cancelled" => crate::bounded_contexts::fan_ventures::domain::entities::DeliveryStatus::Cancelled,
+                 _ => crate::bounded_contexts::fan_ventures::domain::entities::DeliveryStatus::Pending,
+             };
+             
+             let delivery_method = match row.delivery_method.as_str() {
+                 "Automatic" => DeliveryMethod::Automatic,
+                 "Manual" => DeliveryMethod::Manual,
+                 "Physical" => DeliveryMethod::Physical,
+                 "Experience" => DeliveryMethod::Experience,
+                 _ => DeliveryMethod::Manual, 
+             };
+
+             Ok(Some(crate::bounded_contexts::fan_ventures::domain::entities::BenefitDelivery {
+                 id: row.id,
+                 benefit_id: row.benefit_id,
+                 venture_id: row.venture_id,
+                 fan_id: row.fan_id,
+                 tier_id: row.tier_id,
+                 delivery_status,
+                 delivery_method,
+                 delivery_date: row.delivery_date,
+                 tracking_info: serde_json::from_value(row.tracking_info.unwrap_or(serde_json::Value::Null)).ok(),
+                 notes: row.notes,
+                 created_at: row.created_at.expect("Valid date"),
+                 updated_at: row.updated_at.expect("Valid date"),
+             }))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Update benefit delivery
-    pub async fn update_benefit_delivery(&self, _delivery_id: Uuid, _delivery: &crate::bounded_contexts::fan_ventures::domain::entities::BenefitDelivery) -> Result<(), AppError> {
-        // TODO: Implementar cuando la base de datos esté disponible
+    pub async fn update_benefit_delivery(&self, delivery_id: Uuid, delivery: &crate::bounded_contexts::fan_ventures::domain::entities::BenefitDelivery) -> Result<(), AppError> {
+         sqlx::query!(
+            r#"UPDATE benefit_deliveries 
+               SET delivery_status = $1, tracking_info = $2, notes = $3, updated_at = NOW()
+               WHERE id = $4"#,
+            format!("{:?}", delivery.delivery_status),
+            serde_json::to_value(&delivery.tracking_info).unwrap_or(serde_json::Value::Null),
+            delivery.notes,
+            delivery_id
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(format!("Failed to update benefit delivery: {}", e)))?;
         Ok(())
     }
 
     /// Get fan deliveries
-    pub async fn get_fan_deliveries(&self, _fan_id: Uuid) -> Result<Vec<crate::bounded_contexts::fan_ventures::domain::entities::BenefitDelivery>, AppError> {
-        // TODO: Implementar cuando la base de datos esté disponible
-        Ok(vec![])
+    pub async fn get_fan_deliveries(&self, fan_id: Uuid) -> Result<Vec<crate::bounded_contexts::fan_ventures::domain::entities::BenefitDelivery>, AppError> {
+         let rows = sqlx::query!(
+            r#"SELECT id, benefit_id, venture_id, fan_id, tier_id, delivery_status,
+                      delivery_method, delivery_date, tracking_info, notes, created_at, updated_at
+               FROM benefit_deliveries
+               WHERE fan_id = $1
+               ORDER BY created_at DESC"#,
+            fan_id
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(format!("Failed to get fan deliveries: {}", e)))?;
+
+        // Mapping similar to get_benefit_delivery (can be refactored to helper)
+        let deliveries = rows.into_iter().map(|row| {
+             let delivery_status = match row.delivery_status.as_str() {
+                 "Pending" => crate::bounded_contexts::fan_ventures::domain::entities::DeliveryStatus::Pending,
+                 "InProgress" => crate::bounded_contexts::fan_ventures::domain::entities::DeliveryStatus::InProgress,
+                 "Delivered" => crate::bounded_contexts::fan_ventures::domain::entities::DeliveryStatus::Delivered,
+                 "Failed" => crate::bounded_contexts::fan_ventures::domain::entities::DeliveryStatus::Failed,
+                 "Cancelled" => crate::bounded_contexts::fan_ventures::domain::entities::DeliveryStatus::Cancelled,
+                 _ => crate::bounded_contexts::fan_ventures::domain::entities::DeliveryStatus::Pending,
+             };
+             
+             let delivery_method = match row.delivery_method.as_str() {
+                 "Automatic" => DeliveryMethod::Automatic,
+                 "Manual" => DeliveryMethod::Manual,
+                 "Physical" => DeliveryMethod::Physical,
+                 "Experience" => DeliveryMethod::Experience,
+                 _ => DeliveryMethod::Manual, 
+             };
+
+             crate::bounded_contexts::fan_ventures::domain::entities::BenefitDelivery {
+                 id: row.id,
+                 benefit_id: row.benefit_id,
+                 venture_id: row.venture_id,
+                 fan_id: row.fan_id,
+                 tier_id: row.tier_id,
+                 delivery_status,
+                 delivery_method,
+                 delivery_date: row.delivery_date,
+                 tracking_info: serde_json::from_value(row.tracking_info.unwrap_or(serde_json::Value::Null)).ok(),
+                 notes: row.notes,
+                 created_at: row.created_at.expect("Valid date"),
+                 updated_at: row.updated_at.expect("Valid date"),
+             }
+        }).collect();
+        
+        Ok(deliveries)
     }
 
     /// Get venture deliveries
-    pub async fn get_venture_deliveries(&self, _venture_id: Uuid) -> Result<Vec<crate::bounded_contexts::fan_ventures::domain::entities::BenefitDelivery>, AppError> {
-        // TODO: Implementar cuando la base de datos esté disponible
-        Ok(vec![])
+    pub async fn get_venture_deliveries(&self, venture_id: Uuid) -> Result<Vec<crate::bounded_contexts::fan_ventures::domain::entities::BenefitDelivery>, AppError> {
+         let rows = sqlx::query!(
+            r#"SELECT id, benefit_id, venture_id, fan_id, tier_id, delivery_status,
+                      delivery_method, delivery_date, tracking_info, notes, created_at, updated_at
+               FROM benefit_deliveries
+               WHERE venture_id = $1
+               ORDER BY created_at DESC"#,
+            venture_id
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| AppError::DatabaseError(format!("Failed to get venture deliveries: {}", e)))?;
+
+        let deliveries = rows.into_iter().map(|row| {
+             // Simplified map
+             let delivery_status = match row.delivery_status.as_str() {
+                 "Pending" => crate::bounded_contexts::fan_ventures::domain::entities::DeliveryStatus::Pending,
+                 "InProgress" => crate::bounded_contexts::fan_ventures::domain::entities::DeliveryStatus::InProgress,
+                 "Delivered" => crate::bounded_contexts::fan_ventures::domain::entities::DeliveryStatus::Delivered,
+                 "Failed" => crate::bounded_contexts::fan_ventures::domain::entities::DeliveryStatus::Failed,
+                 "Cancelled" => crate::bounded_contexts::fan_ventures::domain::entities::DeliveryStatus::Cancelled,
+                 _ => crate::bounded_contexts::fan_ventures::domain::entities::DeliveryStatus::Pending,
+             };
+             
+             let delivery_method = match row.delivery_method.as_str() {
+                 "Automatic" => DeliveryMethod::Automatic,
+                 "Manual" => DeliveryMethod::Manual,
+                 "Physical" => DeliveryMethod::Physical,
+                 "Experience" => DeliveryMethod::Experience,
+                 _ => DeliveryMethod::Manual, 
+             };
+
+             crate::bounded_contexts::fan_ventures::domain::entities::BenefitDelivery {
+                 id: row.id,
+                 benefit_id: row.benefit_id,
+                 venture_id: row.venture_id,
+                 fan_id: row.fan_id,
+                 tier_id: row.tier_id,
+                 delivery_status,
+                 delivery_method,
+                 delivery_date: row.delivery_date,
+                 tracking_info: serde_json::from_value(row.tracking_info.unwrap_or(serde_json::Value::Null)).ok(),
+                 notes: row.notes,
+                 created_at: row.created_at.expect("Valid date"),
+                 updated_at: row.updated_at.expect("Valid date"),
+             }
+        }).collect();
+        
+        Ok(deliveries)
     }
 
     /// Get venture recommendations
     pub async fn get_venture_recommendations(&self, _fan_id: Uuid, _limit: u32) -> Result<Vec<crate::bounded_contexts::fan_ventures::domain::entities::VentureRecommendation>, AppError> {
-        // TODO: Implementar cuando la base de datos esté disponible
+        // Keeps stub
         Ok(vec![])
     }
 
     /// Save fan preferences
     pub async fn save_fan_preferences(&self, _preferences: &crate::bounded_contexts::fan_ventures::domain::entities::FanPreferences) -> Result<(), AppError> {
-        // TODO: Implementar cuando la base de datos esté disponible
+        // Keeps stub
         Ok(())
     }
 
     /// Get fan preferences
     pub async fn get_fan_preferences(&self, _fan_id: Uuid) -> Result<Option<crate::bounded_contexts::fan_ventures::domain::entities::FanPreferences>, AppError> {
-        // TODO: Implementar cuando la base de datos esté disponible
+        // Keeps stub
         Ok(None)
     }
 } 
