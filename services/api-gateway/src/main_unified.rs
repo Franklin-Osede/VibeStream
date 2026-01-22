@@ -43,6 +43,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Crear AppState compartido
     let app_state = AppState::default().await?;
     
+    // Obtener puerto desde variable de entorno
+    let port = std::env::var("PORT")
+        .unwrap_or_else(|_| "3000".to_string())
+        .parse::<u16>()
+        .unwrap_or(3000);
+        
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    
     // =============================================================================
     // CREAR GATEWAYS - Solo los que están listos para producción
     // =============================================================================
@@ -125,7 +133,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(
             CorsLayer::new()
                 .allow_origin([
+                    format!("http://localhost:{}", port).parse::<HeaderValue>().unwrap(),
                     "http://localhost:3000".parse::<HeaderValue>().unwrap(),
+                    "http://localhost:3007".parse::<HeaderValue>().unwrap(),
+                    "http://localhost:4200".parse::<HeaderValue>().unwrap(),
+                    "http://localhost:4202".parse::<HeaderValue>().unwrap(),
+                    "http://localhost:4207".parse::<HeaderValue>().unwrap(),
                     "http://localhost:5173".parse::<HeaderValue>().unwrap(),
                     "http://localhost:8080".parse::<HeaderValue>().unwrap(),
                     "https://vibestream.com".parse::<HeaderValue>().unwrap(),
@@ -162,8 +175,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         );
     
-    // Configurar puerto único
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     let listener = tokio::net::TcpListener::bind(addr).await?;
     
     println!("🚀 VibeStream Unified API Gateway iniciado:");
