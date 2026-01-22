@@ -99,4 +99,7 @@ yarn-error.log*
 **/*.rlib
 
 # PID files
-.pid 
+.pid
+.backend.pid
+.frontend.pid
+*.pid 
