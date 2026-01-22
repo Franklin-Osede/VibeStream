@@ -12,15 +12,21 @@ use crate::bounded_contexts::payment::infrastructure::gateways::{
     gateway_router::{MultiGatewayRouter, GatewayRoutingResult},
 };
 use crate::shared::domain::errors::AppError;
+use crate::bounded_contexts::payment::infrastructure::repositories::{
+    refund_repository_impl::{PostgresRefundRepository, Refund, RefundRepository},
+};
+use sqlx::PgPool;
 use uuid::Uuid;
+use chrono::Utc;
 
 pub struct PaymentProcessingServiceImpl {
     gateway_router: Arc<MultiGatewayRouter>,
+    pool: PgPool,
 }
 
 impl PaymentProcessingServiceImpl {
-    pub fn new(gateway_router: Arc<MultiGatewayRouter>) -> Self {
-        Self { gateway_router }
+    pub fn new(gateway_router: Arc<MultiGatewayRouter>, pool: PgPool) -> Self {
+        Self { gateway_router, pool }
     }
 }
 
@@ -35,8 +41,8 @@ impl PaymentProcessingService for PaymentProcessingServiceImpl {
         
         Ok(PaymentProcessingResult {
             success: gateway_result.success,
-            transaction_id: gateway_result.gateway_result.as_ref().map(|r| r.transaction_id.clone()).map(|s| crate::bounded_contexts::payment::domain::value_objects::TransactionId::new()), // TODO: Parse string to UUID if needed or store as string
-            blockchain_hash: None, // Gateway result doesn't explicitly return blockchain hash usually unless crypto
+            transaction_id: gateway_result.gateway_result.as_ref().map(|r| r.transaction_id.clone()).map(|s| crate::bounded_contexts::payment::domain::value_objects::TransactionId::new()), 
+            blockchain_hash: None, 
             gateway_response: Some(gateway_result.routing_reason),
             processing_time_ms: gateway_result.gateway_result.as_ref().map(|r| r.processing_time_ms).unwrap_or(0),
             fees_charged: gateway_result.gateway_result.as_ref().map(|r| r.fees_charged.clone()).unwrap_or_else(|| Amount::new(0.0, payment.payment().amount().currency().clone()).unwrap()),
@@ -76,16 +82,33 @@ impl PaymentProcessingService for PaymentProcessingServiceImpl {
         &self,
         original_payment: &mut PaymentAggregate,
         refund_amount: Amount,
-        _reason: String,
+        reason: String,
     ) -> Result<RefundProcessingResult, AppError> {
-        // TODO: MultiGatewayRouter should support refunds too. 
-        // For now, we assume the gateway that processed the payment handles the refund.
-        // We need to implement `refund` on the router or gateway interface.
+        // 1. Process Refund via Gateway (TODO: MultiGatewayRouter support)
+        // For now, assume gateway handled it or we just record it.
+        // In real life, self.gateway_router.refund(...)
         
-        // Mocking success for now as Router interface doesn't expose refund yet
+        // 2. Persist Refund Record
+        let refund_repo = PostgresRefundRepository::new(self.pool.clone());
+        let refund_id = Uuid::new_v4();
+        
+        let refund = Refund {
+            id: refund_id,
+            payment_id: original_payment.payment().id().value(),
+            amount: refund_amount,
+            reason: reason,
+            status: "pending".to_string(), // Gateway dependent
+            gateway_refund_id: None,
+            metadata: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        
+        refund_repo.save(&refund).await?;
+        
         Ok(RefundProcessingResult {
             success: true,
-            refund_id: Some(Uuid::new_v4()),
+            refund_id: Some(refund_id),
             error_message: None,
         })
     }

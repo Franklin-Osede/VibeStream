@@ -1,7 +1,7 @@
 pub mod payment_repository;
 pub mod royalty_repository;
 pub mod revenue_sharing_repository;
-// Módulos comentados porque los archivos no existen aún
+pub mod refund_repository_impl; // Added
 // pub mod fraud_repository;
 // pub mod payment_analytics_repository;
 
