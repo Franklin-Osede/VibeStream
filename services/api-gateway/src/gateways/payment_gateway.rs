@@ -65,7 +65,8 @@ pub async fn create_payment_gateway(app_state: AppState) -> Result<Router, Box<d
 
     // 4. Initialize Domain Services (Real + Mocks)
     let payment_processing_service = Arc::new(crate::bounded_contexts::payment::infrastructure::services::PaymentProcessingServiceImpl::new(
-        gateway_router.clone()
+        gateway_router.clone(),
+        pool.clone()
     ));
 
     // Using mocks for auxiliary services for now (Phase 1 focus is Payments)
