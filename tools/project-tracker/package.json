@@ -1,0 +1,23 @@
+{
+  "name": "project-tracker-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for tracking project state and enforcing Backend -> Frontend workflow",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "project-tracker": "./build/index.js"
+  },
+  "scripts": {
+    "build": "tsc && chmod +x build/index.js",
+    "prepublishOnly": "npm run build",
+    "start": "node build/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "0.6.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3"
+  }
+}
